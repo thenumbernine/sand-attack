@@ -3,6 +3,7 @@ local ffi = require 'ffi'
 local table = require 'ext.table'
 local template = require 'template'
 local gl = require 'gl'
+local sdl = require 'ffi.sdl'
 local GLTex2D = require 'gl.tex2d'
 local GLProgram  = require 'gl.program'
 local glreport = require 'gl.report'
@@ -208,6 +209,18 @@ function App:updateGame()
 	-- if it collides then merge it
 	local merge
 	self.piecePos.y = self.piecePos.y - 1
+	-- TODO key updates at higher interval than drop rate ...
+	-- but test collision for both
+	if self.leftPress then
+		self.piecePos.x = self.piecePos.x - 1
+		-- TODO check blit and don't move if any pixels are oob
+		if self.piecePos.x < 0 then self.piecePos.x = 0 end
+	end
+	if self.rightPress then 
+		self.piecePos.x = self.piecePos.x + 1 
+		if self.piecePos.x > w-1 then self.piecePos.x = w-1 end
+	end
+	if self.downPress then self.piecePos.y = self.piecePos.y - 1 end
 	if self.piecePos.y <= 0 then
 		self.piecePos.y = 0
 		merge = true
@@ -302,6 +315,35 @@ function App:update(...)
 
 	App.super.update(self, ...)
 	glreport'here'
+end
+
+function App:rotatePiece()
+	if not self.pieceShape then return end
+	local newshape = ''
+	for j=0,3 do
+		for i=0,3 do
+			local k = 1 + (3 - j) + 4 * i
+			newshape = newshape .. self.pieceShape:sub(k,k)
+		end
+	end
+	self.pieceShape = newshape
+end
+
+function App:event(e)
+	if e.type == sdl.SDL_KEYDOWN 
+	or e.type == sdl.SDL_KEYUP
+	then
+		local down = e.type == sdl.SDL_KEYDOWN
+		if e.key.keysym.sym == sdl.SDLK_LEFT then
+			self.leftPress = down 
+		elseif e.key.keysym.sym == sdl.SDLK_RIGHT then
+			self.rightPress = down
+		elseif e.key.keysym.sym == sdl.SDLK_DOWN then
+			self.downPress = down
+		elseif e.key.keysym.sym == sdl.SDLK_UP then
+			if down then self:rotatePiece() end
+		end
+	end
 end
 
 return App():run()
