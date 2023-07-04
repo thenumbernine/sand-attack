@@ -1,20 +1,26 @@
 #!/usr/bin/env luajit
 local ffi = require 'ffi'
 local table = require 'ext.table'
+local string = require 'ext.string'
 local template = require 'template'
 local gl = require 'gl'
 local sdl = require 'ffi.sdl'
+local Image = require 'image'
 local GLTex2D = require 'gl.tex2d'
 local GLProgram  = require 'gl.program'
 local glreport = require 'gl.report'
 local vec2i = require 'vec-ffi.vec2i'
 local getTime = require 'ext.timer'.getTime
 local App = require 'imguiapp.withorbit'()
+	
+local pieceSize = vec2i(40,40)
 
 App.title = 'Sand Tetris'
 
 function App:initGL(...)
 	App.super.initGL(self, ...)
+
+	gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
 
 	math.randomseed(os.time())
 
@@ -43,46 +49,88 @@ function App:initGL(...)
 		minFilter = gl.GL_NEAREST,
 		magFilter = gl.GL_NEAREST,
 	}
-	self:reset()
 
+	self.pieceTex = GLTex2D{
+		internalFormat = gl.GL_RGBA,
+		width = tonumber(pieceSize.x),
+		height = tonumber(pieceSize.y),
+		format = gl.GL_RGBA,
+		type = gl.GL_UNSIGNED_BYTE,
+		wrap = {
+			s = gl.GL_CLAMP_TO_EDGE,
+			t = gl.GL_CLAMP_TO_EDGE,
+		},
+		minFilter = gl.GL_NEAREST,
+		magFilter = gl.GL_NEAREST,
+	}
+	self.pieceImage = Image(pieceSize.x, pieceSize.y, 4, 'unsigned char')
+	
+	self:reset()
+	
 	glreport'here'
 end
 
-local pieces = table{
-	'.   '..
-	'.   '..
-	'.   '..
-	'.   ',
-	
-	'    '..
-	'.   '..
-	'.   '..
-	'..  ',
-	
-	'    '..
-	' .  '..
-	' .  '..
-	'..  ',
-	
-	'    '..
-	'    '..
-	'..  '..
-	'..  ',
-	
-	'    '..
-	'    '..
-	' .  '..
-	'... ',
-	
-	'    '..
-	'.   '..
-	'..  '..
-	' .  ',
-	
-	'    '..
-	' .  '..
-	'..  '..
-	'.   ',
+local function makePieceImage(s)
+	s = string.split(s, '\n')
+	local img = Image(pieceSize.x, pieceSize.y, 4, 'unsigned char')
+	ffi.fill(img.buffer, 4 * img.width * img.height)
+	for j=0,3 do
+		for i=0,3 do
+			if s[j+1]:sub(i+1,i+1) == '#' then
+				for u=0,7 do
+					for v=0,7 do
+						ffi.cast('int*', img.buffer)[(u + 8 * i) + img.width * (v + 8 * j)] = -1
+					end
+				end
+			end
+		end
+	end
+	return img
+end
+
+local pieceImages = table{
+	makePieceImage[[
+ #
+ #
+ #
+ #
+]],
+	makePieceImage[[
+ #
+ #
+ ##
+
+]],
+	makePieceImage[[
+   #
+   #
+  ##
+
+]],
+	makePieceImage[[
+
+ ##
+ ##
+
+]],
+	makePieceImage[[
+
+ #
+###
+
+]],
+	makePieceImage[[
+ #
+ ##
+  #
+
+]],
+	makePieceImage[[
+  #
+ ##
+ #
+
+]],
 }
 
 local colors = table{
@@ -95,15 +143,6 @@ local colors = table{
 function App:reset()
 	local w, h = self.sandSize:unpack()
 	ffi.fill(self.sandCPU, ffi.sizeof'int' * w * h)
-	--[[
-	for i=0,30 do
-		self.sandCPU[bit.rshift(w,1) + w * (h - 1 - i)] = bit.bor(
-			math.random(0,255),
-			bit.lshift(math.random(0,255),8),
-			bit.lshift(math.random(0,255),16)
-		)
-	end
-	--]]
 	self.sandTex
 		:bind()
 		:subimage{data=self.sandCPU}	--a case for saving .data ? like I do with gl buffers?
@@ -116,13 +155,55 @@ end
 
 function App:newPiece()
 	local w, h = self.sandSize:unpack()
-	self.pieceShape = pieces:pickRandom()
+	local srcimage = pieceImages:pickRandom()
+	--[[
+	ffi.copy(self.pieceImage.buffer, srcimage.buffer, pieceSize.x*pieceSize.y*4)
+	--]]
+	-- [[
+	local srcp = ffi.cast('uint32_t*', srcimage.buffer)
+	local dstp = ffi.cast('uint32_t*', self.pieceImage.buffer)
+	for j=0,pieceSize.y-1 do
+		for i=0,pieceSize.x-1 do
+			local k = i + pieceSize.x * j
+			if srcp[0] ~= 0 then
+				dstp[0] = math.random(0,16777215)
+			else
+				dstp[0] = math.random(0,16777215)
+			end
+			dstp[0] = bit.bor(dstp[0], 0xff000000)
+			srcp = srcp + 1
+			dstp = dstp + 1
+		end
+	end
+	--]]
+	self:updatePieceTex()
 	self.piecePos = vec2i(bit.rshift(w,1), h-1)
 	self.pieceColor = colors:pickRandom()	
 	if self:testPieceMerge() then
 		print("YOU LOSE!!!")
 	end
 end
+
+function App:updatePieceTex()
+	self.pieceTex:bind()
+		:subimage{data=self.pieceImage.buffer}
+end
+
+function App:rotatePiece()
+	if not self.pieceImage then return end
+	local newshape = ''
+	self.pieceImage2 = self.pieceImage2 or (self.pieceImage + 0)
+	for j=0,pieceSize.x-1 do
+		for i=0,pieceSize.y-1 do
+			for ch=0,3 do
+				self.pieceImage2.buffer[ch + 4 * (i + pieceSize.x * j)] = self.pieceImage.buffer[ch + 4 * ((pieceSize.x - 1 - j) + pieceSize.x * i)]
+			end
+		end
+	end
+	self.pieceImage, self.pieceImage2 = self.pieceImage2, self.pieceImage
+	self:updatePieceTex()
+end
+
 
 local vtxs = {
 	{0,0},
@@ -136,21 +217,18 @@ local updateInterval = 1/60
 
 function App:testPieceMerge()
 	local w, h = self.sandSize:unpack()
-	for i=0,3 do
-		for j=0,3 do
-			local k = 1 + i + 4 * j
-			if self.pieceShape:sub(k,k) ~= ' ' then
-				for u=0,7 do
-					for v=0,7 do
-						local x = self.piecePos.x+u+8*i
-						local y = self.piecePos.y+v+8*j
-						if x >= 0 and x < w
-						and y >= 0 and y < h
-						and self.sandCPU[x + w * y] ~= 0
-						then
-							return true
-						end
-					end
+	for j=0,pieceSize.y-1 do
+		for i=0,pieceSize.x-1 do
+			local k = i + pieceSize.x * j
+			local color = ffi.cast('int*', self.pieceImage.buffer)[k]
+			if color ~= 0 then
+				local x = self.piecePos.x + i
+				local y = self.piecePos.y + j
+				if x >= 0 and x < w
+				and y >= 0 and y < h
+				and self.sandCPU[x + w * y] ~= 0
+				then
+					return true
 				end
 			end
 		end
@@ -218,7 +296,7 @@ function App:updateGame()
 	end
 	if self.rightPress then 
 		self.piecePos.x = self.piecePos.x + 1 
-		if self.piecePos.x > w-1 then self.piecePos.x = w-1 end
+		if self.piecePos.x > w-pieceSize.x-1 then self.piecePos.x = w-pieceSize.x-1 end
 	end
 	if self.downPress then self.piecePos.y = self.piecePos.y - 1 end
 	if self.piecePos.y <= 0 then
@@ -228,21 +306,18 @@ function App:updateGame()
 		merge = self:testPieceMerge()
 	end
 	if merge then
-		for i=0,3 do
-			for j=0,3 do
-				local k = 1 + i + 4 * j
-				if self.pieceShape:sub(k,k) ~= ' ' then
-					for u=0,7 do
-						for v=0,7 do
-							local x = self.piecePos.x+u+8*i
-							local y = self.piecePos.y+v+8*j
-							if x >= 0 and x < w
-							and y >= 0 and y < h
-							and self.sandCPU[x + w * y] == 0
-							then
-								self.sandCPU[x + w * y] = self.pieceColor
-							end
-						end
+		for j=0,pieceSize.y-1 do
+			for i=0,pieceSize.x-1 do
+				local k =  i + pieceSize.x * j
+				local color = ffi.cast('int*', self.pieceImage.buffer)[k]
+				if color ~= 0 then
+					local x = self.piecePos.x + i
+					local y = self.piecePos.y + j
+					if x >= 0 and x < w
+					and y >= 0 and y < h
+					and self.sandCPU[x + w * y] == 0
+					then
+						self.sandCPU[x + w * y] = color
 					end
 				end
 			end
@@ -270,11 +345,12 @@ function App:update(...)
 
 	-- draw
 	self.view:setup(self.width / self.height)
+	
+	GLTex2D:enable()
 
 	self.sandTex
 		:bind()
 		:subimage{data=self.sandCPU}
-		:enable()
 	local s = w / h
 	gl.glBegin(gl.GL_QUADS)
 	for _,v in ipairs(vtxs) do
@@ -285,48 +361,30 @@ function App:update(...)
 	gl.glEnd()	
 	self.sandTex
 		:unbind()
-		:disable()
 
 	-- draw the current piece
-	if self.pieceShape then
-		gl.glColor3f(
-			bit.band(self.pieceColor, 0xff)/0xff,
-			bit.band(bit.rshift(self.pieceColor,8), 0xff)/0xff,
-			bit.band(bit.rshift(self.pieceColor,16), 0xff)/0xff
-		)
+	if self.pieceImage then
+		self.pieceTex:bind()
+		gl.glEnable(gl.GL_BLEND)
 		gl.glBegin(gl.GL_QUADS)
-		for i=0,3 do
-			for j=0,3 do
-				local k = 1 + i + 4 * j
-				if self.pieceShape:sub(k,k) ~= ' ' then
-					for _,v in ipairs(vtxs) do
-						local x,y = table.unpack(v)
-						gl.glVertex2f(
-							((self.piecePos.x + (i + x) * 8) / w - .5) * s + .5,
-							(self.piecePos.y + (j + y) * 8) / h
-						)
-					end
-				end
-			end
+		for _,v in ipairs(vtxs) do
+			local x,y = table.unpack(v)
+			gl.glTexCoord2f(x,y)
+			gl.glVertex2f(
+				((self.piecePos.x + x * pieceSize.x) / w - .5) * s + .5,
+				(self.piecePos.y + y * pieceSize.y) / h
+			)
 		end
 		gl.glEnd()
+		gl.glDisable(gl.GL_BLEND)
+		self.pieceTex:unbind()
 		gl.glColor3f(1,1,1)
 	end
 
+	GLTex2D:disable()
+
 	App.super.update(self, ...)
 	glreport'here'
-end
-
-function App:rotatePiece()
-	if not self.pieceShape then return end
-	local newshape = ''
-	for j=0,3 do
-		for i=0,3 do
-			local k = 1 + (3 - j) + 4 * i
-			newshape = newshape .. self.pieceShape:sub(k,k)
-		end
-	end
-	self.pieceShape = newshape
 end
 
 function App:event(e)
@@ -342,6 +400,8 @@ function App:event(e)
 			self.downPress = down
 		elseif e.key.keysym.sym == sdl.SDLK_UP then
 			if down then self:rotatePiece() end
+		elseif e.key.keysym.sym == ('r'):byte() then
+			if down then self:reset() end
 		end
 	end
 end
