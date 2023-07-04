@@ -1,6 +1,7 @@
 #!/usr/bin/env luajit
 local ffi = require 'ffi'
 local table = require 'ext.table'
+local math = require 'ext.math'
 local string = require 'ext.string'
 local template = require 'template'
 local gl = require 'gl'
@@ -42,10 +43,8 @@ function App:initGL(...)
 	self.view.orbit:set(.5, .5, 0)
 	self.view.pos:set(.5, .5, 10)
 
-	-- original:
-	self.sandSize = vec2i(80, 144)
-	-- meh
-	--self.sandSize = vec2i(160, 288)
+	--self.sandSize = vec2i(80, 144)	-- original:
+	self.sandSize = vec2i(160, 288)
 	
 	self.sandVolume = tonumber(self.sandSize.x * self.sandSize.y)
 	self.sandImage = Image(self.sandSize.x, self.sandSize.y, 4, 'unsigned char')
@@ -390,6 +389,40 @@ function App:updateGame()
 		end
 	end
 	--]]
+
+	-- TOOD do this faster. This is the lazy way ...
+	for _,color in ipairs(colors) do
+		local clearedCount = 0
+		local r = color.x * 255
+		local g = color.y * 255
+		local b = color.z * 255
+		local blobs = self.sandImage:getBlobs(function(p)
+			return p[3] == 0xff
+			and p[0] == r
+			and p[1] == g
+			and p[2] == b
+		end)
+		for _,blob in ipairs(blobs) do
+			local xmin = math.huge
+			local xmax = -math.huge
+			for _,int in ipairs(blob) do
+				xmin = math.min(xmin, int.x1)
+				xmax = math.max(xmax, int.x2)
+			end
+			local blobwidth = xmax - xmin + 1
+			if blobwidth == w then
+				print("GOT", color)
+				for _,int in ipairs(blob) do
+					local iw = int.x2 - int.x1 + 1
+					clearedCount = clearedCount + iw
+					ffi.fill(self.sandImage.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
+				end
+			end
+		end
+		if clearedCount ~= 0 then
+			print('cleared', clearedCount, color)
+		end
+	end
 end
 
 function App:update(...)
