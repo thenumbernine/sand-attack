@@ -63,18 +63,20 @@ function App:initGL(...)
 			},
 			minFilter = gl.GL_NEAREST,
 			magFilter = gl.GL_NEAREST,
-			data = img.buffer,
+			data = img.buffer,	-- stored
 		}
-		return img, tex
+		tex.image = img
+		-- TODO store tex.image as img?
+		return tex
 	end
 	
-	self.sandImage, self.sandTex = makeImageAndTex(self.sandSize)
-	self.flashImage, self.flashTex = makeImageAndTex(self.sandSize)
-	self.pieceImage, self.pieceTex = makeImageAndTex(pieceSize)
-	self.rotPieceImage, self.rotPieceTex = makeImageAndTex(pieceSize)
+	self.sandTex, self.sandImage = makeImageAndTex(self.sandSize)
+	self.flashTex, self.flashImage = makeImageAndTex(self.sandSize)
+	self.pieceTex, self.pieceImage = makeImageAndTex(pieceSize)
+	self.rotPieceTex, self.rotPieceImage = makeImageAndTex(pieceSize)
 	self.nextPieces = range(3):mapi(function(i)
-		local img, tex = makeImageAndTex(pieceSize)
-		return {img=img, tex=tex}
+		local tex = makeImageAndTex(pieceSize)
+		return {tex=tex}
 	end)
 
 	self:reset()
@@ -154,8 +156,8 @@ local colors = table{
 
 function App:reset()
 	local w, h = self.sandSize:unpack()
-	ffi.fill(self.sandImage.buffer, 4 * w * h)
-	assert(self.sandTex.data == self.sandImage.buffer)
+	ffi.fill(self.sandTex.image.buffer, 4 * w * h)
+	assert(self.sandTex.data == self.sandTex.image.buffer)
 	self.sandTex:bind():subimage():unbind()
 
 	self:newPiece()
@@ -172,7 +174,7 @@ function App:populatePiece(args)
 	local srcimage = pieceImages:pickRandom()
 	local color = colors:pickRandom()	
 	local srcp = ffi.cast('uint32_t*', srcimage.buffer)
-	local dstp = ffi.cast('uint32_t*', args.img.buffer)
+	local dstp = ffi.cast('uint32_t*', args.tex.image.buffer)
 	for j=0,pieceSize.y-1 do
 		for i=0,pieceSize.x-1 do
 			local k = i + pieceSize.x * j
@@ -191,7 +193,6 @@ function App:populatePiece(args)
 			dstp = dstp + 1
 		end
 	end
-	assert(args.tex.data == args.img.buffer)
 	args.tex:bind():subimage()
 end
 
@@ -201,15 +202,15 @@ function App:newPiece()
 	local lastPiece = self.nextPieces:last()
 	-- cycle pieces
 	do
-		local img,tex = self.pieceImage, self.pieceTex
+		local tex = self.pieceTex
 		local np1 = self.nextPieces[1]
-		self.pieceImage, self.pieceTex = np1.img, np1.tex
+		self.pieceTex = np1.tex
 		for i=1,#self.nextPieces-1 do
 			local np = self.nextPieces[i]
 			local np2 = self.nextPieces[i+1]
-			np.img, np.tex = np2.img, np2.tex
+			np.tex = np2.tex
 		end
-		lastPiece.img, lastPiece.tex = img, tex
+		lastPiece.tex = tex
 	end
 	App:populatePiece(lastPiece)
 
@@ -232,7 +233,7 @@ function App:updatePieceTex()
 		for i=istart,iend,istep do
 			local found
 			for j=0,pieceSize.y-1 do
-				if ffi.cast('int*', self.pieceImage.buffer)[i + pieceSize.x * j] ~= 0 then
+				if ffi.cast('int*', self.pieceTex.image.buffer)[i + pieceSize.x * j] ~= 0 then
 					found = true
 					break
 				end
@@ -243,21 +244,19 @@ function App:updatePieceTex()
 			end
 		end
 	end
-	assert(self.pieceTex.data == self.pieceImage.buffer)
 	self.pieceTex:bind():subimage()
 end
 
 function App:rotatePiece()
-	if not self.pieceImage then return end
+	if not self.pieceTex then return end
 	for j=0,pieceSize.x-1 do
 		for i=0,pieceSize.y-1 do
 			for ch=0,3 do
-				self.rotPieceImage.buffer[ch + 4 * (i + pieceSize.x * j)] 
-				= self.pieceImage.buffer[ch + 4 * ((pieceSize.x - 1 - j) + pieceSize.x * i)]
+				self.rotPieceTex.image.buffer[ch + 4 * (i + pieceSize.x * j)] 
+				= self.pieceTex.image.buffer[ch + 4 * ((pieceSize.x - 1 - j) + pieceSize.x * i)]
 			end
 		end
 	end
-	self.pieceImage, self.rotPieceImage = self.rotPieceImage, self.pieceImage
 	self.pieceTex, self.rotPieceTex = self.rotPieceTex, self.pieceTex
 	self:updatePieceTex()
 	self:constrainPiecePos()
@@ -284,13 +283,13 @@ function App:testPieceMerge()
 	for j=0,pieceSize.y-1 do
 		for i=0,pieceSize.x-1 do
 			local k = i + pieceSize.x * j
-			local color = ffi.cast('int*', self.pieceImage.buffer)[k]
+			local color = ffi.cast('int*', self.pieceTex.image.buffer)[k]
 			if color ~= 0 then
 				local x = self.piecePos.x + i
 				local y = self.piecePos.y + j
 				if x >= 0 and x < w
 				and y >= 0 and y < h
-				and ffi.cast('int*',self.sandImage.buffer)[x + w * y] ~= 0
+				and ffi.cast('int*',self.sandTex.image.buffer)[x + w * y] ~= 0
 				then
 					return true
 				end
@@ -309,7 +308,7 @@ function App:updateGame()
 	self.gameTime = self.gameTime + updateInterval
 
 	-- update
-	local prow = ffi.cast('int*', self.sandImage.buffer) + w
+	local prow = ffi.cast('int*', self.sandTex.image.buffer) + w
 	for j=1,h-1 do
 		-- 50/50 cycling left-to-right vs right-to-left
 		local istart, iend, istep
@@ -380,15 +379,15 @@ function App:updateGame()
 		for j=0,pieceSize.y-1 do
 			for i=0,pieceSize.x-1 do
 				local k =  i + pieceSize.x * j
-				local color = ffi.cast('int*', self.pieceImage.buffer)[k]
+				local color = ffi.cast('int*', self.pieceTex.image.buffer)[k]
 				if color ~= 0 then
 					local x = self.piecePos.x + i
 					local y = self.piecePos.y + j
 					if x >= 0 and x < w
 					and y >= 0 and y < h
-					and ffi.cast('int*', self.sandImage.buffer)[x + w * y] == 0
+					and ffi.cast('int*', self.sandTex.image.buffer)[x + w * y] == 0
 					then
-						ffi.cast('int*', self.sandImage.buffer)[x + w * y] = color
+						ffi.cast('int*', self.sandTex.image.buffer)[x + w * y] = color
 					end
 				end
 			end
@@ -425,7 +424,7 @@ function App:updateGame()
 		local r = color.x
 		local g = color.y
 		local b = color.z
-		local blobs = self.sandImage:getBlobs(function(p)
+		local blobs = self.sandTex.image:getBlobs(function(p)
 			return p[3] == 0xff
 			and (p[0] == 0) == (r == 0)
 			and (p[1] == 0) == (g == 0)
@@ -444,9 +443,9 @@ function App:updateGame()
 				for _,int in ipairs(blob) do
 					local iw = int.x2 - int.x1 + 1
 					clearedCount = clearedCount + iw
-					ffi.fill(self.sandImage.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
+					ffi.fill(self.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
 					for k=0,4*iw-1 do
-						self.flashImage.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
+						self.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 					end
 				end
 			end
@@ -457,7 +456,6 @@ function App:updateGame()
 		end
 	end
 	if anyCleared then
-		assert(self.flashTex.data == self.flashImage.buffer)
 		self.flashTex:bind():subimage()
 		self.flashTime = self.gameTime
 	end
@@ -483,7 +481,7 @@ function App:update(...)
 	
 	GLTex2D:enable()
 
-	assert(self.sandTex.data == self.sandImage.buffer)
+	assert(self.sandTex.data == self.sandTex.image.buffer)
 	self.sandTex:bind():subimage()
 	local s = w / h
 	gl.glBegin(gl.GL_QUADS)
@@ -496,7 +494,7 @@ function App:update(...)
 	self.sandTex:unbind()
 
 	-- draw the current piece
-	if self.pieceImage then
+	if self.pieceTex then
 		self.pieceTex:bind()
 		gl.glEnable(gl.GL_BLEND)
 		gl.glBegin(gl.GL_QUADS)
@@ -538,8 +536,8 @@ function App:update(...)
 	elseif self.wasFlashing then
 		self.wasFlashing = false
 		print'CLEARING FLASHING'
-		ffi.fill(self.flashImage.buffer, 4 * w * h)
-		assert(self.flashTex.data == self.flashImage.buffer)
+		ffi.fill(self.flashTex.image.buffer, 4 * w * h)
+		assert(self.flashTex.data == self.flashTex.image.buffer)
 		self.flashTex:bind():subimage():unbind()
 	end
 
@@ -563,7 +561,7 @@ end
 
 function App:flipBoard()
 	local w, h = self.sandSize:unpack()
-	local p1 = ffi.cast('int*', self.sandImage.buffer)
+	local p1 = ffi.cast('int*', self.sandTex.image.buffer)
 	local p2 = p1 + w * h - 1
 	for j=0,bit.rshift(h,1)-1 do
 		for i=0,w-1 do
