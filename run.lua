@@ -71,6 +71,7 @@ function App:initGL(...)
 	self.sandImage, self.sandTex = makeImageAndTex(self.sandSize)
 	self.flashImage, self.flashTex = makeImageAndTex(self.sandSize)
 	self.pieceImage, self.pieceTex = makeImageAndTex(pieceSize)
+	self.rotPieceImage, self.rotPieceTex = makeImageAndTex(pieceSize)
 	self.nextPieces = range(3):mapi(function(i)
 		local img, tex = makeImageAndTex(pieceSize)
 		return {img=img, tex=tex}
@@ -155,10 +156,7 @@ function App:reset()
 	local w, h = self.sandSize:unpack()
 	ffi.fill(self.sandImage.buffer, 4 * w * h)
 	assert(self.sandTex.data == self.sandImage.buffer)
-	self.sandTex
-		:bind()
-		:subimage{data=self.sandImage.buffer}
-		:unbind()
+	self.sandTex:bind():subimage():unbind()
 
 	self:newPiece()
 	for i=1,#self.nextPieces do
@@ -193,8 +191,8 @@ function App:populatePiece(args)
 			dstp = dstp + 1
 		end
 	end
-	--assert(args.tex.data == args.img.buffer)
-	args.tex:bind():subimage{data=args.img.buffer}
+	assert(args.tex.data == args.img.buffer)
+	args.tex:bind():subimage()
 end
 
 function App:newPiece()
@@ -245,24 +243,22 @@ function App:updatePieceTex()
 			end
 		end
 	end
-	--assert(self.pieceTex.data == self.pieceImage.buffer)
-	self.pieceTex:bind()
-		:subimage{data=self.pieceImage.buffer}
+	assert(self.pieceTex.data == self.pieceImage.buffer)
+	self.pieceTex:bind():subimage()
 end
 
 function App:rotatePiece()
 	if not self.pieceImage then return end
-	local newshape = ''
-	self.pieceImage2 = self.pieceImage2 or (self.pieceImage + 0)
 	for j=0,pieceSize.x-1 do
 		for i=0,pieceSize.y-1 do
 			for ch=0,3 do
-				self.pieceImage2.buffer[ch + 4 * (i + pieceSize.x * j)] 
+				self.rotPieceImage.buffer[ch + 4 * (i + pieceSize.x * j)] 
 				= self.pieceImage.buffer[ch + 4 * ((pieceSize.x - 1 - j) + pieceSize.x * i)]
 			end
 		end
 	end
-	self.pieceImage, self.pieceImage2 = self.pieceImage2, self.pieceImage
+	self.pieceImage, self.rotPieceImage = self.rotPieceImage, self.pieceImage
+	self.pieceTex, self.rotPieceTex = self.rotPieceTex, self.pieceTex
 	self:updatePieceTex()
 	self:constrainPiecePos()
 end
@@ -462,7 +458,7 @@ function App:updateGame()
 	end
 	if anyCleared then
 		assert(self.flashTex.data == self.flashImage.buffer)
-		self.flashTex:bind():subimage{data=self.flashImage.buffer}
+		self.flashTex:bind():subimage()
 		self.flashTime = self.gameTime
 	end
 end
@@ -488,9 +484,7 @@ function App:update(...)
 	GLTex2D:enable()
 
 	assert(self.sandTex.data == self.sandImage.buffer)
-	self.sandTex
-		:bind()
-		:subimage{data=self.sandImage.buffer}
+	self.sandTex:bind():subimage()
 	local s = w / h
 	gl.glBegin(gl.GL_QUADS)
 	for _,v in ipairs(vtxs) do
@@ -499,8 +493,7 @@ function App:update(...)
 		gl.glVertex2f((x - .5) * s + .5, y)
 	end
 	gl.glEnd()	
-	self.sandTex
-		:unbind()
+	self.sandTex:unbind()
 
 	-- draw the current piece
 	if self.pieceImage then
@@ -547,7 +540,7 @@ function App:update(...)
 		print'CLEARING FLASHING'
 		ffi.fill(self.flashImage.buffer, 4 * w * h)
 		assert(self.flashTex.data == self.flashImage.buffer)
-		self.flashTex:bind():subimage{data=self.flashImage.buffer}:unbind()
+		self.flashTex:bind():subimage():unbind()
 	end
 
 	local s = w / h
