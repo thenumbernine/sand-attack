@@ -50,6 +50,7 @@ function App:initGL(...)
 
 	local function makeImageAndTex(size)
 		local img = Image(size.x, size.y, 4, 'unsigned char')
+		ffi.fill(img.buffer, 4 * size.x * size.y)
 		local tex = GLTex2D{
 			internalFormat = gl.GL_RGBA,
 			width = tonumber(size.x),
@@ -62,7 +63,9 @@ function App:initGL(...)
 			},
 			minFilter = gl.GL_NEAREST,
 			magFilter = gl.GL_NEAREST,
+			data = img.buffer,
 		}
+		assert(tex.data == img.buffer)
 		return img, tex
 	end
 	
@@ -556,6 +559,9 @@ function App:update(...)
 	glreport'here'
 end
 
+function App:flipBoard()
+end
+
 function App:event(e)
 	if e.type == sdl.SDL_KEYDOWN 
 	or e.type == sdl.SDL_KEYUP
@@ -571,6 +577,8 @@ function App:event(e)
 			if down then self:rotatePiece() end
 		elseif e.key.keysym.sym == ('r'):byte() then
 			if down then self:reset() end
+		elseif e.key.keysym.sym == ('f'):byte() then
+			if down then self:flipBoard() end
 		end
 	end
 end
