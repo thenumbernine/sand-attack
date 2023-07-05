@@ -28,7 +28,7 @@ local updateInterval = 1/60
 --local updateInterval = 1/120
 --local updateInterval = 0
 
-local toppleChance = .5
+local toppleChance = 1
 local ticksToFall = 5
 
 App.title = 'Sand Tetris'
