@@ -1,9 +1,10 @@
 #!/usr/bin/env luajit
 local ffi = require 'ffi'
+local template = require 'template'
 local table = require 'ext.table'
 local math = require 'ext.math'
 local string = require 'ext.string'
-local template = require 'template'
+local range = require 'ext.range'
 local gl = require 'gl'
 local sdl = require 'ffi.sdl'
 local Image = require 'image'
@@ -68,6 +69,10 @@ function App:initGL(...)
 	self.sandImage, self.sandTex = makeImageAndTex(self.sandSize)
 	self.flashImage, self.flashTex = makeImageAndTex(self.sandSize)
 	self.pieceImage, self.pieceTex = makeImageAndTex(pieceSize)
+	self.nextPieces = range(3):mapi(function(i)
+		local img, tex = makeImageAndTex(pieceSize)
+		return {img=img, tex=tex}
+	end)
 
 	self:reset()
 	
@@ -153,18 +158,20 @@ function App:reset()
 		:unbind()
 
 	self:newPiece()
+	for i=1,#self.nextPieces do
+		self:newPiece()
+	end
 
 	self.lastUpdateTime = getTime()
 	self.gameTime = 0
 	self.flashTime = -math.huge
 end
 
-function App:newPiece()
-	local w, h = self.sandSize:unpack()
+function App:populatePiece(args)
 	local srcimage = pieceImages:pickRandom()
 	local color = colors:pickRandom()	
 	local srcp = ffi.cast('uint32_t*', srcimage.buffer)
-	local dstp = ffi.cast('uint32_t*', self.pieceImage.buffer)
+	local dstp = ffi.cast('uint32_t*', args.img.buffer)
 	for j=0,pieceSize.y-1 do
 		for i=0,pieceSize.x-1 do
 			local k = i + pieceSize.x * j
@@ -183,6 +190,23 @@ function App:newPiece()
 			dstp = dstp + 1
 		end
 	end
+	args.tex:bind():subimage{data=args.img.buffer}
+end
+
+function App:newPiece()
+	local w, h = self.sandSize:unpack()
+
+	-- cycle pieces
+	do
+		local img,tex = self.pieceImage, self.pieceTex
+		self.pieceImage, self.pieceTex = self.nextPieces[1].img, self.nextPieces[1].tex
+		for i=1,#self.nextPieces-1 do
+			self.nextPieces[i].img, self.nextPieces[i].tex = self.nextPieces[i+1].img, self.nextPieces[i+1].tex
+		end
+		self.nextPieces:last().img, self.nextPieces:last().tex = img, tex
+	end
+	App:populatePiece(self.nextPieces:last())
+
 	--]]
 	self:updatePieceTex()
 	self.piecePos = vec2i(bit.rshift(w-pieceSize.x,1), h-1)
@@ -231,8 +255,17 @@ function App:rotatePiece()
 	end
 	self.pieceImage, self.pieceImage2 = self.pieceImage2, self.pieceImage
 	self:updatePieceTex()
+	self:constrainPiecePos()
 end
 
+function App:constrainPiecePos()
+	-- TODO check blit and don't move if any pixels are oob
+	local w, h = self.sandSize:unpack()
+	if self.piecePos.x < -self.pieceColMin then self.piecePos.x = -self.pieceColMin end
+	if self.piecePos.x > w-1-self.pieceColMax then
+		self.piecePos.x = w-1-self.pieceColMax
+	end
+end
 
 local vtxs = {
 	{0,0},
@@ -318,15 +351,11 @@ function App:updateGame()
 	-- but test collision for both
 	if self.leftPress then
 		self.piecePos.x = self.piecePos.x - movedx
-		-- TODO check blit and don't move if any pixels are oob
-		if self.piecePos.x < -self.pieceColMin then self.piecePos.x = -self.pieceColMin end
 	end
 	if self.rightPress then 
 		self.piecePos.x = self.piecePos.x + movedx 
-		if self.piecePos.x > w-1-self.pieceColMax then
-			self.piecePos.x = w-1-self.pieceColMax
-		end
 	end
+	self:constrainPiecePos()
 	if self.downPress then self.piecePos.y = self.piecePos.y - movedy end
 	
 	self.fallTick = self.fallTick + 1
@@ -507,6 +536,18 @@ function App:update(...)
 		print'CLEARING FLASHING'
 		ffi.fill(self.flashImage.buffer, 4 * w * h)
 		self.flashTex:bind():subimage{data=self.flashImage.buffer}:unbind()
+	end
+
+	local s = w / h
+	for i,it in ipairs(self.nextPieces) do
+		it.tex:bind()
+		gl.glBegin(gl.GL_QUADS)
+		for _,v in ipairs(vtxs) do
+			local x,y = table.unpack(v)
+			gl.glTexCoord2f(x,y)
+			gl.glVertex2f(.8 + x * .1, 1 - (y + 1.1 * i) * .1)
+		end
+		gl.glEnd()
 	end
 
 	GLTex2D:disable()
