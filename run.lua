@@ -18,7 +18,7 @@ local App = require 'imguiapp.withorbit'()
 -- board size is 80 x 144 visible
 -- piece is 4 blocks arranged
 -- blocks are 8 x 8
-local voxelsPerBlock = 8
+local voxelsPerBlock = 16
 local pieceSizeInBlocks = vec2i(4,4)
 local pieceSize = pieceSizeInBlocks * voxelsPerBlock
 
@@ -175,8 +175,7 @@ function App:newPiece()
 		for i=0,pieceSize.x-1 do
 			local k = i + pieceSize.x * j
 			if srcp[0] ~= 0 then
-				--local l = math.random() * .5 + .5
-				local l = 1	-- for now
+				local l = math.random() * .5 + .5
 				dstp[0] = bit.bor(
 					math.floor(l * color.x * 255),
 					bit.lshift(math.floor(l * color.y * 255), 8),
@@ -393,14 +392,14 @@ function App:updateGame()
 	-- TOOD do this faster. This is the lazy way ...
 	for _,color in ipairs(colors) do
 		local clearedCount = 0
-		local r = color.x * 255
-		local g = color.y * 255
-		local b = color.z * 255
+		local r = color.x
+		local g = color.y
+		local b = color.z
 		local blobs = self.sandImage:getBlobs(function(p)
 			return p[3] == 0xff
-			and p[0] == r
-			and p[1] == g
-			and p[2] == b
+			and (p[0] == 0) == (r == 0)
+			and (p[1] == 0) == (g == 0)
+			and (p[2] == 0) == (b == 0)
 		end)
 		for _,blob in ipairs(blobs) do
 			local xmin = math.huge
