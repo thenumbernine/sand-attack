@@ -18,7 +18,8 @@ local App = require 'imguiapp.withorbit'()
 -- board size is 80 x 144 visible
 -- piece is 4 blocks arranged
 -- blocks are 8 x 8
-local voxelsPerBlock = 16
+local voxelsPerBlock = 8	-- original
+--local voxelsPerBlock = 16
 local pieceSizeInBlocks = vec2i(4,4)
 local pieceSize = pieceSizeInBlocks * voxelsPerBlock
 
@@ -43,40 +44,31 @@ function App:initGL(...)
 	self.view.orbit:set(.5, .5, 0)
 	self.view.pos:set(.5, .5, 10)
 
-	--self.sandSize = vec2i(80, 144)	-- original:
-	self.sandSize = vec2i(160, 288)
-	
-	self.sandVolume = tonumber(self.sandSize.x * self.sandSize.y)
-	self.sandImage = Image(self.sandSize.x, self.sandSize.y, 4, 'unsigned char')
-	self.sandTex = GLTex2D{
-		internalFormat = gl.GL_RGBA,
-		width = tonumber(self.sandSize.x),
-		height = tonumber(self.sandSize.y),
-		format = gl.GL_RGBA,
-		type = gl.GL_UNSIGNED_BYTE,
-		wrap = {
-			s = gl.GL_CLAMP_TO_EDGE,
-			t = gl.GL_CLAMP_TO_EDGE,
-		},
-		minFilter = gl.GL_NEAREST,
-		magFilter = gl.GL_NEAREST,
-	}
+	self.sandSize = vec2i(80, 144)	-- original:
+	--self.sandSize = vec2i(160, 288)
 
-	self.pieceTex = GLTex2D{
-		internalFormat = gl.GL_RGBA,
-		width = tonumber(pieceSize.x),
-		height = tonumber(pieceSize.y),
-		format = gl.GL_RGBA,
-		type = gl.GL_UNSIGNED_BYTE,
-		wrap = {
-			s = gl.GL_CLAMP_TO_EDGE,
-			t = gl.GL_CLAMP_TO_EDGE,
-		},
-		minFilter = gl.GL_NEAREST,
-		magFilter = gl.GL_NEAREST,
-	}
-	self.pieceImage = Image(pieceSize.x, pieceSize.y, 4, 'unsigned char')
+	local function makeImageAndTex(size)
+		local img = Image(size.x, size.y, 4, 'unsigned char')
+		local tex = GLTex2D{
+			internalFormat = gl.GL_RGBA,
+			width = tonumber(size.x),
+			height = tonumber(size.y),
+			format = gl.GL_RGBA,
+			type = gl.GL_UNSIGNED_BYTE,
+			wrap = {
+				s = gl.GL_CLAMP_TO_EDGE,
+				t = gl.GL_CLAMP_TO_EDGE,
+			},
+			minFilter = gl.GL_NEAREST,
+			magFilter = gl.GL_NEAREST,
+		}
+		return img, tex
+	end
 	
+	self.sandImage, self.sandTex = makeImageAndTex(self.sandSize)
+	self.flashImage, self.flashTex = makeImageAndTex(self.sandSize)
+	self.pieceImage, self.pieceTex = makeImageAndTex(pieceSize)
+
 	self:reset()
 	
 	glreport'here'
@@ -163,6 +155,8 @@ function App:reset()
 	self:newPiece()
 
 	self.lastUpdateTime = getTime()
+	self.gameTime = 0
+	self.flashTime = -math.huge
 end
 
 function App:newPiece()
@@ -274,6 +268,7 @@ function App:updateGame()
 	if dt <= updateInterval then return end
 
 	self.lastUpdateTime = self.lastUpdateTime + updateInterval
+	self.gameTime = self.gameTime + updateInterval
 
 	-- update
 	local prow = ffi.cast('int*', self.sandImage.buffer) + w
@@ -390,6 +385,7 @@ function App:updateGame()
 	--]]
 
 	-- TOOD do this faster. This is the lazy way ...
+	local anyCleared
 	for _,color in ipairs(colors) do
 		local clearedCount = 0
 		local r = color.x
@@ -415,12 +411,20 @@ function App:updateGame()
 					local iw = int.x2 - int.x1 + 1
 					clearedCount = clearedCount + iw
 					ffi.fill(self.sandImage.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
+					for k=0,4*iw-1 do
+						self.flashImage.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
+					end
 				end
 			end
 		end
 		if clearedCount ~= 0 then
+			anyCleared = true
 			print('cleared', clearedCount, color)
 		end
+	end
+	if anyCleared then
+		self.flashTex:bind():subimage{data=self.flashImage.buffer}
+		self.flashTime = self.gameTime
 	end
 end
 
@@ -475,6 +479,34 @@ function App:update(...)
 		gl.glDisable(gl.GL_BLEND)
 		self.pieceTex:unbind()
 		gl.glColor3f(1,1,1)
+	end
+
+	-- draw flashing background if necessary
+	local flashDuration = 1 
+	local numFlashes = 5
+	local flashDt = self.gameTime - self.flashTime
+	if flashDt < flashDuration then
+		self.wasFlashing = true
+		gl.glEnable(gl.GL_BLEND)
+		local flashInt = bit.band(math.floor(flashDt * numFlashes * 2), 1) == 0
+		if flashInt then
+			self.flashTex:bind()
+			local s = w / h
+			gl.glBegin(gl.GL_QUADS)
+			for _,v in ipairs(vtxs) do
+				local x,y = table.unpack(v)
+				gl.glTexCoord2f(x,y)
+				gl.glVertex2f((x - .5) * s + .5, y)
+			end
+			gl.glEnd()	
+			self.flashTex:unbind()
+		end
+		gl.glDisable(gl.GL_BLEND)
+	elseif self.wasFlashing then
+		self.wasFlashing = false
+		print'CLEARING FLASHING'
+		ffi.fill(self.flashImage.buffer, 4 * w * h)
+		self.flashTex:bind():subimage{data=self.flashImage.buffer}:unbind()
 	end
 
 	GLTex2D:disable()
