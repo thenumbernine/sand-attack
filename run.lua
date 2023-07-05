@@ -65,7 +65,6 @@ function App:initGL(...)
 			magFilter = gl.GL_NEAREST,
 			data = img.buffer,
 		}
-		assert(tex.data == img.buffer)
 		return img, tex
 	end
 	
@@ -155,9 +154,10 @@ local colors = table{
 function App:reset()
 	local w, h = self.sandSize:unpack()
 	ffi.fill(self.sandImage.buffer, 4 * w * h)
+	assert(self.sandTex.data == self.sandImage.buffer)
 	self.sandTex
 		:bind()
-		:subimage{data=self.sandImage.buffer}	--a case for saving .data ? like I do with gl buffers?
+		:subimage{data=self.sandImage.buffer}
 		:unbind()
 
 	self:newPiece()
@@ -193,22 +193,27 @@ function App:populatePiece(args)
 			dstp = dstp + 1
 		end
 	end
+	--assert(args.tex.data == args.img.buffer)
 	args.tex:bind():subimage{data=args.img.buffer}
 end
 
 function App:newPiece()
 	local w, h = self.sandSize:unpack()
 
+	local lastPiece = self.nextPieces:last()
 	-- cycle pieces
 	do
 		local img,tex = self.pieceImage, self.pieceTex
-		self.pieceImage, self.pieceTex = self.nextPieces[1].img, self.nextPieces[1].tex
+		local np1 = self.nextPieces[1]
+		self.pieceImage, self.pieceTex = np1.img, np1.tex
 		for i=1,#self.nextPieces-1 do
-			self.nextPieces[i].img, self.nextPieces[i].tex = self.nextPieces[i+1].img, self.nextPieces[i+1].tex
+			local np = self.nextPieces[i]
+			local np2 = self.nextPieces[i+1]
+			np.img, np.tex = np2.img, np2.tex
 		end
-		self.nextPieces:last().img, self.nextPieces:last().tex = img, tex
+		lastPiece.img, lastPiece.tex = img, tex
 	end
-	App:populatePiece(self.nextPieces:last())
+	App:populatePiece(lastPiece)
 
 	--]]
 	self:updatePieceTex()
@@ -240,6 +245,7 @@ function App:updatePieceTex()
 			end
 		end
 	end
+	--assert(self.pieceTex.data == self.pieceImage.buffer)
 	self.pieceTex:bind()
 		:subimage{data=self.pieceImage.buffer}
 end
@@ -455,6 +461,7 @@ function App:updateGame()
 		end
 	end
 	if anyCleared then
+		assert(self.flashTex.data == self.flashImage.buffer)
 		self.flashTex:bind():subimage{data=self.flashImage.buffer}
 		self.flashTime = self.gameTime
 	end
@@ -480,6 +487,7 @@ function App:update(...)
 	
 	GLTex2D:enable()
 
+	assert(self.sandTex.data == self.sandImage.buffer)
 	self.sandTex
 		:bind()
 		:subimage{data=self.sandImage.buffer}
@@ -538,6 +546,7 @@ function App:update(...)
 		self.wasFlashing = false
 		print'CLEARING FLASHING'
 		ffi.fill(self.flashImage.buffer, 4 * w * h)
+		assert(self.flashTex.data == self.flashImage.buffer)
 		self.flashTex:bind():subimage{data=self.flashImage.buffer}:unbind()
 	end
 
@@ -560,6 +569,17 @@ function App:update(...)
 end
 
 function App:flipBoard()
+	local w, h = self.sandSize:unpack()
+	local p1 = ffi.cast('int*', self.sandImage.buffer)
+	local p2 = p1 + w * h - 1
+	for j=0,bit.rshift(h,1)-1 do
+		for i=0,w-1 do
+			p1[0], p2[0] = p2[0], p1[0]
+			p1 = p1 + 1
+			p2 = p2 - 1
+		end
+	end
+	self.sandTex:bind():subimage()
 end
 
 function App:event(e)
