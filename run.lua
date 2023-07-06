@@ -26,6 +26,20 @@ local voxelsPerBlock = 8	-- original
 local pieceSizeInBlocks = vec2i(4,4)
 local pieceSize = pieceSizeInBlocks * voxelsPerBlock
 
+local colors = table{
+	vec3f(1,0,0),
+	vec3f(0,1,0),
+	vec3f(0,0,1),
+	vec3f(0,1,1),
+	--[[
+	vec3f(1,0,1),
+	vec3f(1,1,0),
+	vec3f(1,1,1),
+	--]]
+}
+
+local dontCheck = false
+
 local updateInterval = 1/60
 --local updateInterval = 1/120
 --local updateInterval = 0
@@ -48,9 +62,10 @@ function App:initGL(...)
 	self.view.orbit:set(.5, .5, 0)
 	self.view.pos:set(.5, .5, 10)
 
-	--self.sandSize = vec2i(80, 144)	-- original:
+	self.sandSize = vec2i(80, 144)	-- original:
 	--self.sandSize = vec2i(160, 288)
-	self.sandSize = vec2i(80, 360)
+	--self.sandSize = vec2i(80, 360)
+	--self.sandSize = vec2i(512, 512)
 
 	local function makeImageAndTex(size)
 		local img = Image(size.x, size.y, 4, 'unsigned char')
@@ -78,7 +93,7 @@ function App:initGL(...)
 	self.flashTex, self.flashImage = makeImageAndTex(self.sandSize)
 	self.pieceTex, self.pieceImage = makeImageAndTex(pieceSize)
 	self.rotPieceTex, self.rotPieceImage = makeImageAndTex(pieceSize)
-	self.nextPieces = range(3):mapi(function(i)
+	self.nextPieces = range(9):mapi(function(i)
 		local tex = makeImageAndTex(pieceSize)
 		return {tex=tex}
 	end)
@@ -149,16 +164,6 @@ local pieceImages = table{
  #
 
 ]],
-}
-
-local colors = table{
-	vec3f(1,0,0),
-	vec3f(0,1,0),
-	vec3f(0,0,1),
-	vec3f(0,1,1),
-	vec3f(1,0,1),
-	vec3f(1,1,0),
-	vec3f(1,1,1),
 }
 
 function App:reset()
@@ -413,6 +418,8 @@ function App:updateGame()
 		self:newPiece()
 	end
 
+	if dontCheck then needsCheck = false end
+
 	--[[ now ... try to find a connection from left to right
 	local function checkNextCol(i, jmin, jmax, color)
 	
@@ -565,7 +572,7 @@ function App:update(...)
 		for _,v in ipairs(vtxs) do
 			local x,y = table.unpack(v)
 			gl.glTexCoord2f(x,y)
-			gl.glVertex2f(.8 + x * .1, 1 - (y + 1.1 * i) * .1)
+			gl.glVertex2f(.8 + x * .1, 1 - (y + 1.1 * (i - .9)) * .1)
 		end
 		gl.glEnd()
 	end
