@@ -14,6 +14,8 @@ local glreport = require 'gl.report'
 local vec2i = require 'vec-ffi.vec2i'
 local vec3f = require 'vec-ffi.vec3f'
 local getTime = require 'ext.timer'.getTime
+local ig = require 'imgui'
+
 local App = require 'imguiapp.withorbit'()
 
 -- board size is 80 x 144 visible
@@ -168,6 +170,7 @@ function App:reset()
 	self.lastUpdateTime = getTime()
 	self.gameTime = 0
 	self.flashTime = -math.huge
+	self.score = 0
 end
 
 function App:populatePiece(args)
@@ -417,7 +420,7 @@ function App:updateGame()
 	end
 	--]]
 
-	-- TOOD do this faster. This is the lazy way ...
+	-- TOOD do this faster? This is the lazy way ...
 	local anyCleared
 	for _,color in ipairs(colors) do
 		local clearedCount = 0
@@ -439,7 +442,6 @@ function App:updateGame()
 			end
 			local blobwidth = xmax - xmin + 1
 			if blobwidth == w then
-				print("GOT", color)
 				for _,int in ipairs(blob) do
 					local iw = int.x2 - int.x1 + 1
 					clearedCount = clearedCount + iw
@@ -452,7 +454,7 @@ function App:updateGame()
 		end
 		if clearedCount ~= 0 then
 			anyCleared = true
-			print('cleared', clearedCount, color)
+			self.score = self.score + clearedCount 
 		end
 	end
 	if anyCleared then
@@ -535,7 +537,6 @@ function App:update(...)
 		gl.glDisable(gl.GL_BLEND)
 	elseif self.wasFlashing then
 		self.wasFlashing = false
-		print'CLEARING FLASHING'
 		ffi.fill(self.flashTex.image.buffer, 4 * w * h)
 		assert(self.flashTex.data == self.flashTex.image.buffer)
 		self.flashTex:bind():subimage():unbind()
@@ -592,6 +593,22 @@ function App:event(e)
 			if down then self:flipBoard() end
 		end
 	end
+end
+
+function App:updateGUI()
+	ig.igSetNextWindowPos(ig.ImVec2(0, 0), 0, ig.ImVec2())
+	ig.igSetNextWindowSize(ig.ImVec2(
+		120,
+		50
+	), 0)
+	ig.igBegin('score', nil, 
+		ig.ImGuiWindowFlags_NoMove,
+		ig.ImGuiWindowFlags_NoResize,
+		ig.ImGuiWindowFlags_NoCollapse,
+		ig.ImGuiWindowFlags_NoDecoration
+	)
+	ig.igText(tostring(self.score))
+	ig.igEnd()
 end
 
 return App():run()
