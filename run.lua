@@ -38,6 +38,7 @@ App.title = 'Sand Tetris'
 function App:initGL(...)
 	App.super.initGL(self, ...)
 
+	gl.glClearColor(.5, .5, .5, 1)
 	gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
 
 	math.randomseed(os.time())
@@ -47,8 +48,9 @@ function App:initGL(...)
 	self.view.orbit:set(.5, .5, 0)
 	self.view.pos:set(.5, .5, 10)
 
-	self.sandSize = vec2i(80, 144)	-- original:
+	--self.sandSize = vec2i(80, 144)	-- original:
 	--self.sandSize = vec2i(160, 288)
+	self.sandSize = vec2i(80, 360)
 
 	local function makeImageAndTex(size)
 		local img = Image(size.x, size.y, 4, 'unsigned char')
@@ -151,9 +153,12 @@ local pieceImages = table{
 
 local colors = table{
 	vec3f(1,0,0),
-	vec3f(1,1,0),
 	vec3f(0,1,0),
 	vec3f(0,0,1),
+	vec3f(0,1,1),
+	vec3f(1,0,1),
+	vec3f(1,1,0),
+	vec3f(1,1,1),
 }
 
 function App:reset()
@@ -222,6 +227,7 @@ function App:newPiece()
 	self.piecePos = vec2i(bit.rshift(w-pieceSize.x,1), h-1)
 	if self:testPieceMerge() then
 		print("YOU LOSE!!!")
+		-- TODO popup, delay, scoreboard, reset, whatever
 	end
 	self.fallTick = 0 
 end
@@ -310,6 +316,8 @@ function App:updateGame()
 	self.lastUpdateTime = self.lastUpdateTime + updateInterval
 	self.gameTime = self.gameTime + updateInterval
 
+	local needsCheck = false
+
 	-- update
 	local prow = ffi.cast('int*', self.sandTex.image.buffer) + w
 	for j=1,h-1 do
@@ -326,20 +334,25 @@ function App:updateGame()
 			if p[0] ~= 0 then
 				if p[-w] == 0 then
 					p[0], p[-w] = p[-w], p[0]
+					needsCheck = true
 				-- hmm symmetry? check left vs right first?
 				elseif math.random() < toppleChance then
 					-- 50/50 check left then right, vs check right then left
 					if math.random(2) == 2 then
 						if i > 0 and p[-w-1] == 0 then
 							p[0], p[-w-1] = p[-w-1], p[0]
+							needsCheck = true
 						elseif i < w-1 and p[-w+1] == 0 then
 							p[0], p[-w+1] = p[-w+1], p[0]
+							needsCheck = true
 						end
 					else	
 						if i < w-1 and p[-w+1] == 0 then
 							p[0], p[-w+1] = p[-w+1], p[0]
+							needsCheck = true
 						elseif i > 0 and p[-w-1] == 0 then
 							p[0], p[-w-1] = p[-w-1], p[0]
+							needsCheck = true
 						end
 					end
 				end
@@ -379,6 +392,7 @@ function App:updateGame()
 		merge = self:testPieceMerge()
 	end
 	if merge then
+		needsCheck = true
 		for j=0,pieceSize.y-1 do
 			for i=0,pieceSize.x-1 do
 				local k =  i + pieceSize.x * j
@@ -421,45 +435,47 @@ function App:updateGame()
 	--]]
 
 	-- TOOD do this faster? This is the lazy way ...
-	local anyCleared
-	for _,color in ipairs(colors) do
-		local clearedCount = 0
-		local r = color.x
-		local g = color.y
-		local b = color.z
-		local blobs = self.sandTex.image:getBlobs(function(p)
-			return p[3] == 0xff
-			and (p[0] == 0) == (r == 0)
-			and (p[1] == 0) == (g == 0)
-			and (p[2] == 0) == (b == 0)
-		end)
-		for _,blob in ipairs(blobs) do
-			local xmin = math.huge
-			local xmax = -math.huge
-			for _,int in ipairs(blob) do
-				xmin = math.min(xmin, int.x1)
-				xmax = math.max(xmax, int.x2)
-			end
-			local blobwidth = xmax - xmin + 1
-			if blobwidth == w then
+	if needsCheck then
+		local anyCleared
+		for _,color in ipairs(colors) do
+			local clearedCount = 0
+			local r = color.x
+			local g = color.y
+			local b = color.z
+			local blobs = self.sandTex.image:getBlobs(function(p)
+				return p[3] == 0xff
+				and (p[0] == 0) == (r == 0)
+				and (p[1] == 0) == (g == 0)
+				and (p[2] == 0) == (b == 0)
+			end)
+			for _,blob in ipairs(blobs) do
+				local xmin = math.huge
+				local xmax = -math.huge
 				for _,int in ipairs(blob) do
-					local iw = int.x2 - int.x1 + 1
-					clearedCount = clearedCount + iw
-					ffi.fill(self.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
-					for k=0,4*iw-1 do
-						self.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
+					xmin = math.min(xmin, int.x1)
+					xmax = math.max(xmax, int.x2)
+				end
+				local blobwidth = xmax - xmin + 1
+				if blobwidth == w then
+					for _,int in ipairs(blob) do
+						local iw = int.x2 - int.x1 + 1
+						clearedCount = clearedCount + iw
+						ffi.fill(self.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
+						for k=0,4*iw-1 do
+							self.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
+						end
 					end
 				end
 			end
+			if clearedCount ~= 0 then
+				anyCleared = true
+				self.score = self.score + clearedCount 
+			end
 		end
-		if clearedCount ~= 0 then
-			anyCleared = true
-			self.score = self.score + clearedCount 
+		if anyCleared then
+			self.flashTex:bind():subimage()
+			self.flashTime = self.gameTime
 		end
-	end
-	if anyCleared then
-		self.flashTex:bind():subimage()
-		self.flashTime = self.gameTime
 	end
 end
 
