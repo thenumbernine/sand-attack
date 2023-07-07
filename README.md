@@ -4,13 +4,15 @@ Tetris with abelian sandpile models.  Jk it's with sand.
 
 ## Dependencies:
 
-- https://github.com/thenumbernine/lua-ext
 - https://github.com/thenumbernine/lua-template
+- https://github.com/thenumbernine/lua-ext
 - https://github.com/thenumbernine/lua-ffi-bindings
-- https://github.com/thenumbernine/lua-gl
-- https://github.com/thenumbernine/lua-image
 - https://github.com/thenumbernine/vec-ffi-lua
+- https://github.com/thenumbernine/lua-image
+- https://github.com/thenumbernine/lua-gl
+- https://github.com/thenumbernine/lua-glapp
 - https://github.com/thenumbernine/lua-imgui
+- https://github.com/thenumbernine/lua-imguiapp
 
 ## TODO:
 

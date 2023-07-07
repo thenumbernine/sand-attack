@@ -1,0 +1,36 @@
+name = 'SandTetris'
+luaDistVer = 'luajit'	-- luajit-openresty-2.1.0
+luaArgs = {'run.lua'}
+
+files = {
+	['.'] = {'run.lua'},
+	['..'] = table{
+		'template',
+		'ext',
+		'ffi',
+		'vec-ffi',
+		'image',
+		'gl',
+		'glapp',
+		'imgui',
+		'imguiapp',
+	}:append(
+		ffi.os == 'Android' and {'gles2'} or {'gl'}
+	),
+}
+
+-- binary libs needed for luajit
+luajitLibs = {
+	win = {
+		'luajit',
+		'sdl',
+		'png',
+		'z',	-- needed by png
+		'regal',	-- I thought I commented out my OpenGL loading of regal ...
+	},
+	osx = {
+		'sdl',
+		'libpng',
+		'libimgui',
+	},
+}
