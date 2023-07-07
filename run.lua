@@ -26,17 +26,20 @@ local voxelsPerBlock = 8	-- original
 local pieceSizeInBlocks = vec2i(4,4)
 local pieceSize = pieceSizeInBlocks * voxelsPerBlock
 
-local colors = table{
+local baseColors = table{
 	vec3f(1,0,0),
 	vec3f(0,1,0),
 	vec3f(0,0,1),
-	vec3f(0,1,1),
-	--[[
-	vec3f(1,0,1),
 	vec3f(1,1,0),
+	vec3f(1,0,1),
+	vec3f(0,1,1),
 	vec3f(1,1,1),
-	--]]
 }
+--[[ TODO fix detection method first ...
+for i=1,300 do
+	baseColors:insert(vec3f():map(function() return math.random() end):normalize())
+end
+--]]
 
 local dontCheck = false
 
@@ -94,7 +97,7 @@ function Player:init(args)
 			right = ('d'):byte(),
 		}
 	end
-	assert(self.keys, "failed to find key mapping for player "..self.index)	
+	assert(self.keys, "failed to find key mapping for player "..self.index)
 	self.pieceTex, self.pieceImage = makeImageAndTex(pieceSize)
 end
 
@@ -124,6 +127,7 @@ function App:initGL(...)
 	self.view.pos:set(.5, .5, 10)
 
 	self.numPlayers = 1
+	self.numColors = 4
 
 	self.sandSize = vec2i(80, 144)	-- original:
 	--self.sandSize = vec2i(160, 200)
@@ -214,6 +218,9 @@ function App:reset()
 	assert(self.sandTex.data == self.sandTex.image.buffer)
 	self.sandTex:bind():subimage():unbind()
 
+	-- populate # colors
+	self.colors = baseColors:sub(1, self.numColors)
+
 	self.players = range(self.numPlayers):mapi(function(i)
 		return Player{index=i, app=self}
 	end)
@@ -229,14 +236,14 @@ function App:reset()
 
 	self.lastUpdateTime = getTime()
 	self.gameTime = 0
-	self.fallTick = 0 
+	self.fallTick = 0
 	self.flashTime = -math.huge
 	self.score = 0
 end
 
 function App:populatePiece(args)
 	local srcimage = pieceImages:pickRandom()
-	local color = colors:pickRandom()	
+	local color = self.colors:pickRandom()
 	local srcp = ffi.cast('uint32_t*', srcimage.buffer)
 	local dstp = ffi.cast('uint32_t*', args.tex.image.buffer)
 	for j=0,pieceSize.y-1 do
@@ -276,7 +283,7 @@ function App:newPiece(player)
 		end
 		lastPiece.tex = tex
 	end
-	App:populatePiece(lastPiece)
+	self:populatePiece(lastPiece)
 
 	--]]
 	self:updatePieceTex(player)
@@ -316,7 +323,7 @@ function App:rotatePiece(player)
 	for j=0,pieceSize.x-1 do
 		for i=0,pieceSize.y-1 do
 			for ch=0,3 do
-				self.rotPieceTex.image.buffer[ch + 4 * (i + pieceSize.x * j)] 
+				self.rotPieceTex.image.buffer[ch + 4 * (i + pieceSize.x * j)]
 				= player.pieceTex.image.buffer[ch + 4 * ((pieceSize.x - 1 - j) + pieceSize.x * i)]
 			end
 		end
@@ -401,7 +408,7 @@ function App:updateGame()
 							p[0], p[-w+1] = p[-w+1], p[0]
 							needsCheck = true
 						end
-					else	
+					else
 						if i < w-1 and p[-w+1] == 0 then
 							p[0], p[-w+1] = p[-w+1], p[0]
 							needsCheck = true
@@ -429,7 +436,7 @@ function App:updateGame()
 			player.piecePos.x = player.piecePos.x - movedx
 		end
 		if player.keyPress.right then
-			player.piecePos.x = player.piecePos.x + movedx 
+			player.piecePos.x = player.piecePos.x + movedx
 		end
 		self:constrainPiecePos(player)
 		if player.keyPress.down then
@@ -474,7 +481,7 @@ function App:updateGame()
 					end
 				end
 			end
-		
+
 			self:newPiece(player)
 		end
 	end
@@ -483,7 +490,7 @@ function App:updateGame()
 
 	--[[ now ... try to find a connection from left to right
 	local function checkNextCol(i, jmin, jmax, color)
-	
+
 	end
 	local j = 0
 	while j < h-1 do
@@ -505,7 +512,7 @@ function App:updateGame()
 	-- TOOD do this faster? This is the lazy way ...
 	if needsCheck then
 		local anyCleared
-		for _,color in ipairs(colors) do
+		for _,color in ipairs(self.colors) do
 			local clearedCount = 0
 			local r = color.x
 			local g = color.y
@@ -537,7 +544,7 @@ function App:updateGame()
 			end
 			if clearedCount ~= 0 then
 				anyCleared = true
-				self.score = self.score + clearedCount 
+				self.score = self.score + clearedCount
 			end
 		end
 		if anyCleared then
@@ -554,9 +561,9 @@ function App:updateGame()
 end
 
 function App:update(...)
-	local t = 
+	local t =
 	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
-	
+
 	local w, h = self.sandSize:unpack()
 
 	self:updateGame()
@@ -570,7 +577,7 @@ function App:update(...)
 
 	-- draw
 	self.view:setup(self.width / self.height)
-	
+
 	GLTex2D:enable()
 
 	assert(self.sandTex.data == self.sandTex.image.buffer)
@@ -582,7 +589,7 @@ function App:update(...)
 		gl.glTexCoord2f(x,y)
 		gl.glVertex2f((x - .5) * s + .5, y)
 	end
-	gl.glEnd()	
+	gl.glEnd()
 	self.sandTex:unbind()
 
 	-- draw the current piece
@@ -607,7 +614,7 @@ function App:update(...)
 	end
 
 	-- draw flashing background if necessary
-	local flashDuration = 1 
+	local flashDuration = 1
 	local numFlashes = 5
 	local flashDt = self.gameTime - self.flashTime
 	if flashDt < flashDuration then
@@ -623,7 +630,7 @@ function App:update(...)
 				gl.glTexCoord2f(x,y)
 				gl.glVertex2f((x - .5) * s + .5, y)
 			end
-			gl.glEnd()	
+			gl.glEnd()
 			self.flashTex:unbind()
 		end
 		gl.glDisable(gl.GL_BLEND)
@@ -684,7 +691,7 @@ end
 
 function App:event(e, ...)
 	App.super.event(self, e, ...)
-	if e.type == sdl.SDL_KEYDOWN 
+	if e.type == sdl.SDL_KEYDOWN
 	or e.type == sdl.SDL_KEYUP
 	then
 		local down = e.type == sdl.SDL_KEYDOWN
@@ -693,7 +700,7 @@ function App:event(e, ...)
 		end
 		--[[
 		if e.key.keysym.sym == sdl.SDLK_LEFT then
-			self.keyPress.left = down 
+			self.keyPress.left = down
 		elseif e.key.keysym.sym == sdl.SDLK_RIGHT then
 			self.keyPress.right = down
 		elseif e.key.keysym.sym == sdl.SDLK_DOWN then
@@ -717,7 +724,7 @@ function App:updateGUI()
 		120,
 		50
 	), 0)
-	ig.igBegin('score', nil, 
+	ig.igBegin('score', nil,
 		ig.ImGuiWindowFlags_NoMove,
 		ig.ImGuiWindowFlags_NoResize,
 		ig.ImGuiWindowFlags_NoCollapse,
@@ -725,10 +732,11 @@ function App:updateGUI()
 	)
 	--]]
 	ig.igBegin('cfg', nil, 0)
-	
+
 	ig.igText('score: '..tostring(self.score))
-	
+
 	ig.luatableTooltipInputInt('num players', self, 'numPlayers')
+	ig.luatableTooltipInputInt('num colors', self, 'numColors')
 
 	if ig.igButton'reset' then
 		self:reset()
