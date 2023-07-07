@@ -72,9 +72,10 @@ end
 
 local Player = class()
 
-function Player:init(index)
-	self.index = index
-	
+function Player:init(args)
+	self.index = args.index
+	self.app = args.app
+
 	self.keyPress = {}
 	self.keyPressLast = {}
 
@@ -124,8 +125,8 @@ function App:initGL(...)
 
 	self.numPlayers = 1
 
-	--self.sandSize = vec2i(80, 144)	-- original:
-	self.sandSize = vec2i(160, 200)
+	self.sandSize = vec2i(80, 144)	-- original:
+	--self.sandSize = vec2i(160, 200)
 	--self.sandSize = vec2i(160, 288)
 	--self.sandSize = vec2i(80, 360)
 	--self.sandSize = vec2i(512, 512)
@@ -213,7 +214,9 @@ function App:reset()
 	assert(self.sandTex.data == self.sandTex.image.buffer)
 	self.sandTex:bind():subimage():unbind()
 
-	self.players = range(self.numPlayers):mapi(function(i) return Player(i) end)
+	self.players = range(self.numPlayers):mapi(function(i)
+		return Player{index=i, app=self}
+	end)
 
 	-- populate the nextpieces via rotation
 	for i=1,#self.nextPieces do
