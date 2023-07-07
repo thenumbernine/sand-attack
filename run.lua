@@ -2,6 +2,7 @@
 local ffi = require 'ffi'
 local template = require 'template'
 local table = require 'ext.table'
+local class = require 'ext.class'
 local math = require 'ext.math'
 local string = require 'ext.string'
 local range = require 'ext.range'
@@ -16,7 +17,6 @@ local vec3f = require 'vec-ffi.vec3f'
 local getTime = require 'ext.timer'.getTime
 local ig = require 'imgui'
 
-local App = require 'imguiapp.withorbit'()
 
 -- board size is 80 x 144 visible
 -- piece is 4 blocks arranged
@@ -47,6 +47,66 @@ local updateInterval = 1/60
 local toppleChance = 1
 local ticksToFall = 5
 
+
+local function makeImageAndTex(size)
+	local img = Image(size.x, size.y, 4, 'unsigned char')
+	ffi.fill(img.buffer, 4 * size.x * size.y)
+	local tex = GLTex2D{
+		internalFormat = gl.GL_RGBA,
+		width = tonumber(size.x),
+		height = tonumber(size.y),
+		format = gl.GL_RGBA,
+		type = gl.GL_UNSIGNED_BYTE,
+		wrap = {
+			s = gl.GL_CLAMP_TO_EDGE,
+			t = gl.GL_CLAMP_TO_EDGE,
+		},
+		minFilter = gl.GL_NEAREST,
+		magFilter = gl.GL_NEAREST,
+		data = img.buffer,	-- stored
+	}
+	tex.image = img
+	-- TODO store tex.image as img?
+	return tex
+end
+
+local Player = class()
+
+function Player:init(index)
+	self.index = index
+	
+	self.keyPress = {}
+	self.keyPressLast = {}
+
+	if self.index == 1 then
+		self.keys = {
+			up = sdl.SDLK_UP,
+			down = sdl.SDLK_DOWN,
+			left = sdl.SDLK_LEFT,
+			right = sdl.SDLK_RIGHT,
+		}
+	elseif self.index == 2 then
+		self.keys = {
+			up = ('w'):byte(),
+			down = ('s'):byte(),
+			left = ('a'):byte(),
+			right = ('d'):byte(),
+		}
+	end
+	assert(self.keys, "failed to find key mapping for player "..self.index)	
+	self.pieceTex, self.pieceImage = makeImageAndTex(pieceSize)
+end
+
+function Player:handleKeyUpDown(sym, down)
+	for k,v in pairs(self.keys) do
+		if sym == v then
+			self.keyPress[k] = down
+		end
+	end
+end
+
+local App = require 'imguiapp.withorbit'()
+
 App.title = 'Sand Tetris'
 
 function App:initGL(...)
@@ -62,36 +122,17 @@ function App:initGL(...)
 	self.view.orbit:set(.5, .5, 0)
 	self.view.pos:set(.5, .5, 10)
 
-	self.sandSize = vec2i(80, 144)	-- original:
+	self.numPlayers = 1
+
+	--self.sandSize = vec2i(80, 144)	-- original:
+	self.sandSize = vec2i(160, 200)
 	--self.sandSize = vec2i(160, 288)
 	--self.sandSize = vec2i(80, 360)
 	--self.sandSize = vec2i(512, 512)
 
-	local function makeImageAndTex(size)
-		local img = Image(size.x, size.y, 4, 'unsigned char')
-		ffi.fill(img.buffer, 4 * size.x * size.y)
-		local tex = GLTex2D{
-			internalFormat = gl.GL_RGBA,
-			width = tonumber(size.x),
-			height = tonumber(size.y),
-			format = gl.GL_RGBA,
-			type = gl.GL_UNSIGNED_BYTE,
-			wrap = {
-				s = gl.GL_CLAMP_TO_EDGE,
-				t = gl.GL_CLAMP_TO_EDGE,
-			},
-			minFilter = gl.GL_NEAREST,
-			magFilter = gl.GL_NEAREST,
-			data = img.buffer,	-- stored
-		}
-		tex.image = img
-		-- TODO store tex.image as img?
-		return tex
-	end
-	
+
 	self.sandTex, self.sandImage = makeImageAndTex(self.sandSize)
 	self.flashTex, self.flashImage = makeImageAndTex(self.sandSize)
-	self.pieceTex, self.pieceImage = makeImageAndTex(pieceSize)
 	self.rotPieceTex, self.rotPieceImage = makeImageAndTex(pieceSize)
 	self.nextPieces = range(9):mapi(function(i)
 		local tex = makeImageAndTex(pieceSize)
@@ -99,7 +140,7 @@ function App:initGL(...)
 	end)
 
 	self:reset()
-	
+
 	glreport'here'
 end
 
@@ -172,13 +213,20 @@ function App:reset()
 	assert(self.sandTex.data == self.sandTex.image.buffer)
 	self.sandTex:bind():subimage():unbind()
 
-	self:newPiece()
+	self.players = range(self.numPlayers):mapi(function(i) return Player(i) end)
+
+	-- populate the nextpieces via rotation
 	for i=1,#self.nextPieces do
-		self:newPiece()
+		self:newPiece(self.players[1])
+	end
+	-- populate the players pieces
+	for _,player in ipairs(self.players) do
+		self:newPiece(player)
 	end
 
 	self.lastUpdateTime = getTime()
 	self.gameTime = 0
+	self.fallTick = 0 
 	self.flashTime = -math.huge
 	self.score = 0
 end
@@ -209,15 +257,15 @@ function App:populatePiece(args)
 	args.tex:bind():subimage()
 end
 
-function App:newPiece()
+function App:newPiece(player)
 	local w, h = self.sandSize:unpack()
 
 	local lastPiece = self.nextPieces:last()
 	-- cycle pieces
 	do
-		local tex = self.pieceTex
+		local tex = player.pieceTex
 		local np1 = self.nextPieces[1]
-		self.pieceTex = np1.tex
+		player.pieceTex = np1.tex
 		for i=1,#self.nextPieces-1 do
 			local np = self.nextPieces[i]
 			local np2 = self.nextPieces[i+1]
@@ -228,16 +276,15 @@ function App:newPiece()
 	App:populatePiece(lastPiece)
 
 	--]]
-	self:updatePieceTex()
-	self.piecePos = vec2i(bit.rshift(w-pieceSize.x,1), h-1)
-	if self:testPieceMerge() then
+	self:updatePieceTex(player)
+	player.piecePos = vec2i(bit.rshift(w-pieceSize.x,1), h-1)
+	if self:testPieceMerge(player) then
 		print("YOU LOSE!!!")
 		-- TODO popup, delay, scoreboard, reset, whatever
 	end
-	self.fallTick = 0 
 end
 
-function App:updatePieceTex()
+function App:updatePieceTex(player)
 	-- while we're here, find the first and last cols with content
 	for _,info in ipairs{
 		{0,pieceSize.x-1,1, 'pieceColMin'},
@@ -247,41 +294,41 @@ function App:updatePieceTex()
 		for i=istart,iend,istep do
 			local found
 			for j=0,pieceSize.y-1 do
-				if ffi.cast('int*', self.pieceTex.image.buffer)[i + pieceSize.x * j] ~= 0 then
+				if ffi.cast('int*', player.pieceTex.image.buffer)[i + pieceSize.x * j] ~= 0 then
 					found = true
 					break
 				end
 			end
 			if found then
-				self[ifield] = i
+				player[ifield] = i
 				break
 			end
 		end
 	end
-	self.pieceTex:bind():subimage()
+	player.pieceTex:bind():subimage()
 end
 
-function App:rotatePiece()
-	if not self.pieceTex then return end
+function App:rotatePiece(player)
+	if not player.pieceTex then return end
 	for j=0,pieceSize.x-1 do
 		for i=0,pieceSize.y-1 do
 			for ch=0,3 do
 				self.rotPieceTex.image.buffer[ch + 4 * (i + pieceSize.x * j)] 
-				= self.pieceTex.image.buffer[ch + 4 * ((pieceSize.x - 1 - j) + pieceSize.x * i)]
+				= player.pieceTex.image.buffer[ch + 4 * ((pieceSize.x - 1 - j) + pieceSize.x * i)]
 			end
 		end
 	end
-	self.pieceTex, self.rotPieceTex = self.rotPieceTex, self.pieceTex
-	self:updatePieceTex()
-	self:constrainPiecePos()
+	player.pieceTex, self.rotPieceTex = self.rotPieceTex, player.pieceTex
+	self:updatePieceTex(player)
+	self:constrainPiecePos(player)
 end
 
-function App:constrainPiecePos()
+function App:constrainPiecePos(player)
 	-- TODO check blit and don't move if any pixels are oob
 	local w, h = self.sandSize:unpack()
-	if self.piecePos.x < -self.pieceColMin then self.piecePos.x = -self.pieceColMin end
-	if self.piecePos.x > w-1-self.pieceColMax then
-		self.piecePos.x = w-1-self.pieceColMax
+	if player.piecePos.x < -player.pieceColMin then player.piecePos.x = -player.pieceColMin end
+	if player.piecePos.x > w-1-player.pieceColMax then
+		player.piecePos.x = w-1-player.pieceColMax
 	end
 end
 
@@ -292,15 +339,15 @@ local vtxs = {
 	{0,1},
 }
 
-function App:testPieceMerge()
+function App:testPieceMerge(player)
 	local w, h = self.sandSize:unpack()
 	for j=0,pieceSize.y-1 do
 		for i=0,pieceSize.x-1 do
 			local k = i + pieceSize.x * j
-			local color = ffi.cast('int*', self.pieceTex.image.buffer)[k]
+			local color = ffi.cast('int*', player.pieceTex.image.buffer)[k]
 			if color ~= 0 then
-				local x = self.piecePos.x + i
-				local y = self.piecePos.y + j
+				local x = player.piecePos.x + i
+				local y = player.piecePos.y + j
 				if x >= 0 and x < w
 				and y >= 0 and y < h
 				and ffi.cast('int*',self.sandTex.image.buffer)[x + w * y] ~= 0
@@ -372,50 +419,61 @@ function App:updateGame()
 	-- if it collides then merge it
 	local movedx = 1
 	local movedy = 3
-	-- TODO key updates at higher interval than drop rate ...
-	-- but test collision for both
-	if self.leftPress then
-		self.piecePos.x = self.piecePos.x - movedx
+	for _,player in ipairs(self.players) do
+		-- TODO key updates at higher interval than drop rate ...
+		-- but test collision for both
+		if player.keyPress.left then
+			player.piecePos.x = player.piecePos.x - movedx
+		end
+		if player.keyPress.right then
+			player.piecePos.x = player.piecePos.x + movedx 
+		end
+		self:constrainPiecePos(player)
+		if player.keyPress.down then
+			player.piecePos.y = player.piecePos.y - movedy
+		end
+		if player.keyPress.up and not player.keyPressLast.up then
+			self:rotatePiece(player)
+		end
 	end
-	if self.rightPress then 
-		self.piecePos.x = self.piecePos.x + movedx 
-	end
-	self:constrainPiecePos()
-	if self.downPress then self.piecePos.y = self.piecePos.y - movedy end
-	
+
 	self.fallTick = self.fallTick + 1
 	if self.fallTick >= ticksToFall then
 		self.fallTick = 0
-		self.piecePos.y = self.piecePos.y - movedx
+		for _,player in ipairs(self.players) do
+			player.piecePos.y = player.piecePos.y - movedx
+		end
 	end
 
-	local merge
-	if self.piecePos.y <= 0 then
-		self.piecePos.y = 0
-		merge = true
-	else
-		merge = self:testPieceMerge()
-	end
-	if merge then
-		needsCheck = true
-		for j=0,pieceSize.y-1 do
-			for i=0,pieceSize.x-1 do
-				local k =  i + pieceSize.x * j
-				local color = ffi.cast('int*', self.pieceTex.image.buffer)[k]
-				if color ~= 0 then
-					local x = self.piecePos.x + i
-					local y = self.piecePos.y + j
-					if x >= 0 and x < w
-					and y >= 0 and y < h
-					and ffi.cast('int*', self.sandTex.image.buffer)[x + w * y] == 0
-					then
-						ffi.cast('int*', self.sandTex.image.buffer)[x + w * y] = color
+	for _,player in ipairs(self.players) do
+		local merge
+		if player.piecePos.y <= 0 then
+			player.piecePos.y = 0
+			merge = true
+		else
+			merge = self:testPieceMerge(player) or merge
+		end
+		if merge then
+			needsCheck = true
+			for j=0,pieceSize.y-1 do
+				for i=0,pieceSize.x-1 do
+					local k =  i + pieceSize.x * j
+					local color = ffi.cast('int*', player.pieceTex.image.buffer)[k]
+					if color ~= 0 then
+						local x = player.piecePos.x + i
+						local y = player.piecePos.y + j
+						if x >= 0 and x < w
+						and y >= 0 and y < h
+						and ffi.cast('int*', self.sandTex.image.buffer)[x + w * y] == 0
+						then
+							ffi.cast('int*', self.sandTex.image.buffer)[x + w * y] = color
+						end
 					end
 				end
 			end
+		
+			self:newPiece(player)
 		end
-	
-		self:newPiece()
 	end
 
 	if dontCheck then needsCheck = false end
@@ -484,6 +542,12 @@ function App:updateGame()
 			self.flashTime = self.gameTime
 		end
 	end
+
+	for _,player in ipairs(self.players) do
+		for k,v in pairs(player.keyPress) do
+			player.keyPressLast[k] = v
+		end
+	end
 end
 
 function App:update(...)
@@ -519,22 +583,24 @@ function App:update(...)
 	self.sandTex:unbind()
 
 	-- draw the current piece
-	if self.pieceTex then
-		self.pieceTex:bind()
-		gl.glEnable(gl.GL_BLEND)
-		gl.glBegin(gl.GL_QUADS)
-		for _,v in ipairs(vtxs) do
-			local x,y = table.unpack(v)
-			gl.glTexCoord2f(x,y)
-			gl.glVertex2f(
-				((self.piecePos.x + x * pieceSize.x) / w - .5) * s + .5,
-				(self.piecePos.y + y * pieceSize.y) / h
-			)
+	for _,player in ipairs(self.players) do
+		if player.pieceTex then
+			player.pieceTex:bind()
+			gl.glEnable(gl.GL_BLEND)
+			gl.glBegin(gl.GL_QUADS)
+			for _,v in ipairs(vtxs) do
+				local x,y = table.unpack(v)
+				gl.glTexCoord2f(x,y)
+				gl.glVertex2f(
+					((player.piecePos.x + x * pieceSize.x) / w - .5) * s + .5,
+					(player.piecePos.y + y * pieceSize.y) / h
+				)
+			end
+			gl.glEnd()
+			gl.glDisable(gl.GL_BLEND)
+			player.pieceTex:unbind()
+			gl.glColor3f(1,1,1)
 		end
-		gl.glEnd()
-		gl.glDisable(gl.GL_BLEND)
-		self.pieceTex:unbind()
-		gl.glColor3f(1,1,1)
 	end
 
 	-- draw flashing background if necessary
@@ -565,6 +631,7 @@ function App:update(...)
 		self.flashTex:bind():subimage():unbind()
 	end
 
+	local aspectRatio = self.width / self.height
 	local s = w / h
 	for i,it in ipairs(self.nextPieces) do
 		it.tex:bind()
@@ -572,7 +639,7 @@ function App:update(...)
 		for _,v in ipairs(vtxs) do
 			local x,y = table.unpack(v)
 			gl.glTexCoord2f(x,y)
-			gl.glVertex2f(.8 + x * .1, 1 - (y + 1.1 * (i - .9)) * .1)
+			gl.glVertex2f((aspectRatio - 1) * .5 + 1 - .2 + x * .1, 1 - (y + 1.1 * (i - .9)) * .1)
 		end
 		gl.glEnd()
 	end
@@ -612,20 +679,27 @@ function App:flipBoard()
 	self.sandTex:bind():subimage()
 end
 
-function App:event(e)
+function App:event(e, ...)
+	App.super.event(self, e, ...)
 	if e.type == sdl.SDL_KEYDOWN 
 	or e.type == sdl.SDL_KEYUP
 	then
 		local down = e.type == sdl.SDL_KEYDOWN
+		for _,player in ipairs(self.players) do
+			player:handleKeyUpDown(e.key.keysym.sym, down)
+		end
+		--[[
 		if e.key.keysym.sym == sdl.SDLK_LEFT then
-			self.leftPress = down 
+			self.keyPress.left = down 
 		elseif e.key.keysym.sym == sdl.SDLK_RIGHT then
-			self.rightPress = down
+			self.keyPress.right = down
 		elseif e.key.keysym.sym == sdl.SDLK_DOWN then
-			self.downPress = down
+			self.keyPress.down = down
 		elseif e.key.keysym.sym == sdl.SDLK_UP then
 			if down then self:rotatePiece() end
-		elseif e.key.keysym.sym == ('r'):byte() then
+		else
+		--]]
+		if e.key.keysym.sym == ('r'):byte() then
 			if down then self:reset() end
 		elseif e.key.keysym.sym == ('f'):byte() then
 			if down then self:flipBoard() end
@@ -634,6 +708,7 @@ function App:event(e)
 end
 
 function App:updateGUI()
+	--[[
 	ig.igSetNextWindowPos(ig.ImVec2(0, 0), 0, ig.ImVec2())
 	ig.igSetNextWindowSize(ig.ImVec2(
 		120,
@@ -645,7 +720,17 @@ function App:updateGUI()
 		ig.ImGuiWindowFlags_NoCollapse,
 		ig.ImGuiWindowFlags_NoDecoration
 	)
-	ig.igText(tostring(self.score))
+	--]]
+	ig.igBegin('cfg', nil, 0)
+	
+	ig.igText('score: '..tostring(self.score))
+	
+	ig.luatableTooltipInputInt('num players', self, 'numPlayers')
+
+	if ig.igButton'reset' then
+		self:reset()
+	end
+
 	ig.igEnd()
 end
 
