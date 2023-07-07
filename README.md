@@ -1,4 +1,4 @@
-Tetris with abelian sandpile modes.  Jk it's with sand.
+Tetris with abelian sandpile models.  Jk it's with sand.
 
 [![sand tetris](http://img.youtube.com/vi/CUb2mFn1CUY/0.jpg)](https://youtu.be/CUb2mFn1CUY)
 
@@ -17,3 +17,4 @@ Tetris with abelian sandpile modes.  Jk it's with sand.
 - option for multiple previous piece stacks for multiple players
 - varying board width for # of players
 - levels that the speed / # colors goes up for # of lines made / score
+- faster blob detection
