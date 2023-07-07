@@ -581,7 +581,22 @@ function App:update(...)
 
 	App.super.update(self, ...)
 	glreport'here'
+
+
+	-- [[ fps
+	self.fpsSampleCount = self.fpsSampleCount + 1
+	local thisTime = getTime()
+	if thisTime - self.lastFrameTime >= 1 then
+		local deltaTime = thisTime - self.lastFrameTime
+		local fps = self.fpsSampleCount / deltaTime
+		print(fps)
+		self.lastFrameTime = thisTime
+		self.fpsSampleCount = 0
+	end
+	--]]
 end
+App.lastFrameTime = 0
+App.fpsSampleCount = 0
 
 function App:flipBoard()
 	local w, h = self.sandSize:unpack()
