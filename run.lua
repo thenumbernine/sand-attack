@@ -41,6 +41,7 @@ end
 -- ... but not all 8 bit alpha channels are really 8 bits ...
 
 local dontCheck = false
+local showFPS = true
 
 local updateInterval = 1/60
 --local updateInterval = 1/120
@@ -514,13 +515,11 @@ function App:updateGame()
 	-- TOOD do this faster? This is the lazy way ...
 	if needsCheck then
 		local anyCleared
-		for colorIndex,color in ipairs(self.colors) do
-			local alpha = math.floor(colorIndex/self.numColors*0xff)
-			local clearedCount = 0
-			local blobs = self.sandTex.image:getBlobs(function(p)
-				return p[3] == alpha
-			end)
-			for _,blob in ipairs(blobs) do
+		local clearedCount = 0
+		local blobs = self.sandTex.image:getBlobs(function(p) return p[3] end)
+--print('#blobs', #blobs)
+		for _,blob in ipairs(blobs) do
+			if blob.cl ~= 0 then
 				local xmin = math.huge
 				local xmax = -math.huge
 				for _,int in ipairs(blob) do
@@ -529,6 +528,7 @@ function App:updateGame()
 				end
 				local blobwidth = xmax - xmin + 1
 				if blobwidth == w then
+--print('clearing blob of class', blob.cl)
 					for _,int in ipairs(blob) do
 						local iw = int.x2 - int.x1 + 1
 						clearedCount = clearedCount + iw
@@ -539,10 +539,10 @@ function App:updateGame()
 					end
 				end
 			end
-			if clearedCount ~= 0 then
-				anyCleared = true
-				self.score = self.score + clearedCount
-			end
+		end
+		if clearedCount ~= 0 then
+			anyCleared = true
+			self.score = self.score + clearedCount
 		end
 		if anyCleared then
 			self.flashTex:bind():subimage()
@@ -657,17 +657,17 @@ function App:update(...)
 	glreport'here'
 
 
-	-- [[ fps
-	self.fpsSampleCount = self.fpsSampleCount + 1
-	local thisTime = getTime()
-	if thisTime - self.lastFrameTime >= 1 then
-		local deltaTime = thisTime - self.lastFrameTime
-		local fps = self.fpsSampleCount / deltaTime
-		print(fps)
-		self.lastFrameTime = thisTime
-		self.fpsSampleCount = 0
+	if showFPS then
+		self.fpsSampleCount = self.fpsSampleCount + 1
+		local thisTime = getTime()
+		if thisTime - self.lastFrameTime >= 1 then
+			local deltaTime = thisTime - self.lastFrameTime
+			local fps = self.fpsSampleCount / deltaTime
+			print(fps)
+			self.lastFrameTime = thisTime
+			self.fpsSampleCount = 0
+		end
 	end
-	--]]
 end
 App.lastFrameTime = 0
 App.fpsSampleCount = 0
