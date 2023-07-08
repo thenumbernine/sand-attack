@@ -43,9 +43,9 @@ end
 local dontCheck = false
 local showFPS = true
 
-local updateInterval = 1/60
+--local updateInterval = 1/60
 --local updateInterval = 1/120
---local updateInterval = 0
+local updateInterval = 0
 
 local toppleChance = 1
 local ticksToFall = 5
@@ -127,22 +127,23 @@ function App:initGL(...)
 	self.view.pos:set(.5, .5, 10)
 
 	self.numPlayers = 1
-	self.numColors = 4
+	self.numColors = 7
 
-	self.sandSize = vec2i(80, 144)	-- original:
-	--self.sandSize = vec2i(160, 200)
-	--self.sandSize = vec2i(160, 288)
-	--self.sandSize = vec2i(80, 360)
-	--self.sandSize = vec2i(512, 512)
+	self.nextSandSize = vec2i(80, 144)	-- original:
+	--self.nextSandSize = vec2i(160, 200)
+	--self.nextSandSize = vec2i(160, 288)
+	--self.nextSandSize = vec2i(80, 360)
+	--self.nextSandSize = vec2i(512, 512)
 
+	
+	--[[
+	image's getBlobs is a mess... straighten it out
+	should probably be a BlobGetter() class which holds the context, classify callback, results, etc.
+	--]]
+	self.getBlobCtx = {
+		classify = function(p) return p[3] end,	-- classify by alpha channel
+	}
 
-	self.sandTex, self.sandImage = makeImageAndTex(self.sandSize)
-	self.flashTex, self.flashImage = makeImageAndTex(self.sandSize)
-	self.rotPieceTex, self.rotPieceImage = makeImageAndTex(pieceSize)
-	self.nextPieces = range(9):mapi(function(i)
-		local tex = makeImageAndTex(pieceSize)
-		return {tex=tex}
-	end)
 
 	self:reset()
 
@@ -213,7 +214,23 @@ local pieceImages = table{
 }
 
 function App:reset()
+	self.sandSize = vec2i(self.nextSandSize)
+
 	local w, h = self.sandSize:unpack()
+
+
+	-- I only really need to recreate the sand & flash texs if the board size changes ...
+	self.sandTex, self.sandImage = makeImageAndTex(self.sandSize)
+	self.flashTex, self.flashImage = makeImageAndTex(self.sandSize)
+	
+	-- and I only really need to recreate these if the piece size changes ...
+	self.rotPieceTex, self.rotPieceImage = makeImageAndTex(pieceSize)
+	self.nextPieces = range(9):mapi(function(i)
+		local tex = makeImageAndTex(pieceSize)
+		return {tex=tex}
+	end)
+
+
 	ffi.fill(self.sandTex.image.buffer, 4 * w * h)
 	assert(self.sandTex.data == self.sandTex.image.buffer)
 	self.sandTex:bind():subimage():unbind()
@@ -243,9 +260,9 @@ end
 
 function App:populatePiece(args)
 	local srcimage = pieceImages:pickRandom()
-	local colorIndex = math.random(self.numColors)
+	local colorIndex = math.random(#self.colors)
 	local color = self.colors[colorIndex]
-	local alpha = math.floor(colorIndex/self.numColors*0xff)
+	local alpha = math.floor(colorIndex/#self.colors*0xff)
 	alpha = bit.lshift(alpha, 24)
 	local srcp = ffi.cast('uint32_t*', srcimage.buffer)
 	local dstp = ffi.cast('uint32_t*', args.tex.image.buffer)
@@ -512,13 +529,12 @@ function App:updateGame()
 	end
 	--]]
 
-	-- TOOD do this faster? This is the lazy way ...
 	if needsCheck then
 		local anyCleared
 		local clearedCount = 0
-		local blobs = self.sandTex.image:getBlobs(function(p) return p[3] end)
+		local blobs = self.sandTex.image:getBlobs(self.getBlobCtx)
 --print('#blobs', #blobs)
-		for _,blob in ipairs(blobs) do
+		for _,blob in pairs(blobs) do
 			if blob.cl ~= 0 then
 				local xmin = math.huge
 				local xmax = -math.huge
@@ -734,6 +750,8 @@ function App:updateGUI()
 
 	ig.luatableTooltipInputInt('num players', self, 'numPlayers')
 	ig.luatableTooltipInputInt('num colors', self, 'numColors')
+	ig.luatableTooltipInputInt('board width', self.nextSandSize, 'x')
+	ig.luatableTooltipInputInt('board height', self.nextSandSize, 'y')
 
 	if ig.igButton'reset' then
 		self:reset()
