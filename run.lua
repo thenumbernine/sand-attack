@@ -35,11 +35,10 @@ local baseColors = table{
 	vec3f(0,1,1),
 	vec3f(1,1,1),
 }
---[[ TODO fix detection method first ...
-for i=1,300 do
+while #baseColors < 255 do
 	baseColors:insert(vec3f():map(function() return math.random() end):normalize())
 end
---]]
+-- ... but not all 8 bit alpha channels are really 8 bits ...
 
 local dontCheck = false
 
@@ -117,7 +116,7 @@ function App:initGL(...)
 	App.super.initGL(self, ...)
 
 	gl.glClearColor(.5, .5, .5, 1)
-	gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
+	gl.glAlphaFunc(gl.GL_GREATER, 0)
 
 	math.randomseed(os.time())
 
@@ -243,7 +242,10 @@ end
 
 function App:populatePiece(args)
 	local srcimage = pieceImages:pickRandom()
-	local color = self.colors:pickRandom()
+	local colorIndex = math.random(self.numColors)
+	local color = self.colors[colorIndex]
+	local alpha = math.floor(colorIndex/self.numColors*0xff)
+	alpha = bit.lshift(alpha, 24)
 	local srcp = ffi.cast('uint32_t*', srcimage.buffer)
 	local dstp = ffi.cast('uint32_t*', args.tex.image.buffer)
 	for j=0,pieceSize.y-1 do
@@ -255,7 +257,7 @@ function App:populatePiece(args)
 					math.floor(l * color.x * 255),
 					bit.lshift(math.floor(l * color.y * 255), 8),
 					bit.lshift(math.floor(l * color.z * 255), 16),
-					0xff000000
+					alpha
 				)
 			else
 				dstp[0] = 0
@@ -512,16 +514,11 @@ function App:updateGame()
 	-- TOOD do this faster? This is the lazy way ...
 	if needsCheck then
 		local anyCleared
-		for _,color in ipairs(self.colors) do
+		for colorIndex,color in ipairs(self.colors) do
+			local alpha = math.floor(colorIndex/self.numColors*0xff)
 			local clearedCount = 0
-			local r = color.x
-			local g = color.y
-			local b = color.z
 			local blobs = self.sandTex.image:getBlobs(function(p)
-				return p[3] == 0xff
-				and (p[0] == 0) == (r == 0)
-				and (p[1] == 0) == (g == 0)
-				and (p[2] == 0) == (b == 0)
+				return p[3] == alpha
 			end)
 			for _,blob in ipairs(blobs) do
 				local xmin = math.huge
@@ -596,7 +593,7 @@ function App:update(...)
 	for _,player in ipairs(self.players) do
 		if player.pieceTex then
 			player.pieceTex:bind()
-			gl.glEnable(gl.GL_BLEND)
+			gl.glEnable(gl.GL_ALPHA_TEST)
 			gl.glBegin(gl.GL_QUADS)
 			for _,v in ipairs(vtxs) do
 				local x,y = table.unpack(v)
@@ -607,7 +604,7 @@ function App:update(...)
 				)
 			end
 			gl.glEnd()
-			gl.glDisable(gl.GL_BLEND)
+			gl.glDisable(gl.GL_ALPHA_TEST)
 			player.pieceTex:unbind()
 			gl.glColor3f(1,1,1)
 		end
@@ -619,7 +616,7 @@ function App:update(...)
 	local flashDt = self.gameTime - self.flashTime
 	if flashDt < flashDuration then
 		self.wasFlashing = true
-		gl.glEnable(gl.GL_BLEND)
+		gl.glEnable(gl.GL_ALPHA_TEST)
 		local flashInt = bit.band(math.floor(flashDt * numFlashes * 2), 1) == 0
 		if flashInt then
 			self.flashTex:bind()
@@ -633,7 +630,7 @@ function App:update(...)
 			gl.glEnd()
 			self.flashTex:unbind()
 		end
-		gl.glDisable(gl.GL_BLEND)
+		gl.glDisable(gl.GL_ALPHA_TEST)
 	elseif self.wasFlashing then
 		self.wasFlashing = false
 		ffi.fill(self.flashTex.image.buffer, 4 * w * h)
