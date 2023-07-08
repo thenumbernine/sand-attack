@@ -43,11 +43,10 @@ end
 local dontCheck = false
 local showFPS = true
 
---local updateInterval = 1/60
+local updateInterval = 1/60
 --local updateInterval = 1/120
-local updateInterval = 0
+--local updateInterval = 0
 
-local toppleChance = 1
 local ticksToFall = 5
 
 
@@ -128,6 +127,7 @@ function App:initGL(...)
 
 	self.numPlayers = 1
 	self.numColors = 7
+	self.toppleChance = 1
 
 	self.nextSandSize = vec2i(80, 144)	-- original:
 	--self.nextSandSize = vec2i(160, 200)
@@ -308,6 +308,7 @@ function App:newPiece(player)
 	--]]
 	self:updatePieceTex(player)
 	player.piecePos = vec2i(bit.rshift(w-pieceSize.x,1), h-1)
+	player.pieceLastPos = vec2i(player.piecePos)
 	if self:testPieceMerge(player) then
 		print("YOU LOSE!!!")
 		-- TODO popup, delay, scoreboard, reset, whatever
@@ -418,7 +419,7 @@ function App:updateGame()
 					p[0], p[-w] = p[-w], p[0]
 					needsCheck = true
 				-- hmm symmetry? check left vs right first?
-				elseif math.random() < toppleChance then
+				elseif math.random() < self.toppleChance then
 					-- 50/50 check left then right, vs check right then left
 					if math.random(2) == 2 then
 						if i > 0 and p[-w-1] == 0 then
@@ -442,6 +443,10 @@ function App:updateGame()
 			p = p + istep
 		end
 		prow = prow + w
+	end
+
+	for _,player in ipairs(self.players) do
+		player.pieceLastPos:set(player.piecePos:unpack())
 	end
 
 	-- now draw the shape over the sand
@@ -481,7 +486,10 @@ function App:updateGame()
 			player.piecePos.y = 0
 			merge = true
 		else
-			merge = self:testPieceMerge(player) or merge
+			if self:testPieceMerge(player) then
+				player.piecePos:set(player.pieceLastPos:unpack())
+				merge = true
+			end
 		end
 		if merge then
 			needsCheck = true
@@ -752,6 +760,7 @@ function App:updateGUI()
 	ig.luatableTooltipInputInt('num colors', self, 'numColors')
 	ig.luatableTooltipInputInt('board width', self.nextSandSize, 'x')
 	ig.luatableTooltipInputInt('board height', self.nextSandSize, 'y')
+	ig.luatableSliderFloat('topple chance', self, 'toppleChance', 0, 1)
 
 	if ig.igButton'reset' then
 		self:reset()
