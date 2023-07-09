@@ -126,7 +126,7 @@ function App:initGL(...)
 	self.view.pos:set(.5, .5, 10)
 
 	self.numPlayers = 1
-	self.numColors = 7
+	self.numColors = 4
 	self.toppleChance = 1
 
 	self.nextSandSize = vec2i(80, 144)	-- original:
