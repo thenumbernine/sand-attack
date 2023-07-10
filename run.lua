@@ -41,6 +41,7 @@ local baseColors = table{
 
 local dontCheck = false
 local showFPS = true
+local useAudio = false
 
 local updateInterval = 1/60
 --local updateInterval = 1/120
@@ -159,45 +160,45 @@ function App:initGL(...)
 		self.audioSources[i] = src
 	end
 
-	self.audioConfig = {
-		effectVolume = 1,
-		backgroundVolume = .3,
-	}
+	if useAudio then
+		self.audioConfig = {
+			effectVolume = 1,
+			backgroundVolume = .3,
+		}
 
-	self.bgMusicFiles = table{
-		'music/Desert-City.ogg',
-		'music/Exotic-Plains.ogg',
-		'music/Ibn-Al-Noor.ogg',
-		'music/Market_Day.ogg',
-		'music/Return-of-the-Mummy.ogg',
-		'music/temple-of-endless-sands.ogg',
-		'music/wombat-noises-audio-the-legend-of-narmer.ogg',
-	}
-	self.bgMusicFileName = self.bgMusicFiles:pickRandom()
-	if self.bgMusicFileName then
-		self.bgMusic = self:loadSound(self.bgMusicFileName)
-		self.bgAudioSource = AudioSource()
-		self.bgAudioSource:setBuffer(self.bgMusic)
-		self.bgAudioSource:setLooping(true)
-		self.bgAudioSource:setGain(self.audioConfig.backgroundVolume)
-		self.bgAudioSource:play()
+		self.bgMusicFiles = table{
+			'music/Desert-City.ogg',
+			'music/Exotic-Plains.ogg',
+			'music/Ibn-Al-Noor.ogg',
+			'music/Market_Day.ogg',
+			'music/Return-of-the-Mummy.ogg',
+			'music/temple-of-endless-sands.ogg',
+			'music/wombat-noises-audio-the-legend-of-narmer.ogg',
+		}
+		self.bgMusicFileName = self.bgMusicFiles:pickRandom()
+		if self.bgMusicFileName then
+			self.bgMusic = self:loadSound(self.bgMusicFileName)
+			self.bgAudioSource = AudioSource()
+			self.bgAudioSource:setBuffer(self.bgMusic)
+			self.bgAudioSource:setLooping(true)
+			self.bgAudioSource:setGain(self.audioConfig.backgroundVolume)
+			self.bgAudioSource:play()
+		end
 	end
-
+	
 	self:reset()
 
 	glreport'here'
 end
 
 require 'ffi.c.stdio'
-local vorbisfile = require 'ffi.vorbis.vorbisfile'
 function App:loadSound(filename)
 	if not filename then error("warning: couldn't find sound file "..searchfilename) end
 
 	local sound = self.sounds[filename]
 	if not sound then
-print('loading filename', filename)
 		if filename:sub(-4) == '.ogg' then
-print('loading ogg')
+			local vorbisfile = require 'ffi.vorbis.vorbisfile'
 			local wavfn = filename:sub(1,-5)..'.wav'
 
 			local infp = ffi.C.fopen(filename, 'rb')
@@ -246,8 +247,6 @@ print('loading ogg')
 				end
 			end
 			outbuf = outbuf:concat()
-			print('buf should be ', totalsize)
-			print('buf is', #outbuf)
 			--assert(require 'ext.file'(wavfn):write(outbuf))
 
 			local vi = vorbisfile.ov_info(vf, -1)
@@ -290,7 +289,6 @@ print('loading ogg')
 
 			--]]
 		else
-print('loading wav')
 			sound = AudioBuffer(filename)
 		end
 		self.sounds[filename] = sound
@@ -311,6 +309,7 @@ function App:getNextAudioSource()
 end
 
 function App:playSound(name, volume, pitch)
+	if not useAudio then return end
 	local source = self:getNextAudioSource()
 	if not source then
 		print('all audio sources used')
@@ -1027,7 +1026,7 @@ function App:updateGUI()
 		ig.igEndTooltip()
 	end
 
-	if ig.igButton'Audio...' then
+	if useAudio and ig.igButton'Audio...' then
 		modalsOpened.audio = true
 		self.paused = true
 	end
@@ -1069,7 +1068,8 @@ function App:updateGUI()
 			end
 		end
 		if ig.igColorPicker3('edit color', self.nextColors[self.currentColorEditing].s, 0) then
-			print('color changed')
+			-- TODO update the other pieces in realtime?
+			-- or nah?
 		end
 		if ig.igButton'Done' then
 			modalsOpened.colorPicker = false
