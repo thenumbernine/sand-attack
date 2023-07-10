@@ -22,11 +22,9 @@ files = {
 -- binary libs needed for luajit
 luajitLibs = {
 	win = {
-		'luajit',
-		'sdl',
 		'png',
+		'SDL2',
 		'z',	-- needed by png
-		'regal',	-- I thought I commented out my OpenGL loading of regal ...
 	},
 	osx = {
 		'sdl',
