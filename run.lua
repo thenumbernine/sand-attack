@@ -15,7 +15,9 @@ local vec2i = require 'vec-ffi.vec2i'
 local vec3f = require 'vec-ffi.vec3f'
 local getTime = require 'ext.timer'.getTime
 local ig = require 'imgui'
-
+local Audio = require 'audio'
+local AudioSource = require 'audio.source'
+local AudioBuffer = require 'audio.buffer'
 
 -- board size is 80 x 144 visible
 -- piece is 4 blocks arranged
@@ -111,6 +113,8 @@ local App = require 'imguiapp.withorbit'()
 
 App.title = 'Sand Tetris'
 
+App.maxAudioDist = 10
+
 function App:initGL(...)
 	App.super.initGL(self, ...)
 
@@ -143,10 +147,89 @@ function App:initGL(...)
 		classify = function(p) return p[3] end,	-- classify by alpha channel
 	}
 
+	self.sounds = {}
+
+	self.audio = Audio()
+	self.audioSources = table()
+	self.audioSourceIndex = 0
+	self.audio:setDistanceModel'linear clamped'
+	for i=1,31 do	-- 31 for DirectSound, 32 for iphone, infinite for all else?
+		local src = AudioSource()
+		src:setReferenceDistance(self.view.orthoSize)
+		src:setMaxDistance(self.maxAudioDist)
+		src:setRolloffFactor(1)
+		self.audioSources[i] = src
+	end
+
+	self.audioConfig = {
+		effectVolume = 1,
+		backgroundVolume = .3,
+	}
+
+	self.bgMusicFiles =table{
+		'music/Desert-City.wav',
+		'music/Exotic-Plains.wav',
+		'music/Ibn-Al-Noor.wav',
+		'music/Market_Day.wav',
+		'music/Return-of-the-Mummy.wav',
+		'music/temple-of-endless-sands.wav',
+		'music/wombat-noises-audio-the-legend-of-narmer.wav',
+	}
+	self.bgMusicFileName = self.bgMusicFiles:pickRandom()
+	if self.bgMusicFileName then
+		self.bgMusic = AudioBuffer(self.bgMusicFileName)	
+		self.bgAudioSource = AudioSource()
+		self.bgAudioSource:setBuffer(self.bgMusic)
+		self.bgAudioSource:setLooping(true)
+		self.bgAudioSource:setGain(self.audioConfig.backgroundVolume)
+		self.bgAudioSource:play()
+	end
 
 	self:reset()
 
 	glreport'here'
+end
+
+function App:loadSound(filename)
+	if not filename then error("warning: couldn't find sound file "..searchfilename) end
+	
+	local sound = self.sounds[filename]
+	if not sound then
+		sound = AudioBuffer(filename)
+		self.sounds[filename] = sound
+	end
+	return sound
+end
+
+function App:getNextAudioSource()
+	if #self.audioSources == 0 then return end
+	local startIndex = self.audioSourceIndex
+	repeat
+		self.audioSourceIndex = self.audioSourceIndex % #self.audioSources + 1
+		local source = self.audioSources[self.audioSourceIndex]
+		if not source:isPlaying() then
+			return source
+		end
+	until self.audioSourceIndex == startIndex
+end
+
+function App:playSound(name, volume, pitch)
+	local source = self:getNextAudioSource()
+	if not source then
+		print('all audio sources used')
+		return
+	end
+
+	local sound = self:loadSound(name)
+	source:setBuffer(sound)
+	source.volume = volume	-- save for later
+	source:setGain((volume or 1) * self.audioConfig.effectVolume)
+	source:setPitch(pitch or 1)
+	source:setPosition(0, 0, 0)
+	source:setVelocity(0, 0, 0)
+	source:play()
+
+	return source
 end
 
 local function makePieceImage(s)
@@ -395,7 +478,12 @@ function App:updateGame()
 	local dt = thisTime - self.lastUpdateTime
 	if dt <= updateInterval then return end
 
+	--[[ fast-forward to catch up? messes up with pause too
 	self.lastUpdateTime = self.lastUpdateTime + updateInterval
+	--]]
+	-- [[ stutter
+	self.lastUpdateTime = thisTime
+	--]]
 	self.gameTime = self.gameTime + updateInterval
 
 	local needsCheck = false
@@ -491,6 +579,7 @@ function App:updateGame()
 			end
 		end
 		if merge then
+			self:playSound'sfx/place.wav'
 			needsCheck = true
 			for j=0,pieceSize.y-1 do
 				for i=0,pieceSize.x-1 do
@@ -568,6 +657,7 @@ function App:updateGame()
 			self.score = self.score + clearedCount
 		end
 		if anyCleared then
+			self:playSound'sfx/line.wav'
 			self.flashTex:bind():subimage()
 			self.flashTime = self.gameTime
 		end
@@ -586,7 +676,9 @@ function App:update(...)
 
 	local w, h = self.sandSize:unpack()
 
-	self:updateGame()
+	if not self.paused then
+		self:updateGame()
+	end
 
 	--[[ pouring sand
 	self.sandCPU[bit.rshift(w,1) + w * (h - 1)] = bit.bor(
@@ -737,19 +829,28 @@ function App:event(e, ...)
 	end
 end
 
+local function modalBegin(title, t, k)
+	return ig.luatableBegin(title, t, k, bit.bor(
+			ig.ImGuiWindowFlags_NoTitleBar,
+			ig.ImGuiWindowFlags_NoResize,
+			ig.ImGuiWindowFlags_NoCollapse,
+			ig.ImGuiWindowFlags_AlwaysAutoResize,
+			ig.ImGuiWindowFlags_Modal,
+		0))
+end
+
+
+local modalsOpened = {}
+App.paused = false
 function App:updateGUI()
 	-- [[
 	ig.igSetNextWindowPos(ig.ImVec2(0, 0), 0, ig.ImVec2())
-	ig.igSetNextWindowSize(ig.ImVec2(
-		120,
-		220
-	), 0)
-	ig.igBegin('score', nil,
+	ig.igBegin('score', nil, bit.bor(
 		ig.ImGuiWindowFlags_NoMove,
 		ig.ImGuiWindowFlags_NoResize,
 		ig.ImGuiWindowFlags_NoCollapse,
 		ig.ImGuiWindowFlags_NoDecoration
-	)
+	))
 	--]]
 	--[[
 	ig.igBegin('cfg', nil, 0)
@@ -787,8 +888,44 @@ function App:updateGUI()
 		ig.igText(url)
 		ig.igEndTooltip()
 	end
+
+	if ig.igButton'Audio...' then
+		modalsOpened.audio = true
+		self.paused = true
+	end
 	
+	if ig.igButton(self.paused and 'resume' or 'pause') then
+		self.paused = not self.paused
+	end
+
 	ig.igEnd()
+	
+	if modalsOpened.audio then
+		modalBegin('Audio', nil)
+			if ig.luatableSliderFloat('fx volume', self.audioConfig, 'effectVolume', 0, 1) then
+				--[[ if you want, update all previous audio sources...
+				for _,src in ipairs(self.audioSources) do
+					-- TODO if the gameplay sets the gain down then we'll want to multiply by their default gain
+					src:setGain(audioConfig.effectVolume * src.gain)
+				end
+				--]]
+			end
+			if ig.luatableSliderFloat('bg volume', self.audioConfig, 'backgroundVolume', 0, 1) then
+				self.bgAudioSource:setGain(self.audioConfig.backgroundVolume)
+			end
+			if ig.igButton'Done' then
+				modalsOpened.audio = false
+				self.paused = false
+			end
+		ig.igEnd()
+	end
 end
+
+--[[ if you're not using the autorelease
+function App:exit()
+	self.audio:shutdown()
+	App.super.exit(self)
+end
+--]]
 
 return App():run()

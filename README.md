@@ -25,3 +25,40 @@ Tetris with abelian sandpile models.  Jk it's with sand.
 - varying board width for # of players
 - levels that the speed / # colors goes up for # of lines made / score
 - faster blob detection
+
+## Music Credit:
+
+```
+Desert City Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 3.0 License
+http://creativecommons.org/licenses/by/3.0/
+Music promoted by https://www.chosic.com/free-music/all/
+
+Exotic Plains by Darren Curtis | https://www.darrencurtismusic.com/
+Music promoted by https://www.chosic.com/free-music/all/
+Creative Commons CC BY 3.0
+https://creativecommons.org/licenses/by/3.0/
+
+Ibn Al-Noor Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 3.0 License
+http://creativecommons.org/licenses/by/3.0/
+Music promoted by https://www.chosic.com/free-music/all/
+
+Market Day RandomMind
+Music: https://www.chosic.com/free-music/all/
+
+Return of the Mummy Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 3.0 License
+http://creativecommons.org/licenses/by/3.0/
+Music promoted by https://www.chosic.com/free-music/all/
+
+Temple Of Endless Sands by Darren Curtis | https://www.darrencurtismusic.com/
+Music promoted by https://www.chosic.com/free-music/all/
+Creative Commons CC BY 3.0
+https://creativecommons.org/licenses/by/3.0/
+
+The Legend of Narmer by WombatNoisesAudio | https://soundcloud.com/user-734462061
+Creative Commons Attribution 3.0 Unported License
+https://creativecommons.org/licenses/by/3.0/
+Music promoted by https://www.chosic.com/free-music/all/
+```
