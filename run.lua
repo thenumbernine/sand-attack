@@ -738,11 +738,11 @@ function App:event(e, ...)
 end
 
 function App:updateGUI()
-	--[[
+	-- [[
 	ig.igSetNextWindowPos(ig.ImVec2(0, 0), 0, ig.ImVec2())
 	ig.igSetNextWindowSize(ig.ImVec2(
 		120,
-		50
+		220
 	), 0)
 	ig.igBegin('score', nil,
 		ig.ImGuiWindowFlags_NoMove,
@@ -751,7 +751,10 @@ function App:updateGUI()
 		ig.ImGuiWindowFlags_NoDecoration
 	)
 	--]]
+	--[[
 	ig.igBegin('cfg', nil, 0)
+	--]]
+
 
 	ig.igText('score: '..tostring(self.score))
 
@@ -759,12 +762,32 @@ function App:updateGUI()
 	ig.luatableTooltipInputInt('num colors', self, 'numColors')
 	ig.luatableTooltipInputInt('board width', self.nextSandSize, 'x')
 	ig.luatableTooltipInputInt('board height', self.nextSandSize, 'y')
-	ig.luatableSliderFloat('topple chance', self, 'toppleChance', 0, 1)
+	ig.luatableTooltipSliderFloat('topple chance', self, 'toppleChance', 0, 1)
 
 	if ig.igButton'reset' then
 		self:reset()
 	end
 
+	local url = 'https://github.com/thenumbernine/sand-tetris'
+	if ig.igButton'about' then
+		if ffi.os == 'Windows' then
+			os.execute('explorer "'..url..'"')
+		elseif ffi.os == 'OSX' then
+			os.execute('open "'..url..'"')
+		else
+			os.execute('xdg-open "'..url..'"')
+		end
+		print'clicked'
+	end
+	if ig.igIsItemHovered(ig.ImGuiHoveredFlags_None) then
+		ig.igSetMouseCursor(ig.ImGuiMouseCursor_Hand)
+		ig.igBeginTooltip()
+		ig.igText('by Christopher Moore')
+		ig.igText('click to go to')
+		ig.igText(url)
+		ig.igEndTooltip()
+	end
+	
 	ig.igEnd()
 end
 
