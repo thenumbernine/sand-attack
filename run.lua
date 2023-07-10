@@ -13,6 +13,7 @@ local GLTex2D = require 'gl.tex2d'
 local glreport = require 'gl.report'
 local vec2i = require 'vec-ffi.vec2i'
 local vec3f = require 'vec-ffi.vec3f'
+local vec4f = require 'vec-ffi.vec4f'
 local getTime = require 'ext.timer'.getTime
 local ig = require 'imgui'
 local Audio = require 'audio'
@@ -36,9 +37,6 @@ local baseColors = table{
 	vec3f(0,1,1),
 	vec3f(1,1,1),
 }
-while #baseColors < 255 do
-	baseColors:insert(vec3f():map(function() return math.random() end):normalize())
-end
 -- ... but not all 8 bit alpha channels are really 8 bits ...
 
 local dontCheck = false
@@ -318,7 +316,14 @@ function App:reset()
 	self.sandTex:bind():subimage():unbind()
 
 	-- populate # colors
-	self.colors = baseColors:sub(1, self.numColors)
+	while #baseColors < 255 do
+		baseColors:insert(vec3f():map(function() return math.random() end):normalize())
+	end
+	self.gameColors = table(self.nextColors)		-- colors used now
+	while #self.gameColors < self.numColors do
+		self.gameColors[#self.gameColors+1] = baseColors[#self.gameColors+1]
+	end
+	self.nextColors = table(self.gameColors)		-- colors used in next game
 
 	self.players = range(self.numPlayers):mapi(function(i)
 		return Player{index=i, app=self}
@@ -342,9 +347,9 @@ end
 
 function App:populatePiece(args)
 	local srcimage = pieceImages:pickRandom()
-	local colorIndex = math.random(#self.colors)
-	local color = self.colors[colorIndex]
-	local alpha = math.floor(colorIndex/#self.colors*0xff)
+	local colorIndex = math.random(#self.gameColors)
+	local color = self.gameColors[colorIndex]
+	local alpha = math.floor(colorIndex/#self.gameColors*0xff)
 	alpha = bit.lshift(alpha, 24)
 	local srcp = ffi.cast('uint32_t*', srcimage.buffer)
 	local dstp = ffi.cast('uint32_t*', args.tex.image.buffer)
@@ -821,9 +826,12 @@ function App:event(e, ...)
 			if down then self:rotatePiece() end
 		else
 		--]]
+		--[[
 		if e.key.keysym.sym == ('r'):byte() then
 			if down then self:reset() end
-		elseif e.key.keysym.sym == ('f'):byte() then
+		else
+		--]]
+		if e.key.keysym.sym == ('f'):byte() then
 			if down then self:flipBoard() end
 		end
 	end
@@ -839,12 +847,13 @@ local function modalBegin(title, t, k)
 		0))
 end
 
-
+local tmpcolor = ig.ImVec4()
 local modalsOpened = {}
 App.paused = false
 function App:updateGUI()
 	-- [[
 	ig.igSetNextWindowPos(ig.ImVec2(0, 0), 0, ig.ImVec2())
+	ig.igSetNextWindowSize(ig.ImVec2(150, -1), 0)
 	ig.igBegin('score', nil, bit.bor(
 		ig.ImGuiWindowFlags_NoMove,
 		ig.ImGuiWindowFlags_NoResize,
@@ -860,12 +869,42 @@ function App:updateGUI()
 	ig.igText('score: '..tostring(self.score))
 
 	ig.luatableTooltipInputInt('num players', self, 'numPlayers')
-	ig.luatableTooltipInputInt('num colors', self, 'numColors')
+	
+
+	self.colortest = self.colortest or ig.ImVec4()
+	--ig.igColorPicker3('test', self.colortest.s, 0)
+	if ig.igButton'+' then
+		self.numColors = self.numColors + 1
+		self.nextColors = baseColors:sub(1, self.numColors)
+	end
+	ig.igSameLine()
+	if self.numColors > 1 and ig.igButton'-' then
+		self.numColors = self.numColors - 1
+		self.nextColors = baseColors:sub(1, self.numColors)
+	end
+	ig.igSameLine()
+
+	for i=1,self.numColors do
+		local c = self.nextColors[i]
+		tmpcolor.x = c.x
+		tmpcolor.y = c.y
+		tmpcolor.z = c.z
+		tmpcolor.w = 1
+		if ig.igColorButton('color '..i, tmpcolor) then
+			modalsOpened.colorPicker = true
+			self.paused = true
+			self.currentColorEditing = i
+		end
+		if i % 6 ~= 4 and i < self.numColors then
+			ig.igSameLine()
+		end
+	end
+
 	ig.luatableTooltipInputInt('board width', self.nextSandSize, 'x')
 	ig.luatableTooltipInputInt('board height', self.nextSandSize, 'y')
 	ig.luatableTooltipSliderFloat('topple chance', self, 'toppleChance', 0, 1)
 
-	if ig.igButton'reset' then
+	if ig.igButton'New Game' then
 		self:reset()
 	end
 
@@ -902,21 +941,41 @@ function App:updateGUI()
 	
 	if modalsOpened.audio then
 		modalBegin('Audio', nil)
-			if ig.luatableSliderFloat('fx volume', self.audioConfig, 'effectVolume', 0, 1) then
-				--[[ if you want, update all previous audio sources...
-				for _,src in ipairs(self.audioSources) do
-					-- TODO if the gameplay sets the gain down then we'll want to multiply by their default gain
-					src:setGain(audioConfig.effectVolume * src.gain)
-				end
-				--]]
+		if ig.luatableSliderFloat('fx volume', self.audioConfig, 'effectVolume', 0, 1) then
+			--[[ if you want, update all previous audio sources...
+			for _,src in ipairs(self.audioSources) do
+				-- TODO if the gameplay sets the gain down then we'll want to multiply by their default gain
+				src:setGain(audioConfig.effectVolume * src.gain)
 			end
-			if ig.luatableSliderFloat('bg volume', self.audioConfig, 'backgroundVolume', 0, 1) then
-				self.bgAudioSource:setGain(self.audioConfig.backgroundVolume)
-			end
-			if ig.igButton'Done' then
-				modalsOpened.audio = false
+			--]]
+		end
+		if ig.luatableSliderFloat('bg volume', self.audioConfig, 'backgroundVolume', 0, 1) then
+			self.bgAudioSource:setGain(self.audioConfig.backgroundVolume)
+		end
+		if ig.igButton'Done' then
+			modalsOpened.audio = false
+			self.paused = false
+		end
+		ig.igEnd()
+	end
+	if modalsOpened.colorPicker then
+		modalBegin('Color', nil)
+		ig.igText'colors updated upon new game'
+		if #self.nextColors > 1 then
+			if ig.igButton'Delete' then
+				self.nextColors:remove(self.currentColorEditing)
+				self.numColors = self.numColors - 1
+				modalsOpened.colorPicker = false
 				self.paused = false
 			end
+		end
+		if ig.igColorPicker3('edit color', self.nextColors[self.currentColorEditing].s, 0) then
+			print('color changed')
+		end
+		if ig.igButton'Done' then
+			modalsOpened.colorPicker = false
+			self.paused = false
+		end
 		ig.igEnd()
 	end
 end
