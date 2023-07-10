@@ -14,6 +14,12 @@ files = {
 		'glapp',
 		'imgui',
 		'imguiapp',
+		'audio',
+		-- of these 4, i'm only explicitly ffi.load'ing vorbisfile, but idk about interdependencies...
+		'ogg',
+		'vorbis',
+		'vorbisenc',
+		'vorbisfile',
 	}:append(
 		ffi.os == 'Android' and {'gles2'} or {'gl'}
 	),

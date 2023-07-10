@@ -39,9 +39,9 @@ local baseColors = table{
 }
 -- ... but not all 8 bit alpha channels are really 8 bits ...
 
-local dontCheck = false
-local showFPS = true
-local useAudio = false
+local dontCheck = false	-- don't ever ever check for lines.  used for fps testing the sand topple simulation.
+local showFPS = false
+local useAudio = true
 
 local updateInterval = 1/60
 --local updateInterval = 1/120
