@@ -3,7 +3,12 @@ luaDistVer = 'luajit'	-- luajit-openresty-2.1.0
 luaArgs = {'run.lua'}
 
 files = {
-	['.'] = {'run.lua'},
+	['.'] = {
+		'run.lua',
+		'README.md',
+		'music',
+		'sfx',
+	},
 	['..'] = table{
 		'template',
 		'ext',
@@ -15,11 +20,6 @@ files = {
 		'imgui',
 		'imguiapp',
 		'audio',
-		-- of these 4, i'm only explicitly ffi.load'ing vorbisfile, but idk about interdependencies...
-		'ogg',
-		'vorbis',
-		'vorbisenc',
-		'vorbisfile',
 	}:append(
 		ffi.os == 'Android' and {'gles2'} or {'gl'}
 	),
@@ -28,10 +28,15 @@ files = {
 -- binary libs needed for luajit
 luajitLibs = {
 	win = {
-		'png',
+		'png',	-- TODO which dir is it pulling png from? do i need z or zlib? doen't matter, no pngs in this so far
 		'SDL2',
 		'cimgui_sdl',
 		'z',	-- needed by png
+		-- of these 4, i'm only explicitly ffi.load'ing vorbisfile, but idk about interdependencies...
+		'ogg',
+		'vorbis',
+		'vorbisenc',
+		'vorbisfile',
 	},
 	osx = {
 		'sdl',
