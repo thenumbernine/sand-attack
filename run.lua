@@ -136,7 +136,7 @@ function App:initGL(...)
 	--self.nextSandSize = vec2i(80, 360)
 	--self.nextSandSize = vec2i(512, 512)
 
-	
+
 	--[[
 	image's getBlobs is a mess... straighten it out
 	should probably be a BlobGetter() class which holds the context, classify callback, results, etc.
@@ -164,18 +164,18 @@ function App:initGL(...)
 		backgroundVolume = .3,
 	}
 
-	self.bgMusicFiles =table{
-		'music/Desert-City.wav',
-		'music/Exotic-Plains.wav',
-		'music/Ibn-Al-Noor.wav',
-		'music/Market_Day.wav',
-		'music/Return-of-the-Mummy.wav',
-		'music/temple-of-endless-sands.wav',
-		'music/wombat-noises-audio-the-legend-of-narmer.wav',
+	self.bgMusicFiles = table{
+		'music/Desert-City.ogg',
+		'music/Exotic-Plains.ogg',
+		'music/Ibn-Al-Noor.ogg',
+		'music/Market_Day.ogg',
+		'music/Return-of-the-Mummy.ogg',
+		'music/temple-of-endless-sands.ogg',
+		'music/wombat-noises-audio-the-legend-of-narmer.ogg',
 	}
 	self.bgMusicFileName = self.bgMusicFiles:pickRandom()
 	if self.bgMusicFileName then
-		self.bgMusic = AudioBuffer(self.bgMusicFileName)	
+		self.bgMusic = self:loadSound(self.bgMusicFileName)
 		self.bgAudioSource = AudioSource()
 		self.bgAudioSource:setBuffer(self.bgMusic)
 		self.bgAudioSource:setLooping(true)
@@ -188,12 +188,111 @@ function App:initGL(...)
 	glreport'here'
 end
 
+require 'ffi.c.stdio'
+local vorbisfile = require 'ffi.vorbis.vorbisfile'
 function App:loadSound(filename)
 	if not filename then error("warning: couldn't find sound file "..searchfilename) end
-	
+
 	local sound = self.sounds[filename]
 	if not sound then
-		sound = AudioBuffer(filename)
+print('loading filename', filename)
+		if filename:sub(-4) == '.ogg' then
+print('loading ogg')
+			local wavfn = filename:sub(1,-5)..'.wav'
+
+			local infp = ffi.C.fopen(filename, 'rb')
+			if infp == nil then
+				error("unable to open file for reading: "..tostring(filename))
+			end
+
+			-- example from: https://xiph.org/vorbis/doc/vorbisfile/example.html
+			local vf = ffi.new'OggVorbis_File[1]'
+			-- TODO put this in ffi.vorbis.vorbisfile along with the other static-init stuff
+			local OV_CALLBACKS_NOCLOSE = ffi.new'ov_callbacks'
+			OV_CALLBACKS_NOCLOSE.read_func = ffi.C.fread
+			--[[ who puts a function as a static in a header anyways?
+			OV_CALLBACKS_NOCLOSE.seek_func = ffi.C._ov_header_fseek_wrap
+			--]]
+			-- [[
+			-- i'd free the closure but meh
+			OV_CALLBACKS_NOCLOSE.seek_func = ffi.cast('int (*)(void *, ogg_int64_t, int)', function(f,off,whence)
+				if f == nil then return -1 end
+				return ffi.C.fseek(f,off,whence)
+			end)
+			--]]
+			OV_CALLBACKS_NOCLOSE.close_func = nil
+			OV_CALLBACKS_NOCLOSE.tell_func = ffi.C.ftell
+			if vorbisfile.ov_open_callbacks(infp, vf, nil, 0, OV_CALLBACKS_NOCLOSE) < 0 then
+				error"Input does not appear to be an Ogg bitstream"
+			end
+
+			local outbuf = table()
+			local pcmout = ffi.new'char[4096]'
+			local current_section = ffi.new'int[1]'
+			local eof = false
+			local totalsize  = 0
+			while not eof do
+				local ret = vorbisfile.ov_read(vf, pcmout, ffi.sizeof(pcmout), 0, 2, 1, current_section)
+				if ret == 0 then
+					eof = true
+				elseif ret < 0 then
+					print("error decoding ogg "..ret)
+				else
+					-- TODO?
+					-- we don't bother dealing with sample rate changes, etc, but
+					-- you'll have to
+					outbuf:insert(ffi.string(pcmout, ret))
+					totalsize = totalsize + ret
+				end
+			end
+			outbuf = outbuf:concat()
+			print('buf should be ', totalsize)
+			print('buf is', #outbuf)
+			--assert(require 'ext.file'(wavfn):write(outbuf))
+
+			local vi = vorbisfile.ov_info(vf, -1)
+
+			--[[ TODO make this a function of AudioBuffer ...
+			sound = AudioBuffer:fromVorbis(outbuf, vi)
+			--]]
+			-- [[ until then
+			sound = setmetatable({}, AudioBuffer)
+			sound.buffer = ffi.new'ALuint[1]'
+			local al = require 'ffi.OpenAL'
+			al.alGenBuffers(1, sound.buffer)
+			assert(sound.buffer[0] ~= 0, "Could not generate buffer")
+		
+			local audioData = {
+				channels = vi[0].channels,
+				bitsPerSample = 16,
+				sampleRate = vi[0].rate,
+				duration = vorbisfile.ov_time_total(vf, -1),
+			}
+			if audioData.channels == 1 and audioData.bitsPerSample == 8 then
+				audioData.format = al.AL_FORMAT_MONO8
+			elseif audioData.channels == 1 and audioData.bitsPerSample == 16 then
+				audioData.format = al.AL_FORMAT_MONO16
+			elseif audioData.channels == 2 and audioData.bitsPerSample == 8 then
+				audioData.format = al.AL_FORMAT_STEREO8
+			elseif audioData.channels == 2 and audioData.bitsPerSample == 16 then
+				audioData.format = al.AL_FORMAT_STEREO16
+			end
+			if not audioData.format then
+				error("unrecognised ogg format: " .. audioData.channels .. " channels, " .. audioData.bitsPerSample .. " bps")
+			end
+
+			al.alBufferData(
+				sound.buffer[0],
+				audioData.format,
+				outbuf,
+				#outbuf,
+				audioData.sampleRate)
+
+			--]]
+		else
+print('loading wav')
+			sound = AudioBuffer(filename)
+		end
 		self.sounds[filename] = sound
 	end
 	return sound
@@ -302,7 +401,7 @@ function App:reset()
 	-- I only really need to recreate the sand & flash texs if the board size changes ...
 	self.sandTex, self.sandImage = makeImageAndTex(self.sandSize)
 	self.flashTex, self.flashImage = makeImageAndTex(self.sandSize)
-	
+
 	-- and I only really need to recreate these if the piece size changes ...
 	self.rotPieceTex, self.rotPieceImage = makeImageAndTex(pieceSize)
 	self.nextPieces = range(9):mapi(function(i)
@@ -869,7 +968,7 @@ function App:updateGUI()
 	ig.igText('score: '..tostring(self.score))
 
 	ig.luatableTooltipInputInt('num players', self, 'numPlayers')
-	
+
 
 	self.colortest = self.colortest or ig.ImVec4()
 	--ig.igColorPicker3('test', self.colortest.s, 0)
@@ -932,13 +1031,13 @@ function App:updateGUI()
 		modalsOpened.audio = true
 		self.paused = true
 	end
-	
+
 	if ig.igButton(self.paused and 'resume' or 'pause') then
 		self.paused = not self.paused
 	end
 
 	ig.igEnd()
-	
+
 	if modalsOpened.audio then
 		modalBegin('Audio', nil)
 		if ig.luatableSliderFloat('fx volume', self.audioConfig, 'effectVolume', 0, 1) then
