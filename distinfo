@@ -24,6 +24,7 @@ luajitLibs = {
 	win = {
 		'png',
 		'SDL2',
+		'cimgui_sdl',
 		'z',	-- needed by png
 	},
 	osx = {
