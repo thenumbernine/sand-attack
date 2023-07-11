@@ -916,7 +916,6 @@ function App:update(...)
 	
 	self.sandTex:bind()
 	gl.glDrawArrays(gl.GL_QUADS, 0, 4)
-	self.sandTex:unbind()
 	
 	-- draw the current piece
 	for _,player in ipairs(self.players) do
@@ -941,7 +940,6 @@ function App:update(...)
 
 			tex:bind()
 			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
-			tex:unbind()
 
 			if i == 1 then
 				gl.glDisable(gl.GL_BLEND)
@@ -968,7 +966,6 @@ function App:update(...)
 
 			self.flashTex:bind()
 			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
-			self.flashTex:unbind()
 		end
 		gl.glDisable(gl.GL_ALPHA_TEST)
 	elseif self.wasFlashing then
@@ -976,7 +973,7 @@ function App:update(...)
 		self.wasFlashing = false
 		ffi.fill(self.flashTex.image.buffer, 4 * w * h)
 		assert(self.flashTex.data == self.flashTex.image.buffer)
-		self.flashTex:bind():subimage():unbind()
+		self.flashTex:bind():subimage()
 	end
 
 
@@ -985,7 +982,6 @@ function App:update(...)
 		local it = self.nextPieces[i]
 		local dy = #self.nextPieces == 1 and 0 or (1 - nextPieceSize)/(#self.nextPieces-1)
 		dy = math.min(dy, nextPieceSize * 1.1)
-		it.tex:bind()
 	
 		self.mvMat
 			:setTranslate(aspectRatio * .5 - nextPieceSize, .5 - (i-1) * dy)
@@ -993,10 +989,12 @@ function App:update(...)
 		self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 		gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
+		it.tex:bind()
 		gl.glDrawArrays(gl.GL_QUADS, 0, 4)
 	end
 
 	self.displayShader.vao:useNone()
+	GLTex2D:unbind()
 	self.displayShader:useNone()
 
 	App.super.update(self, ...)
