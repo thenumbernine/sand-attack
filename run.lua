@@ -129,6 +129,7 @@ function App:initGL(...)
 
 	self.numPlayers = 1
 	self.numColors = 4
+	self.numNextPieces = 9
 	self.toppleChance = 1
 
 	self.nextSandSize = vec2i(80, 144)	-- original:
@@ -309,7 +310,7 @@ function App:reset()
 
 	-- and I only really need to recreate these if the piece size changes ...
 	self.rotPieceTex, self.rotPieceImage = makeImageAndTex(pieceSize)
-	self.nextPieces = range(9):mapi(function(i)
+	self.nextPieces = range(self.numNextPieces):mapi(function(i)
 		local tex = makeImageAndTex(pieceSize)
 		return {tex=tex}
 	end)
@@ -764,13 +765,20 @@ function App:update(...)
 
 	local aspectRatio = self.width / self.height
 	local s = w / h
-	for i,it in ipairs(self.nextPieces) do
+	local nextPieceSize = .1
+	for i=#self.nextPieces,1,-1 do
+		local it = self.nextPieces[i]
+		local dy = #self.nextPieces == 1 and 0 or (1 - nextPieceSize)/(#self.nextPieces-1)
+		dy = math.min(dy, nextPieceSize * 1.1)
 		it.tex:bind()
 		gl.glBegin(gl.GL_QUADS)
 		for _,v in ipairs(vtxs) do
 			local x,y = table.unpack(v)
 			gl.glTexCoord2f(x,y)
-			gl.glVertex2f((aspectRatio - 1) * .5 + 1 - .2 + x * .1, 1 - (y + 1.1 * (i - .9)) * .1)
+			gl.glVertex2f(
+				.5 + aspectRatio*.5 + (x - 1) * nextPieceSize,
+				1 - ((i-1) * dy + y * nextPieceSize)
+			)
 		end
 		gl.glEnd()
 	end
@@ -874,6 +882,7 @@ function App:updateGUI()
 
 	ig.luatableTooltipInputInt('num players', self, 'numPlayers')
 
+	ig.luatableTooltipInputInt('num next pieces', self, 'numNextPieces')
 
 	self.colortest = self.colortest or ig.ImVec4()
 	--ig.igColorPicker3('test', self.colortest.s, 0)
