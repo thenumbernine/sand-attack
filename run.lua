@@ -909,18 +909,10 @@ function App:update(...)
 	self.displayShader:use()
 	self.displayShader.vao:use()
 
-	--[=[ TODO functions for applying the operations, not for creating hte matrices (so we can cut down on allocs)
 	self.mvMat:setIdent()
-		:translate(-.5, -.5)
-		:translate(.5 * (1 - s), 0)
-		:scale(s, 1)
-	--]=]
-	-- [=[ until then ...
-	self.mvMat = 
-		matrix{4,4}:zeros():setTranslate(-.5, -.5, 0)
-		* matrix{4,4}:zeros():setTranslate(.5 * (1 - s), 0, 0)
-		* matrix{4,4}:zeros():setScale(s, 1, 1)
-	--]=]
+		:applyTranslate(-.5, -.5)
+		:applyTranslate(.5 * (1 - s), 0)
+		:applyScale(s, 1)
 	self.mvProjMat:mul(self.projMat, self.mvMat)
 	gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 	
@@ -941,18 +933,10 @@ function App:update(...)
 				gl.glEnable(gl.GL_ALPHA_TEST)
 			end
 
-			--[=[ TODO
-			self.mvMat:setIdent()
-				:translate(-.5, -.5)
-				:translate((player.piecePos.x / w - .5) * s + .5, player.piecePos.y / h)
-				:scale(pieceSize.x / w * s, pieceSize.y / h)
-			--]=]
-			-- [=[ until then ...
-			self.mvMat =
-				matrix{4,4}:zeros():setTranslate(-.5, -.5, 0)
-				* matrix{4,4}:zeros():setTranslate((player.piecePos.x / w - .5) * s + .5, player.piecePos.y / h, 0)
-				* matrix{4,4}:zeros():setScale(pieceSize.x / w * s, pieceSize.y / h, 1)
-			--]=]
+			self.mvMat
+				:setTranslate(-.5, -.5)
+				:applyTranslate((player.piecePos.x / w - .5) * s + .5, player.piecePos.y / h)
+				:applyScale(pieceSize.x / w * s, pieceSize.y / h)
 			self.mvProjMat:mul(self.projMat, self.mvMat)
 			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
@@ -977,19 +961,10 @@ function App:update(...)
 		gl.glEnable(gl.GL_ALPHA_TEST)
 		local flashInt = bit.band(math.floor(flashDt * numFlashes * 2), 1) == 0
 		if flashInt then
-
-			--[=[ TODO
-			self.mvMat:setIdent()
-				:translate(-.5, -.5)
-				:translate(.5 * (1 - s), 0)
-				:scale(s, 1)
-			--]=]
-			-- [=[ until then
-			self.mvMat = 
-				matrix{4,4}:zeros():setTranslate(-.5, -.5, 0)
-				* matrix{4,4}:zeros():setTranslate(.5 * (1 - s), 0, 0)
-				* matrix{4,4}:zeros():setScale(s, 1, 1)
-			--]=]
+			self.mvMat
+				:setTranslate(-.5, -.5)
+				:applyTranslate(.5 * (1 - s), 0)
+				:applyScale(s, 1)
 			self.mvProjMat:mul(self.projMat, self.mvMat)
 			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
@@ -1014,18 +989,10 @@ function App:update(...)
 		dy = math.min(dy, nextPieceSize * 1.1)
 		it.tex:bind()
 	
-		--[=[ TODO
-		self.mvMat:setIdent()
-			:translate(-.5, -.5)
-			:translate(.5 + aspectRatio * .5 - nextPieceSize, 1 - (i-1) * dy)
-			:scale(nextPieceSize, -nextPieceSize)
-		--]=]
-		-- [=[ until then
-		self.mvMat = 
-			matrix{4,4}:zeros():setTranslate(-.5, -.5, 0)
-			* matrix{4,4}:zeros():setTranslate(.5 + aspectRatio * .5 - nextPieceSize, 1 - (i-1) * dy, 0)
-			* matrix{4,4}:zeros():setScale(nextPieceSize, -nextPieceSize, 1)
-		--]=]
+		self.mvMat
+			:setTranslate(-.5, -.5)
+			:applyTranslate(.5 + aspectRatio * .5 - nextPieceSize, 1 - (i-1) * dy)
+			:applyScale(nextPieceSize, -nextPieceSize)
 		self.mvProjMat:mul(self.projMat, self.mvMat)
 		gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
