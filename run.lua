@@ -12,6 +12,7 @@ local Image = require 'image'
 local GLTex2D = require 'gl.tex2d'
 local glreport = require 'gl.report'
 local vec2i = require 'vec-ffi.vec2i'
+local vec2f = require 'vec-ffi.vec2f'
 local vec3f = require 'vec-ffi.vec3f'
 local vec4f = require 'vec-ffi.vec4f'
 local getTime = require 'ext.timer'.getTime
@@ -20,6 +21,9 @@ local Audio = require 'audio'
 local AudioSource = require 'audio.source'
 local AudioBuffer = require 'audio.buffer'
 local vector = require 'ffi.cpp.vector'
+
+-- TODO put this in ext.math
+local DBL_EPSILON = 2.220446049250313080847e-16
 
 -- board size is 80 x 144 visible
 -- piece is 4 blocks arranged
@@ -132,6 +136,9 @@ function App:initGL(...)
 	self.numColors = 4
 	self.numNextPieces = 9
 	self.toppleChance = 1
+
+	self.fps = 0
+	self.numSandVoxels = 0
 
 	self.nextSandSize = vec2i(80, 144)	-- original:
 	--self.nextSandSize = vec2i(160, 200)
@@ -301,7 +308,8 @@ local pieceImages = table{
 
 ffi.cdef[[
 typedef struct {
-	vec2i_t pos;
+	vec2f_t pos;
+	vec2f_t vel;
 	uint32_t color;
 } grain_t;
 ]]
@@ -515,18 +523,36 @@ function App:updateGame()
 
 	local needsCheckLine = false
 
+	local grav = -9.8 * tonumber(pieceSize.x)
+	local dragCoeff = .9
 	-- move particles, collide based on last iteration's blits
 	for gi=0,self.grains.size-1 do
-		local g = self.grains.v[gi]
-		g.pos.x = math.clamp(g.pos.x, 0, w-1)
-		g.pos.y = math.clamp(g.pos.y, 0, h-1)
-		local x, y = g.pos:unpack()
-		if y > 0 then
+		local g = self.grains.v + gi
+		g.pos.x = g.pos.x + g.vel.x * dt
+		g.pos.y = g.pos.y + g.vel.y * dt
+		g.vel.x = g.vel.x * dragCoeff
+		g.vel.y = g.vel.y + grav * dt
+		if g.pos.x < .5 then
+			g.vel.x = 0	-- TOOD bounce? does sand bounce?
+			g.pos.x = .5
+		elseif g.pos.x > w-.5 then
+			g.vel.x = 0
+			g.pos.x = w-.5
+		end
+		g.pos.y = math.clamp(g.pos.y, 0, h-DBL_EPSILON)
+		
+		local x = math.floor(g.pos.x)
+		local y = math.floor(g.pos.y)
+		local onground
+		if y == 0 then
+			onground = true
+		else
 			local p = ffi.cast('uint32_t*', self.sandTex.image.buffer) + (x + w * y)
 			
 			-- if the cell is blank and there's a sand cell above us ... pull it down
 			--if p[0] ~= 0 then -- should always be true
 			if p[-w] == 0 then
+				-- fall
 				p[0], p[-w] = p[-w], p[0]
 				g.pos.y = g.pos.y - 1
 				needsCheckLine = true
@@ -546,6 +572,8 @@ function App:updateGame()
 						g.pos.x = g.pos.x + 1
 						g.pos.y = g.pos.y - 1
 						needsCheckLine = true
+					else
+						onground = true
 					end
 				else
 					if x < w-1 and p[-w+1] == 0 then
@@ -558,9 +586,14 @@ function App:updateGame()
 						g.pos.x = g.pos.x - 1
 						g.pos.y = g.pos.y - 1
 						needsCheckLine = true
+					else
+						onground = true
 					end
 				end
 			end
+		end
+		if onground then
+			g.vel.y = 0
 		end
 	end
 
@@ -568,7 +601,9 @@ function App:updateGame()
 	ffi.fill(self.sandTex.image.buffer, w * h * 4)
 	for gi=0,self.grains.size-1 do
 		local g = self.grains.v[gi]
-		ffi.cast('uint32_t*', self.sandTex.image.buffer)[g.pos.x + w * g.pos.y] = g.color
+		local x = math.floor(g.pos.x)
+		local y = math.floor(g.pos.y)
+		ffi.cast('uint32_t*', self.sandTex.image.buffer)[x + w * y] = g.color
 	end
 
 	for _,player in ipairs(self.players) do
@@ -646,8 +681,11 @@ function App:updateGame()
 						then
 							ffi.cast('int*', self.sandTex.image.buffer)[x + w * y] = color
 							local g = self.grains:emplace_back()
-							g[0].pos:set(x,y)
-							g[0].color = color
+							g.pos:set(x+.5, y+.5)
+							--local vel = (vec2f(i+.5,j+.5)-vec2f(pieceSize:unpack())*.5) / tonumber(pieceSize.x) * 250
+							--g.vel:set(vel:unpack())
+							g.vel:set(0,0)
+							g.color = color
 						end
 					end
 				end
@@ -698,7 +736,9 @@ function App:updateGame()
 			self.flashTime = self.gameTime
 			for gi=self.grains.size-1,0,-1 do
 				local g = self.grains.v + gi
-				local ofs = g[0].pos.x + w * g[0].pos.y
+				local x = math.floor(g.pos.x)
+				local y = math.floor(g.pos.y)
+				local ofs = x + w * y
 				if ffi.cast('uint32_t*', self.currentClearImage.buffer)[ofs] ~= 0 then
 					ffi.cast('uint32_t*', self.sandTex.image.buffer)[ofs] = 0
 					self.grains:erase(g, g+1)
@@ -708,6 +748,12 @@ function App:updateGame()
 	end
 
 	if needsCheckLine or anyMerged or anyCleared then
+		self.numSandVoxels = 0
+		local p = ffi.cast('uint32_t*', self.sandTex.image.buffer)
+		for i=0,w*h-1 do
+			if p[0] ~= 0 then self.numSandVoxels = self.numSandVoxels + 1 end
+			p = p + 1
+		end
 		self.sandTex:bind():subimage()
 	end
 
@@ -832,8 +878,8 @@ function App:update(...)
 		local thisTime = getTime()
 		if thisTime - self.lastFrameTime >= 1 then
 			local deltaTime = thisTime - self.lastFrameTime
-			local fps = self.fpsSampleCount / deltaTime
-			print(fps)
+			self.fps = self.fpsSampleCount / deltaTime
+			--print(fps)
 			self.lastFrameTime = thisTime
 			self.fpsSampleCount = 0
 		end
@@ -846,7 +892,7 @@ function App:flipBoard()
 	local w, h = self.sandSize:unpack()
 	for i=0,self.grains.size-1 do
 		local g = self.grains.v+i
-		g[0].pos.y = h-1-g[0].pos.y
+		g[0].pos.y = h-g[0].pos.y-DBL_EPSILON
 	end
 	self.sandTex:bind():subimage()
 end
@@ -914,6 +960,9 @@ function App:updateGUI()
 		self.menuOpen = not self.menuOpen
 	end
 	if self.menuOpen then
+		if showFPS then ig.igText('fps: '..self.fps) end
+		ig.igText('num grains: '..self.grains.size)
+		ig.igText('num voxels: '..self.numSandVoxels)
 		ig.igText('score: '..tostring(self.score))
 
 		ig.luatableTooltipInputInt('num players', self, 'numPlayers')
