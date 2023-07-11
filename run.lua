@@ -19,6 +19,7 @@ local ig = require 'imgui'
 local Audio = require 'audio'
 local AudioSource = require 'audio.source'
 local AudioBuffer = require 'audio.buffer'
+local vector = require 'ffi.cpp.vector'
 
 -- board size is 80 x 144 visible
 -- piece is 4 blocks arranged
@@ -40,7 +41,7 @@ local baseColors = table{
 -- ... but not all 8 bit alpha channels are really 8 bits ...
 
 local dontCheck = false	-- don't ever ever check for lines.  used for fps testing the sand topple simulation.
-local showFPS = false
+local showFPS = true
 local useAudio = true
 
 local updateInterval = 1/60
@@ -50,7 +51,7 @@ local updateInterval = 1/60
 local ticksToFall = 5
 
 
-local function makeImageAndTex(size)
+local function makeTexWithImage(size)
 	local img = Image(size.x, size.y, 4, 'unsigned char')
 	ffi.fill(img.buffer, 4 * size.x * size.y)
 	local tex = GLTex2D{
@@ -97,7 +98,7 @@ function Player:init(args)
 		}
 	end
 	assert(self.keys, "failed to find key mapping for player "..self.index)
-	self.pieceTex, self.pieceImage = makeImageAndTex(pieceSize)
+	self.pieceTex, self.pieceImage = makeTexWithImage(pieceSize)
 end
 
 function Player:handleKeyUpDown(sym, down)
@@ -298,20 +299,29 @@ local pieceImages = table{
 ]],
 }
 
+ffi.cdef[[
+typedef struct {
+	vec2i_t pos;
+	uint32_t color;
+} grain_t;
+]]
+
 function App:reset()
 	self.sandSize = vec2i(self.nextSandSize)
 
 	local w, h = self.sandSize:unpack()
 
+	self.grains = vector'grain_t'
 
 	-- I only really need to recreate the sand & flash texs if the board size changes ...
-	self.sandTex, self.sandImage = makeImageAndTex(self.sandSize)
-	self.flashTex, self.flashImage = makeImageAndTex(self.sandSize)
+	self.sandTex = makeTexWithImage(self.sandSize)
+	self.flashTex = makeTexWithImage(self.sandSize)
+	self.currentClearImage = Image(self.sandSize.x, self.sandSize.y, 4, 'unsigned char')
 
 	-- and I only really need to recreate these if the piece size changes ...
-	self.rotPieceTex, self.rotPieceImage = makeImageAndTex(pieceSize)
+	self.rotPieceTex = makeTexWithImage(pieceSize)
 	self.nextPieces = range(self.numNextPieces):mapi(function(i)
-		local tex = makeImageAndTex(pieceSize)
+		local tex = makeTexWithImage(pieceSize)
 		return {tex=tex}
 	end)
 
@@ -503,50 +513,62 @@ function App:updateGame()
 	--]]
 	self.gameTime = self.gameTime + updateInterval
 
-	local needsCheck = false
+	local needsCheckLine = false
 
-	-- update
-	local prow = ffi.cast('int*', self.sandTex.image.buffer) + w
-	for j=1,h-1 do
-		-- 50/50 cycling left-to-right vs right-to-left
-		local istart, iend, istep
-		if math.random(2) == 2 then
-			istart,iend,istep = 0, w-1, 1
-		else
-			istart,iend,istep = w-1, 0, -1
-		end
-		local p = prow + istart
-		for i=istart,iend,istep do
+	-- move particles, collide based on last iteration's blits
+	for gi=0,self.grains.size-1 do
+		local g = self.grains.v[gi]
+		g.pos.x = math.clamp(g.pos.x, 0, w-1)
+		g.pos.y = math.clamp(g.pos.y, 0, h-1)
+		local x, y = g.pos:unpack()
+		if y > 0 then
+			local p = ffi.cast('uint32_t*', self.sandTex.image.buffer) + (x + w * y)
+			
 			-- if the cell is blank and there's a sand cell above us ... pull it down
-			if p[0] ~= 0 then
-				if p[-w] == 0 then
-					p[0], p[-w] = p[-w], p[0]
-					needsCheck = true
+			--if p[0] ~= 0 then -- should always be true
+			if p[-w] == 0 then
+				p[0], p[-w] = p[-w], p[0]
+				g.pos.y = g.pos.y - 1
+				needsCheckLine = true
+			elseif math.random() < self.toppleChance then
 				-- hmm symmetry? check left vs right first?
-				elseif math.random() < self.toppleChance then
-					-- 50/50 check left then right, vs check right then left
-					if math.random(2) == 2 then
-						if i > 0 and p[-w-1] == 0 then
-							p[0], p[-w-1] = p[-w-1], p[0]
-							needsCheck = true
-						elseif i < w-1 and p[-w+1] == 0 then
-							p[0], p[-w+1] = p[-w+1], p[0]
-							needsCheck = true
-						end
-					else
-						if i < w-1 and p[-w+1] == 0 then
-							p[0], p[-w+1] = p[-w+1], p[0]
-							needsCheck = true
-						elseif i > 0 and p[-w-1] == 0 then
-							p[0], p[-w-1] = p[-w-1], p[0]
-							needsCheck = true
-						end
+				-- 50/50 check left then right, vs check right then left
+				if math.random(2) == 2 then
+					if x > 0 and p[-w-1] == 0 then
+						-- swap colors
+						p[0], p[-w-1] = p[-w-1], p[0]
+						-- move sand
+						g.pos.x = g.pos.x - 1
+						g.pos.y = g.pos.y - 1
+						needsCheckLine = true
+					elseif x < w-1 and p[-w+1] == 0 then
+						p[0], p[-w+1] = p[-w+1], p[0]
+						g.pos.x = g.pos.x + 1
+						g.pos.y = g.pos.y - 1
+						needsCheckLine = true
+					end
+				else
+					if x < w-1 and p[-w+1] == 0 then
+						p[0], p[-w+1] = p[-w+1], p[0]
+						g.pos.x = g.pos.x + 1
+						g.pos.y = g.pos.y - 1
+						needsCheckLine = true
+					elseif x > 0 and p[-w-1] == 0 then
+						p[0], p[-w-1] = p[-w-1], p[0]
+						g.pos.x = g.pos.x - 1
+						g.pos.y = g.pos.y - 1
+						needsCheckLine = true
 					end
 				end
 			end
-			p = p + istep
 		end
-		prow = prow + w
+	end
+
+	-- now clear and blit all grains onto the board
+	ffi.fill(self.sandTex.image.buffer, w * h * 4)
+	for gi=0,self.grains.size-1 do
+		local g = self.grains.v[gi]
+		ffi.cast('uint32_t*', self.sandTex.image.buffer)[g.pos.x + w * g.pos.y] = g.color
 	end
 
 	for _,player in ipairs(self.players) do
@@ -584,6 +606,7 @@ function App:updateGame()
 		end
 	end
 
+	local anyMerged
 	for _,player in ipairs(self.players) do
 		local merge
 		if player.piecePos.y <= 0 then
@@ -596,10 +619,21 @@ function App:updateGame()
 			end
 		end
 		if merge then
+			anyMerged = true
 			self:playSound'sfx/place.wav'
-			needsCheck = true
+			needsCheckLine = true
 			for j=0,pieceSize.y-1 do
-				for i=0,pieceSize.x-1 do
+				local istart,iend,istep
+				if math.random(2) == 2 then
+					istart = 0
+					iend = pieceSize.x-1
+					istep = 1
+				else
+					istart = pieceSize.x-1
+					iend = 0
+					istep = -1
+				end
+				for i=istart,iend,istep do
 					local k =  i + pieceSize.x * j
 					local color = ffi.cast('int*', player.pieceTex.image.buffer)[k]
 					if color ~= 0 then
@@ -607,43 +641,27 @@ function App:updateGame()
 						local y = player.piecePos.y + j
 						if x >= 0 and x < w
 						and y >= 0 and y < h
-						and ffi.cast('int*', self.sandTex.image.buffer)[x + w * y] == 0
+						-- use previous sand image to detect collision
+						and ffi.cast('uint32_t*', self.sandTex.image.buffer)[x + w * y] == 0
 						then
 							ffi.cast('int*', self.sandTex.image.buffer)[x + w * y] = color
+							local g = self.grains:emplace_back()
+							g[0].pos:set(x,y)
+							g[0].color = color
 						end
 					end
 				end
 			end
-
 			self:newPiece(player)
 		end
 	end
 
-	if dontCheck then needsCheck = false end
+	if dontCheck then needsCheckLine = false end
 
-	--[[ now ... try to find a connection from left to right
-	local function checkNextCol(i, jmin, jmax, color)
-
-	end
-	local j = 0
-	while j < h-1 do
-		local color = self.sandCPU[0 + w * j]
-		if color ~= 0 then
-			-- this is the start of our color interval
-			local jmin = j
-			-- find the end of i
-			repeat
-				j = j + 1
-			until j >= h or self.sandCPU[0 + w * j] ~= color
-			local jmax = j - 1
-			if checkNextCol(1, jmin, jmax, color) then
-			end
-		end
-	end
-	--]]
-
-	if needsCheck then
-		local anyCleared
+	-- try to find a connection from left to right
+	local anyCleared
+	if needsCheckLine then
+		ffi.fill(self.currentClearImage.buffer, 4 * w * h)
 		local clearedCount = 0
 		local blobs = self.sandTex.image:getBlobs(self.getBlobCtx)
 --print('#blobs', #blobs)
@@ -661,8 +679,11 @@ function App:updateGame()
 					for _,int in ipairs(blob) do
 						local iw = int.x2 - int.x1 + 1
 						clearedCount = clearedCount + iw
-						ffi.fill(self.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
+						--ffi.fill(self.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
 						for k=0,4*iw-1 do
+							-- keep track of what is being cleared this frame
+							-- use this to test for what particles to remove
+							self.currentClearImage.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 							self.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 						end
 					end
@@ -672,12 +693,22 @@ function App:updateGame()
 		if clearedCount ~= 0 then
 			anyCleared = true
 			self.score = self.score + clearedCount
-		end
-		if anyCleared then
 			self:playSound'sfx/line.wav'
 			self.flashTex:bind():subimage()
 			self.flashTime = self.gameTime
+			for gi=self.grains.size-1,0,-1 do
+				local g = self.grains.v + gi
+				local ofs = g[0].pos.x + w * g[0].pos.y
+				if ffi.cast('uint32_t*', self.currentClearImage.buffer)[ofs] ~= 0 then
+					ffi.cast('uint32_t*', self.sandTex.image.buffer)[ofs] = 0
+					self.grains:erase(g, g+1)
+				end
+			end
 		end
+	end
+
+	if needsCheckLine or anyMerged or anyCleared then
+		self.sandTex:bind():subimage()
 	end
 
 	for _,player in ipairs(self.players) do
@@ -710,7 +741,7 @@ function App:update(...)
 	GLTex2D:enable()
 
 	assert(self.sandTex.data == self.sandTex.image.buffer)
-	self.sandTex:bind():subimage()
+	self.sandTex:bind()
 	local s = w / h
 	gl.glBegin(gl.GL_QUADS)
 	for _,v in ipairs(vtxs) do
@@ -813,14 +844,9 @@ App.fpsSampleCount = 0
 
 function App:flipBoard()
 	local w, h = self.sandSize:unpack()
-	local p1 = ffi.cast('int*', self.sandTex.image.buffer)
-	local p2 = p1 + w * h - 1
-	for j=0,bit.rshift(h,1)-1 do
-		for i=0,w-1 do
-			p1[0], p2[0] = p2[0], p1[0]
-			p1 = p1 + 1
-			p2 = p2 - 1
-		end
+	for i=0,self.grains.size-1 do
+		local g = self.grains.v+i
+		g[0].pos.y = h-1-g[0].pos.y
 	end
 	self.sandTex:bind():subimage()
 end
@@ -873,7 +899,7 @@ function App:updateGUI()
 	-- [[
 	ig.igSetNextWindowPos(ig.ImVec2(0, 0), 0, ig.ImVec2())
 	ig.igSetNextWindowSize(ig.ImVec2(150, -1), 0)
-	ig.igBegin('score', nil, bit.bor(
+	ig.igBegin('x', nil, bit.bor(
 		ig.ImGuiWindowFlags_NoMove,
 		ig.ImGuiWindowFlags_NoResize,
 		ig.ImGuiWindowFlags_NoCollapse,
@@ -884,79 +910,82 @@ function App:updateGUI()
 	ig.igBegin('cfg', nil, 0)
 	--]]
 
-
-	ig.igText('score: '..tostring(self.score))
-
-	ig.luatableTooltipInputInt('num players', self, 'numPlayers')
-
-	ig.luatableTooltipInputInt('num next pieces', self, 'numNextPieces')
-
-	self.colortest = self.colortest or ig.ImVec4()
-	--ig.igColorPicker3('test', self.colortest.s, 0)
-	if ig.igButton'+' then
-		self.numColors = self.numColors + 1
-		self.nextColors = baseColors:sub(1, self.numColors)
+	if ig.igButton'...' then
+		self.menuOpen = not self.menuOpen
 	end
-	ig.igSameLine()
-	if self.numColors > 1 and ig.igButton'-' then
-		self.numColors = self.numColors - 1
-		self.nextColors = baseColors:sub(1, self.numColors)
-	end
-	ig.igSameLine()
+	if self.menuOpen then
+		ig.igText('score: '..tostring(self.score))
 
-	for i=1,self.numColors do
-		local c = self.nextColors[i]
-		tmpcolor.x = c.x
-		tmpcolor.y = c.y
-		tmpcolor.z = c.z
-		tmpcolor.w = 1
-		if ig.igColorButton('color '..i, tmpcolor) then
-			modalsOpened.colorPicker = true
+		ig.luatableTooltipInputInt('num players', self, 'numPlayers')
+
+		ig.luatableTooltipInputInt('num next pieces', self, 'numNextPieces')
+
+		self.colortest = self.colortest or ig.ImVec4()
+		--ig.igColorPicker3('test', self.colortest.s, 0)
+		if ig.igButton'+' then
+			self.numColors = self.numColors + 1
+			self.nextColors = baseColors:sub(1, self.numColors)
+		end
+		ig.igSameLine()
+		if self.numColors > 1 and ig.igButton'-' then
+			self.numColors = self.numColors - 1
+			self.nextColors = baseColors:sub(1, self.numColors)
+		end
+		ig.igSameLine()
+
+		for i=1,self.numColors do
+			local c = self.nextColors[i]
+			tmpcolor.x = c.x
+			tmpcolor.y = c.y
+			tmpcolor.z = c.z
+			tmpcolor.w = 1
+			if ig.igColorButton('color '..i, tmpcolor) then
+				modalsOpened.colorPicker = true
+				self.paused = true
+				self.currentColorEditing = i
+			end
+			if i % 6 ~= 4 and i < self.numColors then
+				ig.igSameLine()
+			end
+		end
+
+		ig.luatableTooltipInputInt('board width', self.nextSandSize, 'x')
+		ig.luatableTooltipInputInt('board height', self.nextSandSize, 'y')
+		ig.luatableTooltipSliderFloat('topple chance', self, 'toppleChance', 0, 1)
+
+		if ig.igButton'New Game' then
+			self:reset()
+		end
+
+		local url = 'https://github.com/thenumbernine/sand-tetris'
+		if ig.igButton'about' then
+			if ffi.os == 'Windows' then
+				os.execute('explorer "'..url..'"')
+			elseif ffi.os == 'OSX' then
+				os.execute('open "'..url..'"')
+			else
+				os.execute('xdg-open "'..url..'"')
+			end
+			print'clicked'
+		end
+		if ig.igIsItemHovered(ig.ImGuiHoveredFlags_None) then
+			ig.igSetMouseCursor(ig.ImGuiMouseCursor_Hand)
+			ig.igBeginTooltip()
+			ig.igText('by Christopher Moore')
+			ig.igText('click to go to')
+			ig.igText(url)
+			ig.igEndTooltip()
+		end
+
+		if useAudio and ig.igButton'Audio...' then
+			modalsOpened.audio = true
 			self.paused = true
-			self.currentColorEditing = i
 		end
-		if i % 6 ~= 4 and i < self.numColors then
-			ig.igSameLine()
+
+		if ig.igButton(self.paused and 'resume' or 'pause') then
+			self.paused = not self.paused
 		end
 	end
-
-	ig.luatableTooltipInputInt('board width', self.nextSandSize, 'x')
-	ig.luatableTooltipInputInt('board height', self.nextSandSize, 'y')
-	ig.luatableTooltipSliderFloat('topple chance', self, 'toppleChance', 0, 1)
-
-	if ig.igButton'New Game' then
-		self:reset()
-	end
-
-	local url = 'https://github.com/thenumbernine/sand-tetris'
-	if ig.igButton'about' then
-		if ffi.os == 'Windows' then
-			os.execute('explorer "'..url..'"')
-		elseif ffi.os == 'OSX' then
-			os.execute('open "'..url..'"')
-		else
-			os.execute('xdg-open "'..url..'"')
-		end
-		print'clicked'
-	end
-	if ig.igIsItemHovered(ig.ImGuiHoveredFlags_None) then
-		ig.igSetMouseCursor(ig.ImGuiMouseCursor_Hand)
-		ig.igBeginTooltip()
-		ig.igText('by Christopher Moore')
-		ig.igText('click to go to')
-		ig.igText(url)
-		ig.igEndTooltip()
-	end
-
-	if useAudio and ig.igButton'Audio...' then
-		modalsOpened.audio = true
-		self.paused = true
-	end
-
-	if ig.igButton(self.paused and 'resume' or 'pause') then
-		self.paused = not self.paused
-	end
-
 	ig.igEnd()
 
 	if modalsOpened.audio then
