@@ -10,6 +10,8 @@ local gl = require 'gl'
 local sdl = require 'ffi.sdl'
 local Image = require 'image'
 local GLTex2D = require 'gl.tex2d'
+local GLProgram = require 'gl.program'
+local GLArrayBuffer = require 'gl.arraybuffer'
 local glreport = require 'gl.report'
 local vec2i = require 'vec-ffi.vec2i'
 local vec2f = require 'vec-ffi.vec2f'
@@ -25,6 +27,18 @@ local vector = require 'ffi.cpp.vector'
 -- TODO put this in ext.math
 --local DBL_EPSILON = 2.220446049250313080847e-16
 local FLT_EPSILON = 1.1920928955078125e-7
+
+local function matmul4x4(c,a,b)
+	for i=0,3 do
+		for j=0,3 do
+			local sum = 0
+			for k=0,3 do
+				sum = sum + a[i + 4 * k] * b[k + 4 * j]
+			end
+			c[i + 4 * j] = sum
+		end
+	end
+end
 
 -- board size is 80 x 144 visible
 -- piece is 4 blocks arranged
@@ -53,8 +67,10 @@ local updateInterval = 1/60
 --local updateInterval = 1/120
 --local updateInterval = 0
 
+-- fall every 5 ticks
+-- TODO something about speeding up with levels
+-- TODO level
 local ticksToFall = 5
-
 
 local function makeTexWithImage(size)
 	local img = Image(size.x, size.y, 4, 'unsigned char')
@@ -156,21 +172,68 @@ function App:initGL(...)
 		classify = function(p) return p[3] end,	-- classify by alpha channel
 	}
 
+	self.projMat = ffi.new'float[16]'
+	self.mvMat = ffi.new'float[16]'
+	self.mvProjMat = ffi.new'float[16]'
+
+	local vtxbufCPU = ffi.new('float[8]', {
+		0,0,
+		1,0,
+		1,1,
+		0,1,
+	})
+	local vertexBuf = GLArrayBuffer{
+		size = ffi.sizeof(vtxbufCPU),
+		data = vtxbufCPU,
+	}
+
+	self.displayShader = GLProgram{
+		vertexCode = [[
+#version 460
+in vec2 vertex;
+out vec2 texcoordv;
+uniform mat4 modelViewProjMat;
+uniform vec2 scale;	//temp
+uniform vec2 ofs;
+void main() {
+	texcoordv = vertex;
+	vec2 pos = vertex * scale + ofs;
+	gl_Position = modelViewProjMat * vec4(pos, 0., 1.);
+}
+]],
+		fragmentCode = [[
+#version 460
+in vec2 texcoordv;
+out vec4 fragColor;
+uniform sampler2D tex;
+void main() {
+	fragColor = texture(tex, texcoordv);
+}
+]],
+		uniforms = {
+			tex = 0,
+		},
+	
+		attrs = {
+			vertex = vertexBuf,
+		},
+	}:useNone()
+
 	self.sounds = {}
 
-	self.audio = Audio()
-	self.audioSources = table()
-	self.audioSourceIndex = 0
-	self.audio:setDistanceModel'linear clamped'
-	for i=1,31 do	-- 31 for DirectSound, 32 for iphone, infinite for all else?
-		local src = AudioSource()
-		src:setReferenceDistance(self.view.orthoSize)
-		src:setMaxDistance(self.maxAudioDist)
-		src:setRolloffFactor(1)
-		self.audioSources[i] = src
-	end
-
 	if useAudio then
+		self.audio = Audio()
+		self.audioSources = table()
+		self.audioSourceIndex = 0
+		self.audio:setDistanceModel'linear clamped'
+		for i=1,31 do	-- 31 for DirectSound, 32 for iphone, infinite for all else?
+			local src = AudioSource()
+			src:setReferenceDistance(self.view.orthoSize)
+			src:setMaxDistance(self.maxAudioDist)
+			src:setRolloffFactor(1)
+			self.audioSources[i] = src
+		end
+
 		self.audioConfig = {
 			effectVolume = 1,
 			backgroundVolume = .3,
@@ -513,6 +576,7 @@ function App:updateGame()
 	local thisTime = getTime()
 	local dt = thisTime - self.lastUpdateTime
 	if dt <= updateInterval then return end
+	dt = updateInterval
 
 	--[[ fast-forward to catch up? messes up with pause too
 	self.lastUpdateTime = self.lastUpdateTime + updateInterval
@@ -555,7 +619,7 @@ function App:updateGame()
 			--if p[0] ~= 0 then -- should be true from blitting last frame?
 			if p[-w] ~= 0 then
 				if g.vel.y < 0 then
-					g.vel.y = -.1 * g.vel.y
+					g.vel.y = -groundFriction * g.vel.y
 				end
 			end
 			-- resting velocity
@@ -804,20 +868,26 @@ function App:update(...)
 	--]]
 
 	-- draw
-	self.view:setup(self.width / self.height)
 
-	GLTex2D:enable()
+	-- TODO this without using gl:
+	self.view:setup(self.width / self.height)
+	gl.glGetFloatv(gl.GL_PROJECTION_MATRIX, self.projMat)
+	gl.glGetFloatv(gl.GL_MODELVIEW_MATRIX, self.mvMat)
+	matmul4x4(self.mvProjMat, self.projMat, self.mvMat)
+
+	self.displayShader:use()
+	gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat)
+	self.displayShader.vao:use()
 
 	assert(self.sandTex.data == self.sandTex.image.buffer)
 	self.sandTex:bind()
+
 	local s = w / h
-	gl.glBegin(gl.GL_QUADS)
-	for _,v in ipairs(vtxs) do
-		local x,y = table.unpack(v)
-		gl.glTexCoord2f(x,y)
-		gl.glVertex2f((x - .5) * s + .5, y)
-	end
-	gl.glEnd()
+	gl.glUniform2f(self.displayShader.uniforms.ofs.loc, .5 * (1 - s), 0)
+	gl.glUniform2f(self.displayShader.uniforms.scale.loc, s, 1)
+	
+	gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+
 	self.sandTex:unbind()
 
 	-- draw the current piece
@@ -825,16 +895,12 @@ function App:update(...)
 		if player.pieceTex then
 			player.pieceTex:bind()
 			gl.glEnable(gl.GL_ALPHA_TEST)
-			gl.glBegin(gl.GL_QUADS)
-			for _,v in ipairs(vtxs) do
-				local x,y = table.unpack(v)
-				gl.glTexCoord2f(x,y)
-				gl.glVertex2f(
-					((player.piecePos.x + x * pieceSize.x) / w - .5) * s + .5,
-					(player.piecePos.y + y * pieceSize.y) / h
-				)
-			end
-			gl.glEnd()
+			
+			gl.glUniform2f(self.displayShader.uniforms.ofs.loc, (player.piecePos.x / w - .5) * s + .5, player.piecePos.y / h)
+			gl.glUniform2f(self.displayShader.uniforms.scale.loc, pieceSize.x / w * s, pieceSize.y / h)
+			
+			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+			
 			gl.glDisable(gl.GL_ALPHA_TEST)
 			player.pieceTex:unbind()
 			gl.glColor3f(1,1,1)
@@ -851,18 +917,17 @@ function App:update(...)
 		local flashInt = bit.band(math.floor(flashDt * numFlashes * 2), 1) == 0
 		if flashInt then
 			self.flashTex:bind()
-			local s = w / h
-			gl.glBegin(gl.GL_QUADS)
-			for _,v in ipairs(vtxs) do
-				local x,y = table.unpack(v)
-				gl.glTexCoord2f(x,y)
-				gl.glVertex2f((x - .5) * s + .5, y)
-			end
-			gl.glEnd()
+			
+			gl.glUniform2f(self.displayShader.uniforms.ofs.loc, .5 * (1 - s), 0)
+			gl.glUniform2f(self.displayShader.uniforms.scale.loc, s, 1)
+			
+			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+
 			self.flashTex:unbind()
 		end
 		gl.glDisable(gl.GL_ALPHA_TEST)
 	elseif self.wasFlashing then
+		-- clear once we're done flashing
 		self.wasFlashing = false
 		ffi.fill(self.flashTex.image.buffer, 4 * w * h)
 		assert(self.flashTex.data == self.flashTex.image.buffer)
@@ -870,26 +935,20 @@ function App:update(...)
 	end
 
 	local aspectRatio = self.width / self.height
-	local s = w / h
 	local nextPieceSize = .1
 	for i=#self.nextPieces,1,-1 do
 		local it = self.nextPieces[i]
 		local dy = #self.nextPieces == 1 and 0 or (1 - nextPieceSize)/(#self.nextPieces-1)
 		dy = math.min(dy, nextPieceSize * 1.1)
 		it.tex:bind()
-		gl.glBegin(gl.GL_QUADS)
-		for _,v in ipairs(vtxs) do
-			local x,y = table.unpack(v)
-			gl.glTexCoord2f(x,y)
-			gl.glVertex2f(
-				.5 + aspectRatio*.5 + (x - 1) * nextPieceSize,
-				1 - ((i-1) * dy + y * nextPieceSize)
-			)
-		end
-		gl.glEnd()
+		gl.glUniform2f(self.displayShader.uniforms.ofs.loc, .5 + aspectRatio * .5 - nextPieceSize, 1 - (i-1) * dy)
+		gl.glUniform2f(self.displayShader.uniforms.scale.loc, nextPieceSize, -nextPieceSize)
+			
+		gl.glDrawArrays(gl.GL_QUADS, 0, 4)
 	end
 
-	GLTex2D:disable()
+	self.displayShader.vao:useNone()
+	self.displayShader:useNone()
 
 	App.super.update(self, ...)
 	glreport'here'
@@ -901,7 +960,6 @@ function App:update(...)
 		if thisTime - self.lastFrameTime >= 1 then
 			local deltaTime = thisTime - self.lastFrameTime
 			self.fps = self.fpsSampleCount / deltaTime
-			--print(fps)
 			self.lastFrameTime = thisTime
 			self.fpsSampleCount = 0
 		end
