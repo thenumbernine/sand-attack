@@ -53,8 +53,8 @@ local pieceSize = pieceSizeInBlocks * voxelsPerBlock
 
 local baseColors = table{
 	vec3f(1,0,0),
-	vec3f(0,1,0),
 	vec3f(0,0,1),
+	vec3f(0,1,0),
 	vec3f(1,1,0),
 	vec3f(1,0,1),
 	vec3f(0,1,1),
@@ -99,10 +99,19 @@ end
 
 local Player = class()
 
+local function vec3fto4ub(v)
+	return bit.bor(
+		math.floor(math.clamp(v.x, 0, 1) * 255),
+		bit.lshift(math.floor(math.clamp(v.y, 0, 1) * 255), 8),
+		bit.lshift(math.floor(math.clamp(v.z, 0, 1) * 255), 16),
+		0xff000000
+	)
+end
+
 function Player:init(args)
 	self.index = args.index
 	self.app = args.app
-
+	self.color = baseColors[self.index]
 	self.keyPress = {}
 	self.keyPressLast = {}
 
@@ -122,7 +131,9 @@ function Player:init(args)
 		}
 	end
 	assert(self.keys, "failed to find key mapping for player "..self.index)
-	self.pieceTex, self.pieceImage = makeTexWithImage(pieceSize)
+	self.pieceTex = makeTexWithImage(pieceSize)
+	-- give pieces an outline so you can tell players apart
+	self.pieceOutlineTex = makeTexWithImage(pieceSize)
 end
 
 function Player:handleKeyUpDown(sym, down)
@@ -314,7 +325,7 @@ local function makePieceImage(s)
 			if s[j+1]:sub(i+1,i+1) == '#' then
 				for u=0,voxelsPerBlock-1 do
 					for v=0,voxelsPerBlock-1 do
-						ffi.cast('int*', img.buffer)[(u + voxelsPerBlock * i) + img.width * (v + voxelsPerBlock * j)] = -1
+						ffi.cast('uint32_t*', img.buffer)[(u + voxelsPerBlock * i) + img.width * (v + voxelsPerBlock * j)] = 0xffffffff
 					end
 				end
 			end
@@ -504,7 +515,7 @@ function App:updatePieceTex(player)
 		for i=istart,iend,istep do
 			local found
 			for j=0,pieceSize.y-1 do
-				if ffi.cast('int*', player.pieceTex.image.buffer)[i + pieceSize.x * j] ~= 0 then
+				if ffi.cast('uint32_t*', player.pieceTex.image.buffer)[i + pieceSize.x * j] ~= 0 then
 					found = true
 					break
 				end
@@ -516,6 +527,32 @@ function App:updatePieceTex(player)
 		end
 	end
 	player.pieceTex:bind():subimage()
+
+	-- [[ update the piece outline
+	local outlineRadius = 5
+	ffi.fill(player.pieceOutlineTex.image.buffer, 4 * pieceSize.x * pieceSize.y)
+	for j=0,pieceSize.y-1 do
+		for i=0,pieceSize.x-1 do
+			local bestDistSq = math.huge
+			for ofy=-outlineRadius,outlineRadius do
+				for ofx=-outlineRadius,outlineRadius do
+					local x = math.clamp(i + ofx, 0, pieceSize.x-1)
+					local y = math.clamp(j + ofy, 0, pieceSize.y-1)
+					if ffi.cast('uint32_t*', player.pieceTex.image.buffer)[x + pieceSize.x * y] ~= 0 then
+						local distSq = math.max(1, ofx*ofx + ofy*ofy)
+						bestDistSq = math.min(bestDistSq, distSq)
+					end
+				end
+			end
+			if bestDistSq < math.huge then
+				--bestDistSq = math.sqrt(bestDistSq)
+				local frac = 1 / bestDistSq
+				ffi.cast('uint32_t*', player.pieceOutlineTex.image.buffer)[i + pieceSize.x * j] = vec3fto4ub(player.color * frac)
+			end
+		end
+	end
+	player.pieceOutlineTex:bind():subimage()
+	--]]
 end
 
 function App:rotatePiece(player)
@@ -554,13 +591,13 @@ function App:testPieceMerge(player)
 	for j=0,pieceSize.y-1 do
 		for i=0,pieceSize.x-1 do
 			local k = i + pieceSize.x * j
-			local color = ffi.cast('int*', player.pieceTex.image.buffer)[k]
+			local color = ffi.cast('uint32_t*', player.pieceTex.image.buffer)[k]
 			if color ~= 0 then
 				local x = player.piecePos.x + i
 				local y = player.piecePos.y + j
 				if x >= 0 and x < w
 				and y >= 0 and y < h
-				and ffi.cast('int*',self.sandTex.image.buffer)[x + w * y] ~= 0
+				and ffi.cast('uint32_t*',self.sandTex.image.buffer)[x + w * y] ~= 0
 				then
 					return true
 				end
@@ -754,7 +791,7 @@ function App:updateGame()
 				end
 				for i=istart,iend,istep do
 					local k =  i + pieceSize.x * j
-					local color = ffi.cast('int*', player.pieceTex.image.buffer)[k]
+					local color = ffi.cast('uint32_t*', player.pieceTex.image.buffer)[k]
 					if color ~= 0 then
 						local x = player.piecePos.x + i
 						local y = player.piecePos.y + j
@@ -763,7 +800,7 @@ function App:updateGame()
 						-- use previous sand image to detect collision
 						and ffi.cast('uint32_t*', self.sandTex.image.buffer)[x + w * y] == 0
 						then
-							ffi.cast('int*', self.sandTex.image.buffer)[x + w * y] = color
+							ffi.cast('uint32_t*', self.sandTex.image.buffer)[x + w * y] = color
 							local g = self.grains:emplace_back()
 							g.pos:set(x+.5, y+.5)
 							--local vel = math.random() * 150 * (vec2f(0,1) + (vec2f(i+.5,j+.5)-vec2f(pieceSize:unpack())*.5) / tonumber(pieceSize.x))
@@ -891,18 +928,29 @@ function App:update(...)
 
 	-- draw the current piece
 	for _,player in ipairs(self.players) do
-		if player.pieceTex then
-			player.pieceTex:bind()
-			gl.glEnable(gl.GL_ALPHA_TEST)
+		for i=1,2 do
+			local tex
+			if i == 1 then
+				tex = player.pieceOutlineTex
+				gl.glEnable(gl.GL_BLEND)
+				gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
+			else
+				tex = player.pieceTex
+				gl.glEnable(gl.GL_ALPHA_TEST)
+			end
+			tex:bind()
 
 			gl.glUniform2f(self.displayShader.uniforms.ofs.loc, (player.piecePos.x / w - .5) * s + .5, player.piecePos.y / h)
 			gl.glUniform2f(self.displayShader.uniforms.scale.loc, pieceSize.x / w * s, pieceSize.y / h)
 
 			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
 
-			gl.glDisable(gl.GL_ALPHA_TEST)
-			player.pieceTex:unbind()
-			gl.glColor3f(1,1,1)
+			tex:unbind()
+			if i == 1 then
+				gl.glDisable(gl.GL_BLEND)
+			else
+				gl.glDisable(gl.GL_ALPHA_TEST)
+			end
 		end
 	end
 
