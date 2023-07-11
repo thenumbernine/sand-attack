@@ -526,6 +526,7 @@ function App:updateGame()
 
 	local grav = -9.8 * tonumber(pieceSize.x)
 	local dragCoeff = .9
+	local groundFriction = .1
 	-- move particles, collide based on last iteration's blits
 	for gi=0,self.grains.size-1 do
 		local g = self.grains.v + gi
@@ -552,12 +553,12 @@ function App:updateGame()
 			
 			-- if the cell is blank and there's a sand cell above us ... pull it down
 			--if p[0] ~= 0 then -- should be true from blitting last frame?
-			if p[-w] == 0 then
-				-- fall
-				p[0], p[-w] = p[-w], p[0]
-				g.pos.y = g.pos.y - 1
-				needsCheckLine = true
-			elseif math.random() < self.toppleChance then
+			if p[-w] ~= 0 then
+				onground = true
+			end
+			if math.random() < self.toppleChance
+			and math.abs(g.vel.x) + math.abs(g.vel.y) < 10
+			then
 				-- hmm symmetry? check left vs right first?
 				-- 50/50 check left then right, vs check right then left
 				if math.random(2) == 2 then
@@ -595,6 +596,7 @@ function App:updateGame()
 		end
 		if onground then
 			g.vel.y = 0
+			g.vel.x = g.vel.x * groundFriction
 		end
 	end
 
@@ -696,7 +698,7 @@ function App:updateGame()
 							ffi.cast('int*', self.sandTex.image.buffer)[x + w * y] = color
 							local g = self.grains:emplace_back()
 							g.pos:set(x+.5, y+.5)
-							--local vel = (vec2f(i+.5,j+.5)-vec2f(pieceSize:unpack())*.5) / tonumber(pieceSize.x) * 250
+							--local vel = math.random() * 150 * (vec2f(0,1) + (vec2f(i+.5,j+.5)-vec2f(pieceSize:unpack())*.5) / tonumber(pieceSize.x))
 							--g.vel:set(vel:unpack())
 							g.vel:set(0,0)
 							g.color = color
