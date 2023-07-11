@@ -202,12 +202,9 @@ function App:initGL(...)
 in vec2 vertex;
 out vec2 texcoordv;
 uniform mat4 modelViewProjMat;
-uniform vec2 scale;	//temp
-uniform vec2 ofs;
 void main() {
 	texcoordv = vertex;
-	vec2 pos = vertex * scale + ofs;
-	gl_Position = modelViewProjMat * vec4(pos, 0., 1.);
+	gl_Position = modelViewProjMat * vec4(vertex, 0., 1.);
 }
 ]],
 		fragmentCode = [[
@@ -911,16 +908,7 @@ function App:update(...)
 
 	self.displayShader:use()
 	self.displayShader.vao:use()
-	
-	self.mvMat:ident():translate(-.5, -.5, 0)
-	self.mvProjMat:mul(self.projMat, self.mvMat)
-	gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
---[[
-	gl.glUniform2f(self.displayShader.uniforms.ofs.loc, .5 * (1 - s), 0)
-	gl.glUniform2f(self.displayShader.uniforms.scale.loc, s, 1)
---]]
--- [[
 	--[=[ TODO functions for applying the operations, not for creating hte matrices (so we can cut down on allocs)
 	self.mvMat:ident()
 		:translate(-.5, -.5)
@@ -935,9 +923,6 @@ function App:update(...)
 	--]=]
 	self.mvProjMat:mul(self.projMat, self.mvMat)
 	gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
-	gl.glUniform2f(self.displayShader.uniforms.ofs.loc, 0, 0)
-	gl.glUniform2f(self.displayShader.uniforms.scale.loc, 1, 1)
---]]
 	
 	self.sandTex:bind()
 	gl.glDrawArrays(gl.GL_QUADS, 0, 4)
@@ -956,11 +941,6 @@ function App:update(...)
 				gl.glEnable(gl.GL_ALPHA_TEST)
 			end
 
-			--[[
-			gl.glUniform2f(self.displayShader.uniforms.ofs.loc, (player.piecePos.x / w - .5) * s + .5, player.piecePos.y / h)
-			gl.glUniform2f(self.displayShader.uniforms.scale.loc, pieceSize.x / w * s, pieceSize.y / h)
-			--]]
-			-- [[
 			--[=[ TODO
 			self.mvMat:ident()
 				:translate(-.5, -.5)
@@ -975,9 +955,6 @@ function App:update(...)
 			--]=]
 			self.mvProjMat:mul(self.projMat, self.mvMat)
 			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
-			gl.glUniform2f(self.displayShader.uniforms.ofs.loc, 0, 0)
-			gl.glUniform2f(self.displayShader.uniforms.scale.loc, 1, 1)
-			--]]
 
 			tex:bind()
 			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
@@ -1001,11 +978,6 @@ function App:update(...)
 		local flashInt = bit.band(math.floor(flashDt * numFlashes * 2), 1) == 0
 		if flashInt then
 
-			--[[
-			gl.glUniform2f(self.displayShader.uniforms.ofs.loc, .5 * (1 - s), 0)
-			gl.glUniform2f(self.displayShader.uniforms.scale.loc, s, 1)
-			--]]
-			-- [[
 			--[=[ TODO
 			self.mvMat:ident()
 				:translate(-.5, -.5)
@@ -1020,9 +992,6 @@ function App:update(...)
 			--]=]
 			self.mvProjMat:mul(self.projMat, self.mvMat)
 			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
-			gl.glUniform2f(self.displayShader.uniforms.ofs.loc, 0, 0)
-			gl.glUniform2f(self.displayShader.uniforms.scale.loc, 1, 1)
-			--]]
 
 			self.flashTex:bind()
 			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
@@ -1045,11 +1014,6 @@ function App:update(...)
 		dy = math.min(dy, nextPieceSize * 1.1)
 		it.tex:bind()
 	
-		--[[
-		gl.glUniform2f(self.displayShader.uniforms.ofs.loc, .5 + aspectRatio * .5 - nextPieceSize, 1 - (i-1) * dy)
-		gl.glUniform2f(self.displayShader.uniforms.scale.loc, nextPieceSize, -nextPieceSize)
-		--]]
-		-- [[
 		--[=[ TODO
 		self.mvMat:ident()
 			:translate(-.5, -.5)
@@ -1064,9 +1028,6 @@ function App:update(...)
 		--]=]
 		self.mvProjMat:mul(self.projMat, self.mvMat)
 		gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
-		gl.glUniform2f(self.displayShader.uniforms.ofs.loc, 0, 0)
-		gl.glUniform2f(self.displayShader.uniforms.scale.loc, 1, 1)	
-		--]]
 
 		gl.glDrawArrays(gl.GL_QUADS, 0, 4)
 	end
