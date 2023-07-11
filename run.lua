@@ -369,7 +369,7 @@ function App:populatePiece(args)
 			local k = i + pieceSize.x * j
 			if srcp[0] ~= 0 then
 				local l = math.random() * .25 + .75
-				l = l * (.25 + .75 * (1 - c))
+				l = l * (.25 + .75 * math.sqrt(1 - c*c))
 				dstp[0] = bit.bor(
 					math.floor(l * color.x * 255),
 					bit.lshift(math.floor(l * color.y * 255), 8),
