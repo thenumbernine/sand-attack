@@ -23,7 +23,8 @@ local AudioBuffer = require 'audio.buffer'
 local vector = require 'ffi.cpp.vector'
 
 -- TODO put this in ext.math
-local DBL_EPSILON = 2.220446049250313080847e-16
+--local DBL_EPSILON = 2.220446049250313080847e-16
+local FLT_EPSILON = 1.1920928955078125e-7
 
 -- board size is 80 x 144 visible
 -- piece is 4 blocks arranged
@@ -539,7 +540,7 @@ function App:updateGame()
 			g.vel.x = 0
 			g.pos.x = w-.5
 		end
-		g.pos.y = math.clamp(g.pos.y, 0, h-DBL_EPSILON)
+		g.pos.y = math.clamp(g.pos.y, 0, h-FLT_EPSILON)
 		
 		local x = math.floor(g.pos.x)
 		local y = math.floor(g.pos.y)
@@ -550,7 +551,7 @@ function App:updateGame()
 			local p = ffi.cast('uint32_t*', self.sandTex.image.buffer) + (x + w * y)
 			
 			-- if the cell is blank and there's a sand cell above us ... pull it down
-			--if p[0] ~= 0 then -- should always be true
+			--if p[0] ~= 0 then -- should be true from blitting last frame?
 			if p[-w] == 0 then
 				-- fall
 				p[0], p[-w] = p[-w], p[0]
@@ -599,12 +600,25 @@ function App:updateGame()
 
 	-- now clear and blit all grains onto the board
 	ffi.fill(self.sandTex.image.buffer, w * h * 4)
+	local pushForceTimesDT = 1
+	local numOverlaps = 0
 	for gi=0,self.grains.size-1 do
 		local g = self.grains.v[gi]
 		local x = math.floor(g.pos.x)
 		local y = math.floor(g.pos.y)
-		ffi.cast('uint32_t*', self.sandTex.image.buffer)[x + w * y] = g.color
+		local p = ffi.cast('uint32_t*', self.sandTex.image.buffer) + (x + w * y)
+		-- if there's already a color here / sand here
+		if p[0] ~= 0 then
+			numOverlaps = numOverlaps + 1
+			-- give it a push up?
+			g.vel.y = g.vel.y + (math.random() - .5) * pushForceTimesDT
+			g.vel.y = g.vel.y + pushForceTimesDT
+			g.pos.y = math.clamp(g.pos.y + 1, 0, h-FLT_EPSILON)
+		end
+		p[0] = g.color
 	end
+	--print('numOverlaps ',numOverlaps)
+
 
 	for _,player in ipairs(self.players) do
 		player.pieceLastPos:set(player.piecePos:unpack())
@@ -892,7 +906,7 @@ function App:flipBoard()
 	local w, h = self.sandSize:unpack()
 	for i=0,self.grains.size-1 do
 		local g = self.grains.v+i
-		g[0].pos.y = h-g[0].pos.y-DBL_EPSILON
+		g[0].pos.y = h-g[0].pos.y-FLT_EPSILON
 	end
 	self.sandTex:bind():subimage()
 end
