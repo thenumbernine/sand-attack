@@ -905,27 +905,44 @@ function App:update(...)
 	-- draw
 
 	local aspectRatio = self.width / self.height
+	local s = w / h
 
 	self.projMat:ident():ortho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
-	self.mvMat:ident():translate(-.5, -.5, 0)
-
-	self.mvProjMat:mul(self.projMat, self.mvMat)
 
 	self.displayShader:use()
-	gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 	self.displayShader.vao:use()
+	
+	self.mvMat:ident():translate(-.5, -.5, 0)
+	self.mvProjMat:mul(self.projMat, self.mvMat)
+	gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
-	assert(self.sandTex.data == self.sandTex.image.buffer)
-	self.sandTex:bind()
-
-	local s = w / h
+--[[
 	gl.glUniform2f(self.displayShader.uniforms.ofs.loc, .5 * (1 - s), 0)
 	gl.glUniform2f(self.displayShader.uniforms.scale.loc, s, 1)
-
+--]]
+-- [[
+	--[=[ TODO functions for applying the operations, not for creating hte matrices (so we can cut down on allocs)
+	self.mvMat:ident()
+		:translate(-.5, -.5)
+		:translate(.5 * (1 - s), 0)
+		:scale(s, 1)
+	--]=]
+	-- [=[ until then ...
+	self.mvMat = 
+		matrix{4,4}:zeros():translate(-.5, -.5, 0)
+		* matrix{4,4}:zeros():translate(.5 * (1 - s), 0, 0)
+		* matrix{4,4}:zeros():scale(s, 1, 1)
+	--]=]
+	self.mvProjMat:mul(self.projMat, self.mvMat)
+	gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+	gl.glUniform2f(self.displayShader.uniforms.ofs.loc, 0, 0)
+	gl.glUniform2f(self.displayShader.uniforms.scale.loc, 1, 1)
+--]]
+	
+	self.sandTex:bind()
 	gl.glDrawArrays(gl.GL_QUADS, 0, 4)
-
 	self.sandTex:unbind()
-
+	
 	-- draw the current piece
 	for _,player in ipairs(self.players) do
 		for i=1,2 do
@@ -938,14 +955,34 @@ function App:update(...)
 				tex = player.pieceTex
 				gl.glEnable(gl.GL_ALPHA_TEST)
 			end
-			tex:bind()
 
+			--[[
 			gl.glUniform2f(self.displayShader.uniforms.ofs.loc, (player.piecePos.x / w - .5) * s + .5, player.piecePos.y / h)
 			gl.glUniform2f(self.displayShader.uniforms.scale.loc, pieceSize.x / w * s, pieceSize.y / h)
+			--]]
+			-- [[
+			--[=[ TODO
+			self.mvMat:ident()
+				:translate(-.5, -.5)
+				:translate((player.piecePos.x / w - .5) * s + .5, player.piecePos.y / h)
+				:scale(pieceSize.x / w * s, pieceSize.y / h)
+			--]=]
+			-- [=[ until then ...
+			self.mvMat =
+				matrix{4,4}:zeros():translate(-.5, -.5, 0)
+				* matrix{4,4}:zeros():translate((player.piecePos.x / w - .5) * s + .5, player.piecePos.y / h, 0)
+				* matrix{4,4}:zeros():scale(pieceSize.x / w * s, pieceSize.y / h, 1)
+			--]=]
+			self.mvProjMat:mul(self.projMat, self.mvMat)
+			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+			gl.glUniform2f(self.displayShader.uniforms.ofs.loc, 0, 0)
+			gl.glUniform2f(self.displayShader.uniforms.scale.loc, 1, 1)
+			--]]
 
+			tex:bind()
 			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
-
 			tex:unbind()
+
 			if i == 1 then
 				gl.glDisable(gl.GL_BLEND)
 			else
@@ -963,13 +1000,32 @@ function App:update(...)
 		gl.glEnable(gl.GL_ALPHA_TEST)
 		local flashInt = bit.band(math.floor(flashDt * numFlashes * 2), 1) == 0
 		if flashInt then
-			self.flashTex:bind()
 
+			--[[
 			gl.glUniform2f(self.displayShader.uniforms.ofs.loc, .5 * (1 - s), 0)
 			gl.glUniform2f(self.displayShader.uniforms.scale.loc, s, 1)
+			--]]
+			-- [[
+			--[=[ TODO
+			self.mvMat:ident()
+				:translate(-.5, -.5)
+				:translate(.5 * (1 - s), 0)
+				:scale(s, 1)
+			--]=]
+			-- [=[ until then
+			self.mvMat = 
+				matrix{4,4}:zeros():translate(-.5, -.5, 0)
+				* matrix{4,4}:zeros():translate(.5 * (1 - s), 0, 0)
+				* matrix{4,4}:zeros():scale(s, 1, 1)
+			--]=]
+			self.mvProjMat:mul(self.projMat, self.mvMat)
+			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+			gl.glUniform2f(self.displayShader.uniforms.ofs.loc, 0, 0)
+			gl.glUniform2f(self.displayShader.uniforms.scale.loc, 1, 1)
+			--]]
 
+			self.flashTex:bind()
 			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
-
 			self.flashTex:unbind()
 		end
 		gl.glDisable(gl.GL_ALPHA_TEST)
@@ -981,14 +1037,36 @@ function App:update(...)
 		self.flashTex:bind():subimage():unbind()
 	end
 
+
 	local nextPieceSize = .1
 	for i=#self.nextPieces,1,-1 do
 		local it = self.nextPieces[i]
 		local dy = #self.nextPieces == 1 and 0 or (1 - nextPieceSize)/(#self.nextPieces-1)
 		dy = math.min(dy, nextPieceSize * 1.1)
 		it.tex:bind()
+	
+		--[[
 		gl.glUniform2f(self.displayShader.uniforms.ofs.loc, .5 + aspectRatio * .5 - nextPieceSize, 1 - (i-1) * dy)
 		gl.glUniform2f(self.displayShader.uniforms.scale.loc, nextPieceSize, -nextPieceSize)
+		--]]
+		-- [[
+		--[=[ TODO
+		self.mvMat:ident()
+			:translate(-.5, -.5)
+			:translate(.5 + aspectRatio * .5 - nextPieceSize, 1 - (i-1) * dy)
+			:scale(nextPieceSize, -nextPieceSize)
+		--]=]
+		-- [=[ until then
+		self.mvMat = 
+			matrix{4,4}:zeros():translate(-.5, -.5, 0)
+			* matrix{4,4}:zeros():translate(.5 + aspectRatio * .5 - nextPieceSize, 1 - (i-1) * dy, 0)
+			* matrix{4,4}:zeros():scale(nextPieceSize, -nextPieceSize, 1)
+		--]=]
+		self.mvProjMat:mul(self.projMat, self.mvMat)
+		gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+		gl.glUniform2f(self.displayShader.uniforms.ofs.loc, 0, 0)
+		gl.glUniform2f(self.displayShader.uniforms.scale.loc, 1, 1)	
+		--]]
 
 		gl.glDrawArrays(gl.GL_QUADS, 0, 4)
 	end
