@@ -31,7 +31,7 @@ luajitLibs = {
 		'png',	-- TODO which dir is it pulling png from? do i need z or zlib? doen't matter, no pngs in this so far
 		'SDL2',
 		'cimgui_sdl',
-		'z',	-- needed by png
+		'z',	-- needed by png ... or is it zlib?  which png am I using? ufo's (z) or my own build of libpng (zlib)?
 		-- of these 4, i'm only explicitly ffi.load'ing vorbisfile, but idk about interdependencies...
 		'ogg',
 		'vorbis',
