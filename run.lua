@@ -360,9 +360,16 @@ function App:populatePiece(args)
 	local dstp = ffi.cast('uint32_t*', args.tex.image.buffer)
 	for j=0,pieceSize.y-1 do
 		for i=0,pieceSize.x-1 do
+			local u = i % voxelsPerBlock + .5
+			local v = j % voxelsPerBlock + .5
+			local c = math.max(
+				math.abs(u - voxelsPerBlock/2),
+				math.abs(v - voxelsPerBlock/2)
+			) / (voxelsPerBlock/2)
 			local k = i + pieceSize.x * j
 			if srcp[0] ~= 0 then
-				local l = math.random() * .5 + .5
+				local l = math.random() * .25 + .75
+				l = l * (.25 + .75 * (1 - c))
 				dstp[0] = bit.bor(
 					math.floor(l * color.x * 255),
 					bit.lshift(math.floor(l * color.y * 255), 8),
