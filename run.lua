@@ -1,5 +1,6 @@
 #!/usr/bin/env luajit
 local ffi = require 'ffi'
+local sdl = require 'ffi.sdl'
 local template = require 'template'
 local table = require 'ext.table'
 local class = require 'ext.class'
@@ -7,7 +8,6 @@ local math = require 'ext.math'
 local string = require 'ext.string'
 local range = require 'ext.range'
 local gl = require 'gl'
-local sdl = require 'ffi.sdl'
 local Image = require 'image'
 local GLTex2D = require 'gl.tex2d'
 local GLProgram = require 'gl.program'
@@ -19,6 +19,7 @@ local vec3f = require 'vec-ffi.vec3f'
 local vec4f = require 'vec-ffi.vec4f'
 local getTime = require 'ext.timer'.getTime
 local ig = require 'imgui'
+local ImGuiApp = require 'imguiapp'
 local Audio = require 'audio'
 local AudioSource = require 'audio.source'
 local AudioBuffer = require 'audio.buffer'
@@ -130,7 +131,7 @@ function Player:handleKeyUpDown(sym, down)
 	end
 end
 
-local App = require 'imguiapp.withorbit'()
+local App = class(ImGuiApp)
 
 App.title = 'Sand Tetris'
 
@@ -143,11 +144,6 @@ function App:initGL(...)
 	gl.glAlphaFunc(gl.GL_GREATER, 0)
 
 	math.randomseed(os.time())
-
-	self.view.ortho = true
-	self.view.orthoSize = .5
-	self.view.orbit:set(.5, .5, 0)
-	self.view.pos:set(.5, .5, 10)
 
 	self.numPlayers = 1
 	self.numColors = 4
@@ -228,7 +224,7 @@ void main() {
 		self.audio:setDistanceModel'linear clamped'
 		for i=1,31 do	-- 31 for DirectSound, 32 for iphone, infinite for all else?
 			local src = AudioSource()
-			src:setReferenceDistance(self.view.orthoSize)
+			src:setReferenceDistance(1)
 			src:setMaxDistance(self.maxAudioDist)
 			src:setRolloffFactor(1)
 			self.audioSources[i] = src
@@ -869,8 +865,22 @@ function App:update(...)
 
 	-- draw
 
-	-- TODO this without using gl:
-	self.view:setup(self.width / self.height)
+	local aspectRatio = self.width / self.height
+	
+	gl.glMatrixMode(gl.GL_PROJECTION)
+	gl.glLoadIdentity()
+	gl.glOrtho(
+		-.5 * aspectRatio,
+		.5 * aspectRatio,
+		-.5,
+		.5,
+		-1,
+		1
+	)
+	gl.glMatrixMode(gl.GL_MODELVIEW)
+	gl.glLoadIdentity()
+	gl.glTranslatef(-.5, -.5, 0)
+	
 	gl.glGetFloatv(gl.GL_PROJECTION_MATRIX, self.projMat)
 	gl.glGetFloatv(gl.GL_MODELVIEW_MATRIX, self.mvMat)
 	matmul4x4(self.mvProjMat, self.projMat, self.mvMat)
@@ -934,7 +944,6 @@ function App:update(...)
 		self.flashTex:bind():subimage():unbind()
 	end
 
-	local aspectRatio = self.width / self.height
 	local nextPieceSize = .1
 	for i=#self.nextPieces,1,-1 do
 		local it = self.nextPieces[i]
