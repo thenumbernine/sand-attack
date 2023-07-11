@@ -909,11 +909,9 @@ function App:update(...)
 	self.displayShader:use()
 	self.displayShader.vao:use()
 
-	self.mvMat:setIdent()
-		:applyTranslate(-.5, -.5)
-		:applyTranslate(.5 * (1 - s), 0)
+	self.mvMat:setTranslate(-.5 * s, -.5)
 		:applyScale(s, 1)
-	self.mvProjMat:mul(self.projMat, self.mvMat)
+	self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 	gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 	
 	self.sandTex:bind()
@@ -933,11 +931,12 @@ function App:update(...)
 				gl.glEnable(gl.GL_ALPHA_TEST)
 			end
 
-			self.mvMat
-				:setTranslate(-.5, -.5)
-				:applyTranslate((player.piecePos.x / w - .5) * s + .5, player.piecePos.y / h)
+			self.mvMat:setTranslate(
+					(player.piecePos.x / w - .5) * s,
+					player.piecePos.y / h - .5
+				)
 				:applyScale(pieceSize.x / w * s, pieceSize.y / h)
-			self.mvProjMat:mul(self.projMat, self.mvMat)
+			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 			tex:bind()
@@ -962,10 +961,9 @@ function App:update(...)
 		local flashInt = bit.band(math.floor(flashDt * numFlashes * 2), 1) == 0
 		if flashInt then
 			self.mvMat
-				:setTranslate(-.5, -.5)
-				:applyTranslate(.5 * (1 - s), 0)
+				:setTranslate(-.5 * s, -.5)
 				:applyScale(s, 1)
-			self.mvProjMat:mul(self.projMat, self.mvMat)
+			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 			self.flashTex:bind()
@@ -990,10 +988,9 @@ function App:update(...)
 		it.tex:bind()
 	
 		self.mvMat
-			:setTranslate(-.5, -.5)
-			:applyTranslate(.5 + aspectRatio * .5 - nextPieceSize, 1 - (i-1) * dy)
+			:setTranslate(aspectRatio * .5 - nextPieceSize, .5 - (i-1) * dy)
 			:applyScale(nextPieceSize, -nextPieceSize)
-		self.mvProjMat:mul(self.projMat, self.mvMat)
+		self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 		gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 		gl.glDrawArrays(gl.GL_QUADS, 0, 4)
