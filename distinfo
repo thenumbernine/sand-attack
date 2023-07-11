@@ -37,6 +37,8 @@ luajitLibs = {
 		'vorbis',
 		'vorbisenc',
 		'vorbisfile',
+		'openal32',
+		'openalut32',
 	},
 	linux = {
 		'png',			-- /usr/lib/x86_64-linux-gnu/libpng16.so.16.39.0
@@ -47,6 +49,8 @@ luajitLibs = {
 		'vorbis',
 		'vorbisenc',
 		'ogg',
+		'openal',		-- libopenal.so.1
+		'alut',			-- libalut.so.0.1.0
 	},
 	osx = {
 		'sdl',
