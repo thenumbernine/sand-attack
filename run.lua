@@ -24,6 +24,8 @@ local Audio = require 'audio'
 local AudioSource = require 'audio.source'
 local AudioBuffer = require 'audio.buffer'
 local vector = require 'ffi.cpp.vector'
+local matrix = require 'matrix.ffi'
+matrix.real = 'float'
 
 -- TODO put this in ext.math
 --local DBL_EPSILON = 2.220446049250313080847e-16
@@ -168,9 +170,9 @@ function App:initGL(...)
 		classify = function(p) return p[3] end,	-- classify by alpha channel
 	}
 
-	self.projMat = ffi.new'float[16]'
-	self.mvMat = ffi.new'float[16]'
-	self.mvProjMat = ffi.new'float[16]'
+	self.projMat = matrix{4,4}:zeros()
+	self.mvMat = matrix{4,4}:zeros()
+	self.mvProjMat = matrix{4,4}:zeros()
 
 	local vtxbufCPU = ffi.new('float[8]', {
 		0,0,
@@ -209,7 +211,7 @@ void main() {
 		uniforms = {
 			tex = 0,
 		},
-	
+
 		attrs = {
 			vertex = vertexBuf,
 		},
@@ -254,7 +256,7 @@ void main() {
 			self.bgAudioSource:play()
 		end
 	end
-	
+
 	self:reset()
 
 	glreport'here'
@@ -602,7 +604,7 @@ function App:updateGame()
 			g.pos.x = w-.5
 		end
 		g.pos.y = math.clamp(g.pos.y, 0, h-FLT_EPSILON)
-		
+
 		local x = math.floor(g.pos.x)
 		local y = math.floor(g.pos.y)
 		local onground
@@ -610,7 +612,7 @@ function App:updateGame()
 			onground = true
 		else
 			local p = ffi.cast('uint32_t*', self.sandTex.image.buffer) + (x + w * y)
-			
+
 			-- if the cell is blank and there's a sand cell above us ... pull it down
 			--if p[0] ~= 0 then -- should be true from blitting last frame?
 			if p[-w] ~= 0 then
@@ -866,27 +868,14 @@ function App:update(...)
 	-- draw
 
 	local aspectRatio = self.width / self.height
-	
-	gl.glMatrixMode(gl.GL_PROJECTION)
-	gl.glLoadIdentity()
-	gl.glOrtho(
-		-.5 * aspectRatio,
-		.5 * aspectRatio,
-		-.5,
-		.5,
-		-1,
-		1
-	)
-	gl.glMatrixMode(gl.GL_MODELVIEW)
-	gl.glLoadIdentity()
-	gl.glTranslatef(-.5, -.5, 0)
-	
-	gl.glGetFloatv(gl.GL_PROJECTION_MATRIX, self.projMat)
-	gl.glGetFloatv(gl.GL_MODELVIEW_MATRIX, self.mvMat)
-	matmul4x4(self.mvProjMat, self.projMat, self.mvMat)
+
+	self.projMat:ident():ortho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
+	self.mvMat:ident():translate(-.5, -.5, 0)
+
+	self.mvProjMat:mul(self.projMat, self.mvMat)
 
 	self.displayShader:use()
-	gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat)
+	gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 	self.displayShader.vao:use()
 
 	assert(self.sandTex.data == self.sandTex.image.buffer)
@@ -895,7 +884,7 @@ function App:update(...)
 	local s = w / h
 	gl.glUniform2f(self.displayShader.uniforms.ofs.loc, .5 * (1 - s), 0)
 	gl.glUniform2f(self.displayShader.uniforms.scale.loc, s, 1)
-	
+
 	gl.glDrawArrays(gl.GL_QUADS, 0, 4)
 
 	self.sandTex:unbind()
@@ -905,12 +894,12 @@ function App:update(...)
 		if player.pieceTex then
 			player.pieceTex:bind()
 			gl.glEnable(gl.GL_ALPHA_TEST)
-			
+
 			gl.glUniform2f(self.displayShader.uniforms.ofs.loc, (player.piecePos.x / w - .5) * s + .5, player.piecePos.y / h)
 			gl.glUniform2f(self.displayShader.uniforms.scale.loc, pieceSize.x / w * s, pieceSize.y / h)
-			
+
 			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
-			
+
 			gl.glDisable(gl.GL_ALPHA_TEST)
 			player.pieceTex:unbind()
 			gl.glColor3f(1,1,1)
@@ -927,10 +916,10 @@ function App:update(...)
 		local flashInt = bit.band(math.floor(flashDt * numFlashes * 2), 1) == 0
 		if flashInt then
 			self.flashTex:bind()
-			
+
 			gl.glUniform2f(self.displayShader.uniforms.ofs.loc, .5 * (1 - s), 0)
 			gl.glUniform2f(self.displayShader.uniforms.scale.loc, s, 1)
-			
+
 			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
 
 			self.flashTex:unbind()
@@ -952,7 +941,7 @@ function App:update(...)
 		it.tex:bind()
 		gl.glUniform2f(self.displayShader.uniforms.ofs.loc, .5 + aspectRatio * .5 - nextPieceSize, 1 - (i-1) * dy)
 		gl.glUniform2f(self.displayShader.uniforms.scale.loc, nextPieceSize, -nextPieceSize)
-			
+
 		gl.glDrawArrays(gl.GL_QUADS, 0, 4)
 	end
 
