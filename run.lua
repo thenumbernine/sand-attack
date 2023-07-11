@@ -554,42 +554,48 @@ function App:updateGame()
 			-- if the cell is blank and there's a sand cell above us ... pull it down
 			--if p[0] ~= 0 then -- should be true from blitting last frame?
 			if p[-w] ~= 0 then
-				onground = true
+				if g.vel.y < 0 then
+					g.vel.y = -.1 * g.vel.y
+				end
 			end
-			if math.random() < self.toppleChance
-			and math.abs(g.vel.x) + math.abs(g.vel.y) < 10
-			then
-				-- hmm symmetry? check left vs right first?
-				-- 50/50 check left then right, vs check right then left
-				if math.random(2) == 2 then
-					if x > 0 and p[-w-1] == 0 then
-						-- swap colors
-						p[0], p[-w-1] = p[-w-1], p[0]
-						-- move sand
-						g.pos.x = g.pos.x - 1
-						g.pos.y = g.pos.y - 1
-						needsCheckLine = true
-					elseif x < w-1 and p[-w+1] == 0 then
-						p[0], p[-w+1] = p[-w+1], p[0]
-						g.pos.x = g.pos.x + 1
-						g.pos.y = g.pos.y - 1
-						needsCheckLine = true
+			-- resting velocity
+			if math.abs(g.vel.x) + math.abs(g.vel.y) < 10 then
+				if p[-w] ~= 0 then
+					onground = true
+				end
+				if math.random() < self.toppleChance then
+					-- hmm symmetry? check left vs right first?
+					-- 50/50 check left then right, vs check right then left
+					if math.random(2) == 2 then
+						if x > 0 and p[-w-1] == 0 then
+							-- swap colors
+							p[0], p[-w-1] = p[-w-1], p[0]
+							-- move sand
+							g.pos.x = g.pos.x - 1
+							g.pos.y = g.pos.y - 1
+							needsCheckLine = true
+						elseif x < w-1 and p[-w+1] == 0 then
+							p[0], p[-w+1] = p[-w+1], p[0]
+							g.pos.x = g.pos.x + 1
+							g.pos.y = g.pos.y - 1
+							needsCheckLine = true
+						else
+							onground = true
+						end
 					else
-						onground = true
-					end
-				else
-					if x < w-1 and p[-w+1] == 0 then
-						p[0], p[-w+1] = p[-w+1], p[0]
-						g.pos.x = g.pos.x + 1
-						g.pos.y = g.pos.y - 1
-						needsCheckLine = true
-					elseif x > 0 and p[-w-1] == 0 then
-						p[0], p[-w-1] = p[-w-1], p[0]
-						g.pos.x = g.pos.x - 1
-						g.pos.y = g.pos.y - 1
-						needsCheckLine = true
-					else
-						onground = true
+						if x < w-1 and p[-w+1] == 0 then
+							p[0], p[-w+1] = p[-w+1], p[0]
+							g.pos.x = g.pos.x + 1
+							g.pos.y = g.pos.y - 1
+							needsCheckLine = true
+						elseif x > 0 and p[-w-1] == 0 then
+							p[0], p[-w-1] = p[-w-1], p[0]
+							g.pos.x = g.pos.x - 1
+							g.pos.y = g.pos.y - 1
+							needsCheckLine = true
+						else
+							onground = true
+						end
 					end
 				end
 			end
