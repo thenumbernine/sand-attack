@@ -120,7 +120,7 @@ function ConfigState:updateGUI()
 	ig.igText'Board:'
 	ig.luatableTooltipInputInt('Board Width', app.nextSandSize, 'x')
 	ig.luatableTooltipInputInt('Board Height', app.nextSandSize, 'y')
-	ig.luatableTooltipSliderFloat('Topple Chance', app, 'toppleChance', 0, 1)
+	ig.luatableTooltipSliderFloat('Topple Chance', app.cfg, 'toppleChance', 0, 1)
 
 	if app.useAudio then
 		ig.igText'Audio:'
@@ -166,8 +166,8 @@ function StartNewGameState:updateGUI()
 		ig.igBegin('New Game', nil, 0)
 	end
 
-	ig.luatableInputInt('Level:', app, 'level')
-	app.level = math.clamp(app.level, 1, 20)
+	ig.luatableInputInt('Level:', app.cfg, 'startLevel')
+	app.cfg.startLevel = math.clamp(app.cfg.startLevel, 1, 20)
 
 	if ig.igButton'Back' then
 		app.state = GameState.MainMenuState(app)

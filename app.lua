@@ -86,14 +86,15 @@ function App:initGL(...)
 
 	self.cfg.effectVolume = self.cfg.effectVolume or 1
 	self.cfg.backgroundVolume = self.cfg.backgroundVolume or .3
+	self.cfg.startLevel = self.cfg.startLevel or 1
+	self.cfg.toppleChance = self.cfg.toppleChance or 1
+	-- TODO add colors to config?
 
 	self.state = GameState.SplashScreenState(self)
 
 	self.numPlayers = 1
 	self.numColors = 4
 	self.numNextPieces = 3
-	self.toppleChance = 1
-	self.level = 1
 	self.dropSpeed = 5
 
 	self.fps = 0
@@ -342,6 +343,8 @@ function App:saveConfig()
 end
 
 function App:reset()
+	self:saveConfig()
+
 	self.sandSize = vec2i(self.nextSandSize)
 	local w, h = self.sandSize:unpack()
 
@@ -393,6 +396,7 @@ function App:reset()
 	self.flashTime = -math.huge
 	self.score = 0
 	self.lines = 0
+	self.level = self.cfg.startLevel
 	self:upateFallSpeed()
 	self.paused = true
 end
@@ -615,7 +619,7 @@ function App:updateGame()
 					p[0], p[-w] = p[-w], p[0]
 					needsCheckLine = true
 				-- hmm symmetry? check left vs right first?
-				elseif math.random() < self.toppleChance then
+				elseif math.random() < self.cfg.toppleChance then
 					-- 50/50 check left then right, vs check right then left
 					if math.random(2) == 2 then
 						if i > 0 and p[-w-1] == 0 then
