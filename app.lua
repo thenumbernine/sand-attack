@@ -2,10 +2,13 @@ local ffi = require 'ffi'
 local sdl = require 'ffi.sdl'
 local template = require 'template'
 local table = require 'ext.table'
+local file = require 'ext.file'
 local class = require 'ext.class'
 local math = require 'ext.math'
 local string = require 'ext.string'
 local range = require 'ext.range'
+local fromlua = require 'ext.fromlua'
+local tolua = require 'ext.tolua'
 local matrix = require 'matrix.ffi'
 local Image = require 'image'
 local gl = require 'gl'
@@ -63,6 +66,8 @@ App.pieceSize = App.pieceSizeInBlocks * App.voxelsPerBlock
 
 App.maxAudioDist = 10
 
+App.cfgfilename = 'config.lua'
+
 function App:initGL(...)
 	App.super.initGL(self, ...)
 
@@ -70,6 +75,17 @@ function App:initGL(...)
 	gl.glAlphaFunc(gl.GL_GREATER, 0)
 
 	math.randomseed(os.time())
+
+	-- load config if it exists
+	xpcall(function()
+		self.cfg = fromlua(assert(file(self.cfgfilename):read()))
+	end, function(err)
+		print("failed to read config file: "..tostring(err))
+	end)
+	self.cfg = self.cfg or {}
+
+	self.cfg.effectVolume = self.cfg.effectVolume or 1
+	self.cfg.backgroundVolume = self.cfg.backgroundVolume or .3
 
 	self.state = GameState.SplashScreenState(self)
 
@@ -168,11 +184,6 @@ void main() {
 			self.audioSources[i] = src
 		end
 
-		self.audioConfig = {
-			effectVolume = 1,
-			backgroundVolume = .3,
-		}
-
 		self.bgMusicFiles = table{
 			'music/Desert-City.ogg',
 			'music/Exotic-Plains.ogg',
@@ -188,7 +199,7 @@ void main() {
 			self.bgAudioSource = AudioSource()
 			self.bgAudioSource:setBuffer(self.bgMusic)
 			self.bgAudioSource:setLooping(true)
-			self.bgAudioSource:setGain(self.audioConfig.backgroundVolume)
+			self.bgAudioSource:setGain(self.cfg.backgroundVolume)
 			self.bgAudioSource:play()
 		end
 	end
@@ -317,7 +328,7 @@ function App:playSound(name, volume, pitch)
 	local sound = self:loadSound(name)
 	source:setBuffer(sound)
 	source.volume = volume	-- save for later
-	source:setGain((volume or 1) * self.audioConfig.effectVolume)
+	source:setGain((volume or 1) * self.cfg.effectVolume)
 	source:setPitch(pitch or 1)
 	source:setPosition(0, 0, 0)
 	source:setVelocity(0, 0, 0)
@@ -326,10 +337,14 @@ function App:playSound(name, volume, pitch)
 	return source
 end
 
+function App:saveConfig()
+	file(self.cfgfilename):write(tolua(self.cfg))
+end
+
 function App:reset()
 	self.sandSize = vec2i(self.nextSandSize)
 	local w, h = self.sandSize:unpack()
-	
+
 	self.loseTime = nil
 
 	-- I only really need to recreate the sand & flash texs if the board size changes ...

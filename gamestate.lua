@@ -58,6 +58,7 @@ function PlayingState:updateGUI()
 end
 
 
+-- TODO save config
 local ConfigState = class(GameState)
 local tmpcolor = ig.ImVec4()
 function ConfigState:updateGUI()
@@ -123,21 +124,22 @@ function ConfigState:updateGUI()
 
 	if app.useAudio then
 		ig.igText'Audio:'
-		if ig.luatableSliderFloat('FX Volume', app.audioConfig, 'effectVolume', 0, 1) then
+		if ig.luatableSliderFloat('FX Volume', app.cfg, 'effectVolume', 0, 1) then
 			--[[ if you want, update all previous audio sources...
 			for _,src in ipairs(app.audioSources) do
 				-- TODO if the gameplay sets the gain down then we'll want to multiply by their default gain
-				src:setGain(audioConfig.effectVolume * src.gain)
+				src:setGain(app.cfg.effectVolume * src.gain)
 			end
 			--]]
 		end
-		if ig.luatableSliderFloat('BG Volume', app.audioConfig, 'backgroundVolume', 0, 1) then
-			app.bgAudioSource:setGain(app.audioConfig.backgroundVolume)
+		if ig.luatableSliderFloat('BG Volume', app.cfg, 'backgroundVolume', 0, 1) then
+			app.bgAudioSource:setGain(app.cfg.backgroundVolume)
 		end
 	end
 
 
 	if ig.igButton'Done' then
+		app:saveConfig()
 		app.state = GameState.MainMenuState(app)
 	end
 	ig.igEnd()
@@ -197,7 +199,6 @@ function MainMenuState:updateGUI()
 	end
 	-- TODO RESUME GAME here
 	if ig.igButton'Config' then
-		-- TODO config state
 		app.state = ConfigState(app)
 	end
 	
@@ -236,6 +237,11 @@ function SplashScreenState:update()
 	if getTime() - self.startTime > self.duration then
 		app.state = MainMenuState(app)
 	end
+end
+
+local HighScoreState = class(GameState)
+function HighScoreState:updateGUI()
+	
 end
 
 return GameState
