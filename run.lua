@@ -1,4 +1,11 @@
 #!/usr/bin/env luajit
+
+-- TODO this variable is half hardwired into lua-gl and luajit-ffi-bindings projects ... I don't like how it is set up
+--ffi_OpenGL = nil	-- for desktop GL
+--ffi_OpenGL = 'ffi.OpenGLES1'	-- for GLES1
+ffi_OpenGL = 'ffi.OpenGLES2'	-- for GLES2
+
+local gl = require 'gl'
 local ffi = require 'ffi'
 local sdl = require 'ffi.sdl'
 local template = require 'template'
@@ -7,7 +14,6 @@ local class = require 'ext.class'
 local math = require 'ext.math'
 local string = require 'ext.string'
 local range = require 'ext.range'
-local gl = require 'gl'
 local Image = require 'image'
 local GLTex2D = require 'gl.tex2d'
 local GLProgram = require 'gl.program'
@@ -900,10 +906,10 @@ function App:update(...)
 		:applyScale(s, 1)
 	self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 	gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
-	
+
 	self.sandTex:bind()
 	gl.glDrawArrays(gl.GL_QUADS, 0, 4)
-	
+
 	-- draw the current piece
 	for _,player in ipairs(self.players) do
 		for i=1,2 do
@@ -968,7 +974,7 @@ function App:update(...)
 		local it = self.nextPieces[i]
 		local dy = #self.nextPieces == 1 and 0 or (1 - nextPieceSize)/(#self.nextPieces-1)
 		dy = math.min(dy, nextPieceSize * 1.1)
-	
+
 		self.mvMat
 			:setTranslate(aspectRatio * .5 - nextPieceSize, .5 - (i-1) * dy)
 			:applyScale(nextPieceSize, -nextPieceSize)
@@ -1192,11 +1198,11 @@ function App:updateGUI()
 	end
 end
 
---[[ if you're not using the autorelease
 function App:exit()
 	self.audio:shutdown()
 	App.super.exit(self)
 end
---]]
 
-return App():run()
+local app = App()
+app.gl = gl	-- tell app to use a dif gl (in case i'm using a dif gl)
+return app:run()
