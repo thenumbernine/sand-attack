@@ -1,6 +1,8 @@
 local class = require 'ext.class'
 local math = require 'ext.math'
 local tolua = require 'ext.tolua'
+local gl = require 'gl'
+local GLTex2D = require 'gl.tex2d'
 local ig = require 'imgui'
 local getTime = require 'ext.timer'.getTime
 
@@ -234,11 +236,36 @@ end
 
 local SplashScreenState = class(GameState)
 GameState.SplashScreenState = SplashScreenState
-SplashScreenState.duration = 0
+SplashScreenState.duration = 3
 SplashScreenState.startTime = getTime()
 function SplashScreenState:update()
 	local app = self.app
-	-- TODO show a splash screen logo.
+	
+	local w, h = app.sandSize:unpack()
+		
+	local aspectRatio = app.width / app.height
+	local s = w / h
+	
+	app.projMat:setOrtho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
+	app.displayShader:use()
+	app.displayShader.vao:use()
+
+	app.mvMat
+		:setTranslate(-.5 * s, -.5)
+		:applyScale(s, 1)
+	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
+	gl.glUniformMatrix4fv(app.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
+
+	gl.glEnable(gl.GL_ALPHA_TEST)
+	app.splashTex:bind()
+	gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+	gl.glDisable(gl.GL_ALPHA_TEST)
+
+	app.displayShader.vao:useNone()
+	GLTex2D:unbind()
+	app.displayShader:useNone()
+
+
 	if getTime() - self.startTime > self.duration then
 		app.state = MainMenuState(app)
 	end

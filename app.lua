@@ -96,7 +96,6 @@ function App:initGL(...)
 	-- TODO add colors to config?
 	self.cfg.highscores = self.cfg.highscores or {}
 
-	self.state = GameState.SplashScreenState(self)
 
 	self.numPlayers = 1
 	self.numColors = 4
@@ -114,8 +113,17 @@ function App:initGL(...)
 
 	self.loseScreenDuration = 5
 	
-	self.loseTex = GLTex2D{
+	self.youloseTex = GLTex2D{
 		image = Image'tex/youlose.png':flip(),
+		wrap = {
+			s = gl.GL_CLAMP_TO_EDGE,
+			t = gl.GL_CLAMP_TO_EDGE,
+		},
+		minFilter = gl.GL_NEAREST,
+		magFilter = gl.GL_NEAREST,
+	}
+	self.splashTex = GLTex2D{
+		image = Image'tex/splash.png':flip(),
 		wrap = {
 			s = gl.GL_CLAMP_TO_EDGE,
 			t = gl.GL_CLAMP_TO_EDGE,
@@ -210,6 +218,8 @@ void main() {
 			self.bgAudioSource:play()
 		end
 	end
+
+	self.state = GameState.SplashScreenState(self)
 
 	self:reset()
 
@@ -827,7 +837,6 @@ function App:update(...)
 		local s = w / h
 
 		self.projMat:setOrtho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
-
 		self.displayShader:use()
 		self.displayShader.vao:use()
 
@@ -906,7 +915,7 @@ function App:update(...)
 				gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 				gl.glEnable(gl.GL_ALPHA_TEST)
-				self.loseTex:bind()
+				self.youloseTex:bind()
 				gl.glDrawArrays(gl.GL_QUADS, 0, 4)
 				gl.glDisable(gl.GL_ALPHA_TEST)
 			end
