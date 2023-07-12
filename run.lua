@@ -1,5 +1,6 @@
 #!/usr/bin/env luajit
 local ffi = require 'ffi'
+local sdl = require 'ffi.sdl'
 local template = require 'template'
 local table = require 'ext.table'
 local class = require 'ext.class'
@@ -7,18 +8,26 @@ local math = require 'ext.math'
 local string = require 'ext.string'
 local range = require 'ext.range'
 local gl = require 'gl'
-local sdl = require 'ffi.sdl'
 local Image = require 'image'
 local GLTex2D = require 'gl.tex2d'
+local GLProgram = require 'gl.program'
+local GLArrayBuffer = require 'gl.arraybuffer'
 local glreport = require 'gl.report'
 local vec2i = require 'vec-ffi.vec2i'
+local vec2f = require 'vec-ffi.vec2f'
 local vec3f = require 'vec-ffi.vec3f'
-local vec4f = require 'vec-ffi.vec4f'
 local getTime = require 'ext.timer'.getTime
 local ig = require 'imgui'
+local ImGuiApp = require 'imguiapp'
 local Audio = require 'audio'
 local AudioSource = require 'audio.source'
 local AudioBuffer = require 'audio.buffer'
+local matrix = require 'matrix.ffi'
+matrix.real = 'float'
+
+-- TODO put this in ext.math
+--local DBL_EPSILON = 2.220446049250313080847e-16
+local FLT_EPSILON = 1.1920928955078125e-7
 
 -- board size is 80 x 144 visible
 -- piece is 4 blocks arranged
@@ -30,8 +39,8 @@ local pieceSize = pieceSizeInBlocks * voxelsPerBlock
 
 local baseColors = table{
 	vec3f(1,0,0),
-	vec3f(0,1,0),
 	vec3f(0,0,1),
+	vec3f(0,1,0),
 	vec3f(1,1,0),
 	vec3f(1,0,1),
 	vec3f(0,1,1),
@@ -40,17 +49,19 @@ local baseColors = table{
 -- ... but not all 8 bit alpha channels are really 8 bits ...
 
 local dontCheck = false	-- don't ever ever check for lines.  used for fps testing the sand topple simulation.
-local showFPS = false
+local showFPS = true
 local useAudio = true
 
 local updateInterval = 1/60
 --local updateInterval = 1/120
 --local updateInterval = 0
 
+-- fall every 5 ticks
+-- TODO something about speeding up with levels
+-- TODO level
 local ticksToFall = 5
 
-
-local function makeImageAndTex(size)
+local function makeTexWithImage(size)
 	local img = Image(size.x, size.y, 4, 'unsigned char')
 	ffi.fill(img.buffer, 4 * size.x * size.y)
 	local tex = GLTex2D{
@@ -74,10 +85,19 @@ end
 
 local Player = class()
 
+local function vec3fto4ub(v)
+	return bit.bor(
+		math.floor(math.clamp(v.x, 0, 1) * 255),
+		bit.lshift(math.floor(math.clamp(v.y, 0, 1) * 255), 8),
+		bit.lshift(math.floor(math.clamp(v.z, 0, 1) * 255), 16),
+		0xff000000
+	)
+end
+
 function Player:init(args)
 	self.index = args.index
 	self.app = args.app
-
+	self.color = baseColors[self.index]
 	self.keyPress = {}
 	self.keyPressLast = {}
 
@@ -97,7 +117,9 @@ function Player:init(args)
 		}
 	end
 	assert(self.keys, "failed to find key mapping for player "..self.index)
-	self.pieceTex, self.pieceImage = makeImageAndTex(pieceSize)
+	self.pieceTex = makeTexWithImage(pieceSize)
+	-- give pieces an outline so you can tell players apart
+	self.pieceOutlineTex = makeTexWithImage(pieceSize)
 end
 
 function Player:handleKeyUpDown(sym, down)
@@ -108,7 +130,7 @@ function Player:handleKeyUpDown(sym, down)
 	end
 end
 
-local App = require 'imguiapp.withorbit'()
+local App = class(ImGuiApp)
 
 App.title = 'Sand Tetris'
 
@@ -122,15 +144,13 @@ function App:initGL(...)
 
 	math.randomseed(os.time())
 
-	self.view.ortho = true
-	self.view.orthoSize = .5
-	self.view.orbit:set(.5, .5, 0)
-	self.view.pos:set(.5, .5, 10)
-
 	self.numPlayers = 1
 	self.numColors = 4
 	self.numNextPieces = 9
 	self.toppleChance = 1
+
+	self.fps = 0
+	self.numSandVoxels = 0
 
 	self.nextSandSize = vec2i(80, 144)	-- original:
 	--self.nextSandSize = vec2i(160, 200)
@@ -147,21 +167,65 @@ function App:initGL(...)
 		classify = function(p) return p[3] end,	-- classify by alpha channel
 	}
 
+	self.projMat = matrix{4,4}:zeros()
+	self.mvMat = matrix{4,4}:zeros()
+	self.mvProjMat = matrix{4,4}:zeros()
+
+	local vtxbufCPU = ffi.new('float[8]', {
+		0,0,
+		1,0,
+		1,1,
+		0,1,
+	})
+	local vertexBuf = GLArrayBuffer{
+		size = ffi.sizeof(vtxbufCPU),
+		data = vtxbufCPU,
+	}
+
+	self.displayShader = GLProgram{
+		vertexCode = [[
+#version 460
+in vec2 vertex;
+out vec2 texcoordv;
+uniform mat4 modelViewProjMat;
+void main() {
+	texcoordv = vertex;
+	gl_Position = modelViewProjMat * vec4(vertex, 0., 1.);
+}
+]],
+		fragmentCode = [[
+#version 460
+in vec2 texcoordv;
+out vec4 fragColor;
+uniform sampler2D tex;
+void main() {
+	fragColor = texture(tex, texcoordv);
+}
+]],
+		uniforms = {
+			tex = 0,
+		},
+
+		attrs = {
+			vertex = vertexBuf,
+		},
+	}:useNone()
+
 	self.sounds = {}
 
-	self.audio = Audio()
-	self.audioSources = table()
-	self.audioSourceIndex = 0
-	self.audio:setDistanceModel'linear clamped'
-	for i=1,31 do	-- 31 for DirectSound, 32 for iphone, infinite for all else?
-		local src = AudioSource()
-		src:setReferenceDistance(self.view.orthoSize)
-		src:setMaxDistance(self.maxAudioDist)
-		src:setRolloffFactor(1)
-		self.audioSources[i] = src
-	end
-
 	if useAudio then
+		self.audio = Audio()
+		self.audioSources = table()
+		self.audioSourceIndex = 0
+		self.audio:setDistanceModel'linear clamped'
+		for i=1,31 do	-- 31 for DirectSound, 32 for iphone, infinite for all else?
+			local src = AudioSource()
+			src:setReferenceDistance(1)
+			src:setMaxDistance(self.maxAudioDist)
+			src:setRolloffFactor(1)
+			self.audioSources[i] = src
+		end
+
 		self.audioConfig = {
 			effectVolume = 1,
 			backgroundVolume = .3,
@@ -186,7 +250,7 @@ function App:initGL(...)
 			self.bgAudioSource:play()
 		end
 	end
-	
+
 	self:reset()
 
 	glreport'here'
@@ -244,7 +308,7 @@ local function makePieceImage(s)
 			if s[j+1]:sub(i+1,i+1) == '#' then
 				for u=0,voxelsPerBlock-1 do
 					for v=0,voxelsPerBlock-1 do
-						ffi.cast('int*', img.buffer)[(u + voxelsPerBlock * i) + img.width * (v + voxelsPerBlock * j)] = -1
+						ffi.cast('uint32_t*', img.buffer)[(u + voxelsPerBlock * i) + img.width * (v + voxelsPerBlock * j)] = 0xffffffff
 					end
 				end
 			end
@@ -305,13 +369,13 @@ function App:reset()
 
 
 	-- I only really need to recreate the sand & flash texs if the board size changes ...
-	self.sandTex, self.sandImage = makeImageAndTex(self.sandSize)
-	self.flashTex, self.flashImage = makeImageAndTex(self.sandSize)
+	self.sandTex = makeTexWithImage(self.sandSize)
+	self.flashTex = makeTexWithImage(self.sandSize)
 
 	-- and I only really need to recreate these if the piece size changes ...
-	self.rotPieceTex, self.rotPieceImage = makeImageAndTex(pieceSize)
+	self.rotPieceTex = makeTexWithImage(pieceSize)
 	self.nextPieces = range(self.numNextPieces):mapi(function(i)
-		local tex = makeImageAndTex(pieceSize)
+		local tex = makeTexWithImage(pieceSize)
 		return {tex=tex}
 	end)
 
@@ -424,7 +488,7 @@ function App:updatePieceTex(player)
 		for i=istart,iend,istep do
 			local found
 			for j=0,pieceSize.y-1 do
-				if ffi.cast('int*', player.pieceTex.image.buffer)[i + pieceSize.x * j] ~= 0 then
+				if ffi.cast('uint32_t*', player.pieceTex.image.buffer)[i + pieceSize.x * j] ~= 0 then
 					found = true
 					break
 				end
@@ -436,6 +500,32 @@ function App:updatePieceTex(player)
 		end
 	end
 	player.pieceTex:bind():subimage()
+
+	-- [[ update the piece outline
+	local outlineRadius = 5
+	ffi.fill(player.pieceOutlineTex.image.buffer, 4 * pieceSize.x * pieceSize.y)
+	for j=0,pieceSize.y-1 do
+		for i=0,pieceSize.x-1 do
+			local bestDistSq = math.huge
+			for ofy=-outlineRadius,outlineRadius do
+				for ofx=-outlineRadius,outlineRadius do
+					local x = math.clamp(i + ofx, 0, pieceSize.x-1)
+					local y = math.clamp(j + ofy, 0, pieceSize.y-1)
+					if ffi.cast('uint32_t*', player.pieceTex.image.buffer)[x + pieceSize.x * y] ~= 0 then
+						local distSq = math.max(1, ofx*ofx + ofy*ofy)
+						bestDistSq = math.min(bestDistSq, distSq)
+					end
+				end
+			end
+			if bestDistSq < math.huge then
+				--bestDistSq = math.sqrt(bestDistSq)
+				local frac = 1 / bestDistSq
+				ffi.cast('uint32_t*', player.pieceOutlineTex.image.buffer)[i + pieceSize.x * j] = vec3fto4ub(player.color * frac)
+			end
+		end
+	end
+	player.pieceOutlineTex:bind():subimage()
+	--]]
 end
 
 function App:rotatePiece(player)
@@ -474,13 +564,13 @@ function App:testPieceMerge(player)
 	for j=0,pieceSize.y-1 do
 		for i=0,pieceSize.x-1 do
 			local k = i + pieceSize.x * j
-			local color = ffi.cast('int*', player.pieceTex.image.buffer)[k]
+			local color = ffi.cast('uint32_t*', player.pieceTex.image.buffer)[k]
 			if color ~= 0 then
 				local x = player.piecePos.x + i
 				local y = player.piecePos.y + j
 				if x >= 0 and x < w
 				and y >= 0 and y < h
-				and ffi.cast('int*',self.sandTex.image.buffer)[x + w * y] ~= 0
+				and ffi.cast('uint32_t*',self.sandTex.image.buffer)[x + w * y] ~= 0
 				then
 					return true
 				end
@@ -494,6 +584,7 @@ function App:updateGame()
 	local thisTime = getTime()
 	local dt = thisTime - self.lastUpdateTime
 	if dt <= updateInterval then return end
+	dt = updateInterval
 
 	--[[ fast-forward to catch up? messes up with pause too
 	self.lastUpdateTime = self.lastUpdateTime + updateInterval
@@ -503,7 +594,7 @@ function App:updateGame()
 	--]]
 	self.gameTime = self.gameTime + updateInterval
 
-	local needsCheck = false
+	local needsCheckLine = false
 
 	-- update
 	local prow = ffi.cast('int*', self.sandTex.image.buffer) + w
@@ -521,25 +612,25 @@ function App:updateGame()
 			if p[0] ~= 0 then
 				if p[-w] == 0 then
 					p[0], p[-w] = p[-w], p[0]
-					needsCheck = true
+					needsCheckLine = true
 				-- hmm symmetry? check left vs right first?
 				elseif math.random() < self.toppleChance then
 					-- 50/50 check left then right, vs check right then left
 					if math.random(2) == 2 then
 						if i > 0 and p[-w-1] == 0 then
 							p[0], p[-w-1] = p[-w-1], p[0]
-							needsCheck = true
+							needsCheckLine = true
 						elseif i < w-1 and p[-w+1] == 0 then
 							p[0], p[-w+1] = p[-w+1], p[0]
-							needsCheck = true
+							needsCheckLine = true
 						end
 					else
 						if i < w-1 and p[-w+1] == 0 then
 							p[0], p[-w+1] = p[-w+1], p[0]
-							needsCheck = true
+							needsCheckLine = true
 						elseif i > 0 and p[-w-1] == 0 then
 							p[0], p[-w-1] = p[-w-1], p[0]
-							needsCheck = true
+							needsCheckLine = true
 						end
 					end
 				end
@@ -584,6 +675,7 @@ function App:updateGame()
 		end
 	end
 
+	local anyMerged
 	for _,player in ipairs(self.players) do
 		local merge
 		if player.piecePos.y <= 0 then
@@ -596,54 +688,34 @@ function App:updateGame()
 			end
 		end
 		if merge then
+			anyMerged = true
 			self:playSound'sfx/place.wav'
-			needsCheck = true
+			needsCheckLine = true
 			for j=0,pieceSize.y-1 do
 				for i=0,pieceSize.x-1 do
 					local k =  i + pieceSize.x * j
-					local color = ffi.cast('int*', player.pieceTex.image.buffer)[k]
+					local color = ffi.cast('uint32_t*', player.pieceTex.image.buffer)[k]
 					if color ~= 0 then
 						local x = player.piecePos.x + i
 						local y = player.piecePos.y + j
 						if x >= 0 and x < w
 						and y >= 0 and y < h
-						and ffi.cast('int*', self.sandTex.image.buffer)[x + w * y] == 0
+						and ffi.cast('uint32_t*', self.sandTex.image.buffer)[x + w * y] == 0
 						then
-							ffi.cast('int*', self.sandTex.image.buffer)[x + w * y] = color
+							ffi.cast('uint32_t*', self.sandTex.image.buffer)[x + w * y] = color
 						end
 					end
 				end
 			end
-
 			self:newPiece(player)
 		end
 	end
 
-	if dontCheck then needsCheck = false end
+	if dontCheck then needsCheckLine = false end
 
-	--[[ now ... try to find a connection from left to right
-	local function checkNextCol(i, jmin, jmax, color)
-
-	end
-	local j = 0
-	while j < h-1 do
-		local color = self.sandCPU[0 + w * j]
-		if color ~= 0 then
-			-- this is the start of our color interval
-			local jmin = j
-			-- find the end of i
-			repeat
-				j = j + 1
-			until j >= h or self.sandCPU[0 + w * j] ~= color
-			local jmax = j - 1
-			if checkNextCol(1, jmin, jmax, color) then
-			end
-		end
-	end
-	--]]
-
-	if needsCheck then
-		local anyCleared
+	-- try to find a connection from left to right
+	local anyCleared
+	if needsCheckLine then
 		local clearedCount = 0
 		local blobs = self.sandTex.image:getBlobs(self.getBlobCtx)
 --print('#blobs', #blobs)
@@ -672,12 +744,20 @@ function App:updateGame()
 		if clearedCount ~= 0 then
 			anyCleared = true
 			self.score = self.score + clearedCount
-		end
-		if anyCleared then
 			self:playSound'sfx/line.wav'
 			self.flashTex:bind():subimage()
 			self.flashTime = self.gameTime
 		end
+	end
+
+	if needsCheckLine or anyMerged or anyCleared then
+		self.numSandVoxels = 0
+		local p = ffi.cast('uint32_t*', self.sandTex.image.buffer)
+		for i=0,w*h-1 do
+			if p[0] ~= 0 then self.numSandVoxels = self.numSandVoxels + 1 end
+			p = p + 1
+		end
+		self.sandTex:bind():subimage()
 	end
 
 	for _,player in ipairs(self.players) do
@@ -705,40 +785,52 @@ function App:update(...)
 	--]]
 
 	-- draw
-	self.view:setup(self.width / self.height)
 
-	GLTex2D:enable()
-
-	assert(self.sandTex.data == self.sandTex.image.buffer)
-	self.sandTex:bind():subimage()
+	local aspectRatio = self.width / self.height
 	local s = w / h
-	gl.glBegin(gl.GL_QUADS)
-	for _,v in ipairs(vtxs) do
-		local x,y = table.unpack(v)
-		gl.glTexCoord2f(x,y)
-		gl.glVertex2f((x - .5) * s + .5, y)
-	end
-	gl.glEnd()
-	self.sandTex:unbind()
+
+	self.projMat:setOrtho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
+
+	self.displayShader:use()
+	self.displayShader.vao:use()
+
+	self.mvMat:setTranslate(-.5 * s, -.5)
+		:applyScale(s, 1)
+	self.mvProjMat:mul4x4(self.projMat, self.mvMat)
+	gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+
+	self.sandTex:bind()
+	gl.glDrawArrays(gl.GL_QUADS, 0, 4)
 
 	-- draw the current piece
 	for _,player in ipairs(self.players) do
-		if player.pieceTex then
-			player.pieceTex:bind()
-			gl.glEnable(gl.GL_ALPHA_TEST)
-			gl.glBegin(gl.GL_QUADS)
-			for _,v in ipairs(vtxs) do
-				local x,y = table.unpack(v)
-				gl.glTexCoord2f(x,y)
-				gl.glVertex2f(
-					((player.piecePos.x + x * pieceSize.x) / w - .5) * s + .5,
-					(player.piecePos.y + y * pieceSize.y) / h
-				)
+		for i=1,2 do
+			local tex
+			if i == 1 then
+				tex = player.pieceOutlineTex
+				gl.glEnable(gl.GL_BLEND)
+				gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
+			else
+				tex = player.pieceTex
+				gl.glEnable(gl.GL_ALPHA_TEST)
 			end
-			gl.glEnd()
-			gl.glDisable(gl.GL_ALPHA_TEST)
-			player.pieceTex:unbind()
-			gl.glColor3f(1,1,1)
+
+			self.mvMat:setTranslate(
+					(player.piecePos.x / w - .5) * s,
+					player.piecePos.y / h - .5
+				)
+				:applyScale(pieceSize.x / w * s, pieceSize.y / h)
+			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
+			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+
+			tex:bind()
+			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+
+			if i == 1 then
+				gl.glDisable(gl.GL_BLEND)
+			else
+				gl.glDisable(gl.GL_ALPHA_TEST)
+			end
 		end
 	end
 
@@ -751,46 +843,43 @@ function App:update(...)
 		gl.glEnable(gl.GL_ALPHA_TEST)
 		local flashInt = bit.band(math.floor(flashDt * numFlashes * 2), 1) == 0
 		if flashInt then
+			self.mvMat
+				:setTranslate(-.5 * s, -.5)
+				:applyScale(s, 1)
+			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
+			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+
 			self.flashTex:bind()
-			local s = w / h
-			gl.glBegin(gl.GL_QUADS)
-			for _,v in ipairs(vtxs) do
-				local x,y = table.unpack(v)
-				gl.glTexCoord2f(x,y)
-				gl.glVertex2f((x - .5) * s + .5, y)
-			end
-			gl.glEnd()
-			self.flashTex:unbind()
+			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
 		end
 		gl.glDisable(gl.GL_ALPHA_TEST)
 	elseif self.wasFlashing then
+		-- clear once we're done flashing
 		self.wasFlashing = false
 		ffi.fill(self.flashTex.image.buffer, 4 * w * h)
 		assert(self.flashTex.data == self.flashTex.image.buffer)
-		self.flashTex:bind():subimage():unbind()
+		self.flashTex:bind():subimage()
 	end
 
-	local aspectRatio = self.width / self.height
-	local s = w / h
 	local nextPieceSize = .1
 	for i=#self.nextPieces,1,-1 do
 		local it = self.nextPieces[i]
 		local dy = #self.nextPieces == 1 and 0 or (1 - nextPieceSize)/(#self.nextPieces-1)
 		dy = math.min(dy, nextPieceSize * 1.1)
+
+		self.mvMat
+			:setTranslate(aspectRatio * .5 - nextPieceSize, .5 - (i-1) * dy)
+			:applyScale(nextPieceSize, -nextPieceSize)
+		self.mvProjMat:mul4x4(self.projMat, self.mvMat)
+		gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+
 		it.tex:bind()
-		gl.glBegin(gl.GL_QUADS)
-		for _,v in ipairs(vtxs) do
-			local x,y = table.unpack(v)
-			gl.glTexCoord2f(x,y)
-			gl.glVertex2f(
-				.5 + aspectRatio*.5 + (x - 1) * nextPieceSize,
-				1 - ((i-1) * dy + y * nextPieceSize)
-			)
-		end
-		gl.glEnd()
+		gl.glDrawArrays(gl.GL_QUADS, 0, 4)
 	end
 
-	GLTex2D:disable()
+	self.displayShader.vao:useNone()
+	GLTex2D:unbind()
+	self.displayShader:useNone()
 
 	App.super.update(self, ...)
 	glreport'here'
@@ -801,8 +890,7 @@ function App:update(...)
 		local thisTime = getTime()
 		if thisTime - self.lastFrameTime >= 1 then
 			local deltaTime = thisTime - self.lastFrameTime
-			local fps = self.fpsSampleCount / deltaTime
-			print(fps)
+			self.fps = self.fpsSampleCount / deltaTime
 			self.lastFrameTime = thisTime
 			self.fpsSampleCount = 0
 		end
@@ -873,7 +961,7 @@ function App:updateGUI()
 	-- [[
 	ig.igSetNextWindowPos(ig.ImVec2(0, 0), 0, ig.ImVec2())
 	ig.igSetNextWindowSize(ig.ImVec2(150, -1), 0)
-	ig.igBegin('score', nil, bit.bor(
+	ig.igBegin('x', nil, bit.bor(
 		ig.ImGuiWindowFlags_NoMove,
 		ig.ImGuiWindowFlags_NoResize,
 		ig.ImGuiWindowFlags_NoCollapse,
@@ -884,79 +972,84 @@ function App:updateGUI()
 	ig.igBegin('cfg', nil, 0)
 	--]]
 
-
-	ig.igText('score: '..tostring(self.score))
-
-	ig.luatableTooltipInputInt('num players', self, 'numPlayers')
-
-	ig.luatableTooltipInputInt('num next pieces', self, 'numNextPieces')
-
-	self.colortest = self.colortest or ig.ImVec4()
-	--ig.igColorPicker3('test', self.colortest.s, 0)
-	if ig.igButton'+' then
-		self.numColors = self.numColors + 1
-		self.nextColors = baseColors:sub(1, self.numColors)
+	if ig.igButton'...' then
+		self.menuOpen = not self.menuOpen
 	end
-	ig.igSameLine()
-	if self.numColors > 1 and ig.igButton'-' then
-		self.numColors = self.numColors - 1
-		self.nextColors = baseColors:sub(1, self.numColors)
-	end
-	ig.igSameLine()
+	if self.menuOpen then
+		if showFPS then ig.igText('fps: '..self.fps) end
+		ig.igText('num voxels: '..self.numSandVoxels)
+		ig.igText('score: '..tostring(self.score))
 
-	for i=1,self.numColors do
-		local c = self.nextColors[i]
-		tmpcolor.x = c.x
-		tmpcolor.y = c.y
-		tmpcolor.z = c.z
-		tmpcolor.w = 1
-		if ig.igColorButton('color '..i, tmpcolor) then
-			modalsOpened.colorPicker = true
+		ig.luatableTooltipInputInt('num players', self, 'numPlayers')
+
+		ig.luatableTooltipInputInt('num next pieces', self, 'numNextPieces')
+
+		self.colortest = self.colortest or ig.ImVec4()
+		--ig.igColorPicker3('test', self.colortest.s, 0)
+		if ig.igButton'+' then
+			self.numColors = self.numColors + 1
+			self.nextColors = baseColors:sub(1, self.numColors)
+		end
+		ig.igSameLine()
+		if self.numColors > 1 and ig.igButton'-' then
+			self.numColors = self.numColors - 1
+			self.nextColors = baseColors:sub(1, self.numColors)
+		end
+		ig.igSameLine()
+
+		for i=1,self.numColors do
+			local c = self.nextColors[i]
+			tmpcolor.x = c.x
+			tmpcolor.y = c.y
+			tmpcolor.z = c.z
+			tmpcolor.w = 1
+			if ig.igColorButton('color '..i, tmpcolor) then
+				modalsOpened.colorPicker = true
+				self.paused = true
+				self.currentColorEditing = i
+			end
+			if i % 6 ~= 4 and i < self.numColors then
+				ig.igSameLine()
+			end
+		end
+
+		ig.luatableTooltipInputInt('board width', self.nextSandSize, 'x')
+		ig.luatableTooltipInputInt('board height', self.nextSandSize, 'y')
+		ig.luatableTooltipSliderFloat('topple chance', self, 'toppleChance', 0, 1)
+
+		if ig.igButton'New Game' then
+			self:reset()
+		end
+
+		local url = 'https://github.com/thenumbernine/sand-tetris'
+		if ig.igButton'about' then
+			if ffi.os == 'Windows' then
+				os.execute('explorer "'..url..'"')
+			elseif ffi.os == 'OSX' then
+				os.execute('open "'..url..'"')
+			else
+				os.execute('xdg-open "'..url..'"')
+			end
+			print'clicked'
+		end
+		if ig.igIsItemHovered(ig.ImGuiHoveredFlags_None) then
+			ig.igSetMouseCursor(ig.ImGuiMouseCursor_Hand)
+			ig.igBeginTooltip()
+			ig.igText('by Christopher Moore')
+			ig.igText('click to go to')
+			ig.igText(url)
+			ig.igEndTooltip()
+		end
+
+		if useAudio and ig.igButton'Audio...' then
+			modalsOpened.audio = true
 			self.paused = true
-			self.currentColorEditing = i
 		end
-		if i % 6 ~= 4 and i < self.numColors then
-			ig.igSameLine()
+
+		if ig.igButton(self.paused and 'resume' or 'pause') then
+			self.paused = not self.paused
 		end
 	end
-
-	ig.luatableTooltipInputInt('board width', self.nextSandSize, 'x')
-	ig.luatableTooltipInputInt('board height', self.nextSandSize, 'y')
-	ig.luatableTooltipSliderFloat('topple chance', self, 'toppleChance', 0, 1)
-
-	if ig.igButton'New Game' then
-		self:reset()
-	end
-
-	local url = 'https://github.com/thenumbernine/sand-tetris'
-	if ig.igButton'about' then
-		if ffi.os == 'Windows' then
-			os.execute('explorer "'..url..'"')
-		elseif ffi.os == 'OSX' then
-			os.execute('open "'..url..'"')
-		else
-			os.execute('xdg-open "'..url..'"')
-		end
-		print'clicked'
-	end
-	if ig.igIsItemHovered(ig.ImGuiHoveredFlags_None) then
-		ig.igSetMouseCursor(ig.ImGuiMouseCursor_Hand)
-		ig.igBeginTooltip()
-		ig.igText('by Christopher Moore')
-		ig.igText('click to go to')
-		ig.igText(url)
-		ig.igEndTooltip()
-	end
-
-	if useAudio and ig.igButton'Audio...' then
-		modalsOpened.audio = true
-		self.paused = true
-	end
-
-	if ig.igButton(self.paused and 'resume' or 'pause') then
-		self.paused = not self.paused
-	end
-
 	ig.igEnd()
 
 	if modalsOpened.audio then
