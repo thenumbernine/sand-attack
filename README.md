@@ -21,9 +21,11 @@ Tetris with abelian sandpile models.  Jk it's with sand.
 
 ## TODO:
 
-- option for multiple previous piece stacks for multiple players
+- option for multipalyer sharing next-pieces vs separate next-pieces 
 - varying board width for # of players
-- levels that the speed / # colors goes up for # of lines made / score
+- gameplay mode for higher # colors goes up for # of lines made / score
+- SPH stuff, exploding pieces, tilting board, obstacles in the board, etc
+- dif music per level
 - faster blob detection
 
 ## Music Credit:

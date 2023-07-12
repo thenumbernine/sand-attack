@@ -106,6 +106,7 @@ function ConfigState:updateGUI()
 	local app = self.app
 	ig.igBegin('config', nil, 0)
 	ig.luatableInputInt('num next pieces', app, 'numNextPieces')
+	ig.luatableInputFloat('drop speed', app, 'dropSpeed')
 
 	ig.igText'Colors:'
 	if ig.igButton'+' then
@@ -312,6 +313,7 @@ function App:initGL(...)
 	self.numNextPieces = 3
 	self.toppleChance = 1
 	self.level = 1
+	self.dropSpeed = 5
 
 	self.fps = 0
 	self.numSandVoxels = 0
@@ -322,6 +324,17 @@ function App:initGL(...)
 	--self.nextSandSize = vec2i(80, 360)
 	--self.nextSandSize = vec2i(512, 512)
 
+	self.loseScreenDuration = 5
+	
+	self.loseTex = GLTex2D{
+		image = Image'tex/youlose.png':flip(),
+		wrap = {
+			s = gl.GL_CLAMP_TO_EDGE,
+			t = gl.GL_CLAMP_TO_EDGE,
+		},
+		minFilter = gl.GL_NEAREST,
+		magFilter = gl.GL_NEAREST,
+	}
 
 	--[[
 	image's getBlobs is a mess... straighten it out
@@ -551,8 +564,9 @@ end
 
 function App:reset()
 	self.sandSize = vec2i(self.nextSandSize)
-
 	local w, h = self.sandSize:unpack()
+	
+	self.loseTime = nil
 
 	-- I only really need to recreate the sand & flash texs if the board size changes ...
 	self.sandTex = self:makeTexWithImage(self.sandSize)
@@ -673,8 +687,8 @@ function App:newPiece(player)
 	player.piecePos = vec2i(bit.rshift(w-self.pieceSize.x,1), h-1)
 	player.pieceLastPos = vec2i(player.piecePos)
 	if self:testPieceMerge(player) then
-		print("YOU LOSE!!!")
-		-- TODO popup, delay, scoreboard, reset, whatever
+		-- but this means you can pause mid-losing ... meh
+		self.loseTime = self.thisTime
 	end
 end
 
@@ -790,8 +804,7 @@ end
 
 function App:updateGame()
 	local w, h = self.sandSize:unpack()
-	local thisTime = getTime()
-	local dt = thisTime - self.lastUpdateTime
+	local dt = self.thisTime - self.lastUpdateTime
 	if dt <= updateInterval then return end
 	dt = updateInterval
 
@@ -799,7 +812,7 @@ function App:updateGame()
 	self.lastUpdateTime = self.lastUpdateTime + updateInterval
 	--]]
 	-- [[ stutter
-	self.lastUpdateTime = thisTime
+	self.lastUpdateTime = self.thisTime
 	--]]
 	self.gameTime = self.gameTime + updateInterval
 
@@ -857,7 +870,6 @@ function App:updateGame()
 	-- test piece for collision with sand
 	-- if it collides then merge it
 	local movedx = 1
-	local dropdy = 5
 	for _,player in ipairs(self.players) do
 		-- TODO key updates at higher interval than drop rate ...
 		-- but test collision for both
@@ -869,7 +881,7 @@ function App:updateGame()
 		end
 		self:constrainPiecePos(player)
 		if player.keyPress.down then
-			player.piecePos.y = player.piecePos.y - dropdy
+			player.piecePos.y = player.piecePos.y - self.dropSpeed
 		end
 		if player.keyPress.up and not player.keyPressLast.up then
 			self:rotatePiece(player)
@@ -984,7 +996,7 @@ function App:updateGame()
 end
 
 function App:update(...)
-	local t =
+	self.thisTime = getTime()
 	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 	
 	if self.state.update then
@@ -994,7 +1006,10 @@ function App:update(...)
 	local w, h = self.sandSize:unpack()
 
 	if not self.paused then
-		self:updateGame()
+		-- if we haven't lost yet ...
+		if not self.loseTime then
+			self:updateGame()
+		end
 
 		--[[ pouring sand
 		self.sandCPU[bit.rshift(w,1) + w * (h - 1)] = bit.bor(
@@ -1080,6 +1095,22 @@ function App:update(...)
 			self.flashTex:bind():subimage()
 		end
 
+		if self.loseTime then
+			local loseDuration = self.thisTime - self.loseTime
+			if math.floor(loseDuration * 2) % 2 == 0 then
+				self.mvMat
+					:setTranslate(-.5 * s, -.5)
+					:applyScale(s, 1)
+				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
+				gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+
+				gl.glEnable(gl.GL_ALPHA_TEST)
+				self.loseTex:bind()
+				gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+				gl.glDisable(gl.GL_ALPHA_TEST)
+			end
+		end
+
 		local nextPieceSize = .1
 		for i=#self.nextPieces,1,-1 do
 			local it = self.nextPieces[i]
@@ -1101,6 +1132,11 @@ function App:update(...)
 		self.displayShader:useNone()
 	end
 
+	if self.loseTime and self.thisTime - self.loseTime > self.loseScreenDuration then
+		-- TODO maybe go to a high score screen instead?
+		self.state = MainMenuState(self)
+	end
+
 	-- update GUI
 	App.super.update(self, ...)
 	glreport'here'
@@ -1108,11 +1144,10 @@ function App:update(...)
 
 	if showFPS then
 		self.fpsSampleCount = self.fpsSampleCount + 1
-		local thisTime = getTime()
-		if thisTime - self.lastFrameTime >= 1 then
-			local deltaTime = thisTime - self.lastFrameTime
+		if self.thisTime - self.lastFrameTime >= 1 then
+			local deltaTime = self.thisTime - self.lastFrameTime
 			self.fps = self.fpsSampleCount / deltaTime
-			self.lastFrameTime = thisTime
+			self.lastFrameTime = self.thisTime
 			self.fpsSampleCount = 0
 		end
 	end
