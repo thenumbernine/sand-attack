@@ -16,7 +16,6 @@ local glreport = require 'gl.report'
 local vec2i = require 'vec-ffi.vec2i'
 local vec2f = require 'vec-ffi.vec2f'
 local vec3f = require 'vec-ffi.vec3f'
-local vec4f = require 'vec-ffi.vec4f'
 local getTime = require 'ext.timer'.getTime
 local ig = require 'imgui'
 local ImGuiApp = require 'imguiapp'
@@ -30,18 +29,6 @@ matrix.real = 'float'
 -- TODO put this in ext.math
 --local DBL_EPSILON = 2.220446049250313080847e-16
 local FLT_EPSILON = 1.1920928955078125e-7
-
-local function matmul4x4(c,a,b)
-	for i=0,3 do
-		for j=0,3 do
-			local sum = 0
-			for k=0,3 do
-				sum = sum + a[i + 4 * k] * b[k + 4 * j]
-			end
-			c[i + 4 * j] = sum
-		end
-	end
-end
 
 -- board size is 80 x 144 visible
 -- piece is 4 blocks arranged
@@ -394,6 +381,8 @@ function App:reset()
 	-- I only really need to recreate the sand & flash texs if the board size changes ...
 	self.sandTex = makeTexWithImage(self.sandSize)
 	self.flashTex = makeTexWithImage(self.sandSize)
+	-- keep track of what is being cleared this frame
+	-- use this to test for what particles to remove
 	self.currentClearImage = Image(self.sandSize.x, self.sandSize.y, 4, 'unsigned char')
 
 	-- and I only really need to recreate these if the piece size changes ...
@@ -837,8 +826,6 @@ function App:updateGame()
 						clearedCount = clearedCount + iw
 						--ffi.fill(self.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
 						for k=0,4*iw-1 do
-							-- keep track of what is being cleared this frame
-							-- use this to test for what particles to remove
 							self.currentClearImage.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 							self.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 						end
@@ -975,7 +962,6 @@ function App:update(...)
 		assert(self.flashTex.data == self.flashTex.image.buffer)
 		self.flashTex:bind():subimage()
 	end
-
 
 	local nextPieceSize = .1
 	for i=#self.nextPieces,1,-1 do
