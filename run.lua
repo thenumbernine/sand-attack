@@ -1,4 +1,11 @@
 #!/usr/bin/env luajit
+
+-- TODO this variable is half hardwired into lua-gl and luajit-ffi-bindings projects ... I don't like how it is set up
+--ffi_OpenGL = nil	-- for desktop GL
+--ffi_OpenGL = 'ffi.OpenGLES1'	-- for GLES1
+ffi_OpenGL = 'ffi.OpenGLES2'	-- for GLES2
+
+local gl = require 'gl'
 local ffi = require 'ffi'
 local sdl = require 'ffi.sdl'
 local template = require 'template'
@@ -7,7 +14,6 @@ local class = require 'ext.class'
 local math = require 'ext.math'
 local string = require 'ext.string'
 local range = require 'ext.range'
-local gl = require 'gl'
 local Image = require 'image'
 local GLTex2D = require 'gl.tex2d'
 local GLProgram = require 'gl.program'
@@ -1101,4 +1107,6 @@ function App:exit()
 end
 --]]
 
-return App():run()
+local app = App()
+app.gl = gl	-- tell app to use a dif gl (in case i'm using a dif gl)
+return app:run()
