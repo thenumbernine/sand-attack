@@ -1,5 +1,6 @@
 local class = require 'ext.class'
 local math = require 'ext.math'
+local tolua = require 'ext.tolua'
 local ig = require 'imgui'
 local getTime = require 'ext.timer'.getTime
 
@@ -201,7 +202,9 @@ function MainMenuState:updateGUI()
 	if ig.igButton'Config' then
 		app.state = ConfigState(app)
 	end
-	
+	if ig.igButton'High Scores' then
+		app.state = GameState.HighScoreState(app)
+	end
 	local url = 'https://github.com/thenumbernine/sand-tetris'
 	if ig.igButton'About' then
 		if ffi.os == 'Windows' then
@@ -240,8 +243,42 @@ function SplashScreenState:update()
 end
 
 local HighScoreState = class(GameState)
+GameState.HighScoreState = HighScoreState
+function HighScoreState:init(app, needsName)
+	HighScoreState.super.init(self, app)
+	self.needsName = needsName
+	self.name = ''
+end
 function HighScoreState:updateGUI()
-	
+	local app = self.app
+	ig.igBegin('High Scores:', nil, 0)
+
+	-- TODO separate state for this?
+	if self.needsName then
+		ig.luatableInputText('Your Name:', self, 'name')
+		if ig.igButton'Ok' then
+			self.needsName = false
+			table.insert(app.cfg.highscores, {
+				name = self.name,
+				lines = app.lines,
+				level = app.level,
+				score = app.score,
+				numColors = app.numColors,
+			})
+			table.sort(app.cfg.highscores, function(a,b)
+				return a.score > b.score
+			end)
+			app:saveConfig()
+		end
+	end
+
+	for i,score in ipairs(app.cfg.highscores) do
+		ig.igText(tolua(score))
+	end
+	if ig.igButton'Done' then
+		app.state = MainMenuState(app)
+	end
+	ig.igEnd()
 end
 
 return GameState

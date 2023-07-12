@@ -89,6 +89,7 @@ function App:initGL(...)
 	self.cfg.startLevel = self.cfg.startLevel or 1
 	self.cfg.toppleChance = self.cfg.toppleChance or 1
 	-- TODO add colors to config?
+	self.cfg.highscores = self.cfg.highscores or {}
 
 	self.state = GameState.SplashScreenState(self)
 
@@ -748,7 +749,7 @@ function App:updateGame()
 		end
 		if clearedCount ~= 0 then
 			anyCleared = true
-			self.score = self.score + clearedCount
+			self.score = self.score + self.level * clearedCount
 			self.lines = self.lines + 1
 			if self.lines % 10 == 0 then
 				self.level = self.level + 1
@@ -919,7 +920,7 @@ function App:update(...)
 		-- TODO maybe go to a high score screen instead?
 		self.loseTime = nil
 		self.paused = true
-		self.state = GameState.MainMenuState(self)
+		self.state = GameState.HighScoreState(self, true)
 	end
 
 	-- update GUI
