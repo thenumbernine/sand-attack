@@ -1100,12 +1100,10 @@ function App:updateGUI()
 	end
 end
 
---[[ if you're not using the autorelease
 function App:exit()
 	self.audio:shutdown()
 	App.super.exit(self)
 end
---]]
 
 local app = App()
 app.gl = gl	-- tell app to use a dif gl (in case i'm using a dif gl)
