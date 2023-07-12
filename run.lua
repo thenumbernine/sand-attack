@@ -4,8 +4,11 @@
 --ffi_OpenGL = nil	-- for desktop GL
 --ffi_OpenGL = 'ffi.OpenGLES1'	-- for GLES1
 ffi_OpenGL = 'ffi.OpenGLES2'	-- for GLES2
-
 local gl = require 'gl'
+
+local matrix = require 'matrix.ffi'
+matrix.real = 'float'
+
 local ffi = require 'ffi'
 local sdl = require 'ffi.sdl'
 local template = require 'template'
@@ -28,22 +31,249 @@ local ImGuiApp = require 'imguiapp'
 local Audio = require 'audio'
 local AudioSource = require 'audio.source'
 local AudioBuffer = require 'audio.buffer'
-local matrix = require 'matrix.ffi'
-matrix.real = 'float'
+local Player = require 'sandtetris.player'
 
 -- TODO put this in ext.math
 --local DBL_EPSILON = 2.220446049250313080847e-16
 local FLT_EPSILON = 1.1920928955078125e-7
 
--- board size is 80 x 144 visible
--- piece is 4 blocks arranged
--- blocks are 8 x 8
-local voxelsPerBlock = 8	-- original
---local voxelsPerBlock = 16
-local pieceSizeInBlocks = vec2i(4,4)
-local pieceSize = pieceSizeInBlocks * voxelsPerBlock
+local dontCheck = false	-- don't ever ever check for lines.  used for fps testing the sand topple simulation.
+local showFPS = true
+local useAudio = true
 
-local baseColors = table{
+local updateInterval = 1/60
+--local updateInterval = 1/120
+--local updateInterval = 0
+
+
+local App = class(ImGuiApp)
+
+
+local GameState = class()
+function GameState:init(app)
+	assert(App:isa(app))
+	self.app = assert(app)
+end
+
+local MainMenuState
+
+local LoseScreen = class(GameState)
+
+local PlayingState = class(GameState)
+function PlayingState:init(app)
+	PlayingState.super.init(self, app)
+	app.paused = false
+end
+function PlayingState:update()
+end
+function PlayingState:updateGUI()
+	local app = self.app
+	-- [[
+	ig.igSetNextWindowPos(ig.ImVec2(0, 0), 0, ig.ImVec2())
+	ig.igSetNextWindowSize(ig.ImVec2(150, -1), 0)
+	ig.igBegin('x', nil, bit.bor(
+		ig.ImGuiWindowFlags_NoMove,
+		ig.ImGuiWindowFlags_NoResize,
+		ig.ImGuiWindowFlags_NoCollapse,
+		ig.ImGuiWindowFlags_NoDecoration
+	))
+	--]]
+	--[[
+	ig.igBegin('cfg', nil, 0)
+	--]]
+
+	if showFPS then ig.igText('fps: '..app.fps) end
+	ig.igText('num voxels: '..app.numSandVoxels)
+	ig.igText('level: '..tostring(app.level))
+	ig.igText('score: '..tostring(app.score))
+	ig.igText('lines: '..tostring(app.lines))
+	--ig.igText('ticks to fall: '..tostring(app.ticksToFall))
+
+	if ig.igButton(app.paused and 'resume' or 'pause') then
+		app.paused = not app.paused
+	end
+	if ig.igButton'Quit' then
+		app.state = MainMenuState(app)
+	end
+	
+	ig.igEnd()
+end
+
+
+local ConfigState = class(GameState)
+local tmpcolor = ig.ImVec4()
+function ConfigState:updateGUI()
+	local app = self.app
+	ig.igBegin('config', nil, 0)
+	ig.luatableInputInt('num next pieces', app, 'numNextPieces')
+
+	ig.igText'Colors:'
+	if ig.igButton'+' then
+		app.numColors = app.numColors + 1
+		app.nextColors = app.baseColors:sub(1, app.numColors)
+	end
+	ig.igSameLine()
+	if app.numColors > 1 and ig.igButton'-' then
+		app.numColors = app.numColors - 1
+		app.nextColors = app.baseColors:sub(1, app.numColors)
+	end
+	ig.igSameLine()
+
+	for i=1,app.numColors do
+		local c = app.nextColors[i]
+		tmpcolor.x = c.x
+		tmpcolor.y = c.y
+		tmpcolor.z = c.z
+		tmpcolor.w = 1
+		if ig.igColorButton('color '..i, tmpcolor) then
+			self.currentColorEditing = i
+		end
+		if i % 6 ~= 4 and i < app.numColors then
+			ig.igSameLine()
+		end
+	end
+
+	if self.currentColorEditing then
+		ig.igBegin('Color', nil, bit.bor(
+			ig.ImGuiWindowFlags_NoTitleBar,
+			ig.ImGuiWindowFlags_NoResize,
+			ig.ImGuiWindowFlags_NoCollapse,
+			ig.ImGuiWindowFlags_AlwaysAutoResize,
+			ig.ImGuiWindowFlags_Modal
+		))
+		if #app.nextColors > 1 then
+			if ig.igButton'Delete Color' then
+				app.nextColors:remove(self.currentColorEditing)
+				app.numColors = app.numColors - 1
+				self.currentColorEditing = nil
+			end
+		end
+		if self.currentColorEditing then
+			ig.igColorPicker3('edit color', app.nextColors[self.currentColorEditing].s, 0)
+		end
+		if ig.igButton'Done' then
+			self.currentColorEditing = nil
+		end
+		ig.igEnd()
+	end
+
+	ig.igText'Board:'
+	ig.luatableTooltipInputInt('board width', app.nextSandSize, 'x')
+	ig.luatableTooltipInputInt('board height', app.nextSandSize, 'y')
+	ig.luatableTooltipSliderFloat('topple chance', app, 'toppleChance', 0, 1)
+
+	if useAudio then
+		ig.igText'Audio:'
+		if ig.luatableSliderFloat('fx volume', app.audioConfig, 'effectVolume', 0, 1) then
+			--[[ if you want, update all previous audio sources...
+			for _,src in ipairs(app.audioSources) do
+				-- TODO if the gameplay sets the gain down then we'll want to multiply by their default gain
+				src:setGain(audioConfig.effectVolume * src.gain)
+			end
+			--]]
+		end
+		if ig.luatableSliderFloat('bg volume', app.audioConfig, 'backgroundVolume', 0, 1) then
+			app.bgAudioSource:setGain(app.audioConfig.backgroundVolume)
+		end
+	end
+
+
+	if ig.igButton'Done' then
+		app.state = MainMenuState(app)
+	end
+	ig.igEnd()
+end
+
+local StartNewGameState = class(GameState)
+function StartNewGameState:init(app, multiplayer)
+	StartNewGameState.super.init(self, app)
+	self.multiplayer = multiplayer
+	if not multiplayer then
+		app.numPlayers = 1
+	end
+end
+function StartNewGameState:updateGUI()
+	local app = self.app
+
+	ig.igBegin('New Game', nil, 0)
+	if self.multiplayer then
+		ig.luatableInputInt('num players', app, 'numPlayers')
+	end
+
+	ig.luatableInputInt('Level:', app, 'level')
+	app.level = math.clamp(app.level, 1, 20)
+
+	if ig.igButton'Back' then
+		app.state = MainMenuState(app)
+	end
+	ig.igSameLine()
+	if ig.igButton'Go!' then
+		app:reset()
+		app.state = PlayingState(app)	-- sets paused=false
+	end
+	ig.igEnd()
+end
+
+MainMenuState = class(GameState)
+function MainMenuState:init(...)
+	MainMenuState.super.init(self, ...)
+	self.app.paused = true
+end
+function MainMenuState:updateGUI()
+	local app = self.app
+	ig.igBegin('main menu', nil, 0)
+	if ig.igButton'New Game' then
+		-- TODO choose gametype and choose level
+		app.state = StartNewGameState(app)
+	end
+	if ig.igButton'New Game Co-op' then
+		app.state = StartNewGameState(app, true)
+		-- TODO pick same as before except pick # of players
+	end
+	-- TODO RESUME GAME here
+	if ig.igButton'Config' then
+		-- TODO config state
+		app.state = ConfigState(app)
+	end
+	
+	local url = 'https://github.com/thenumbernine/sand-tetris'
+	if ig.igButton'About' then
+		if ffi.os == 'Windows' then
+			os.execute('explorer "'..url..'"')
+		elseif ffi.os == 'OSX' then
+			os.execute('open "'..url..'"')
+		else
+			os.execute('xdg-open "'..url..'"')
+		end
+	end
+	if ig.igIsItemHovered(ig.ImGuiHoveredFlags_None) then
+		ig.igSetMouseCursor(ig.ImGuiMouseCursor_Hand)
+		ig.igBeginTooltip()
+		ig.igText('by Christopher Moore')
+		ig.igText('click to go to')
+		ig.igText(url)
+		ig.igEndTooltip()
+	end
+
+	if ig.igButton'Quit' then
+		app:requestExit()
+	end
+	ig.igEnd()
+end
+
+local SplashScreenState = class(GameState)
+SplashScreenState.duration = 0
+SplashScreenState.startTime = getTime()
+function SplashScreenState:update()
+	local app = self.app
+	-- TODO show a splash screen logo.
+	if getTime() - self.startTime > self.duration then
+		app.state = MainMenuState(app)
+	end
+end
+
+
+App.baseColors = table{
 	vec3f(1,0,0),
 	vec3f(0,0,1),
 	vec3f(0,1,0),
@@ -54,86 +284,16 @@ local baseColors = table{
 }
 -- ... but not all 8 bit alpha channels are really 8 bits ...
 
-local dontCheck = false	-- don't ever ever check for lines.  used for fps testing the sand topple simulation.
-local showFPS = true
-local useAudio = true
 
-local updateInterval = 1/60
---local updateInterval = 1/120
---local updateInterval = 0
+App.title = 'Samd'
 
-local function makeTexWithImage(size)
-	local img = Image(size.x, size.y, 4, 'unsigned char')
-	ffi.fill(img.buffer, 4 * size.x * size.y)
-	local tex = GLTex2D{
-		internalFormat = gl.GL_RGBA,
-		width = tonumber(size.x),
-		height = tonumber(size.y),
-		format = gl.GL_RGBA,
-		type = gl.GL_UNSIGNED_BYTE,
-		wrap = {
-			s = gl.GL_CLAMP_TO_EDGE,
-			t = gl.GL_CLAMP_TO_EDGE,
-		},
-		minFilter = gl.GL_NEAREST,
-		magFilter = gl.GL_NEAREST,
-		data = img.buffer,	-- stored
-	}
-	tex.image = img
-	-- TODO store tex.image as img?
-	return tex
-end
-
-local Player = class()
-
-local function vec3fto4ub(v)
-	return bit.bor(
-		math.floor(math.clamp(v.x, 0, 1) * 255),
-		bit.lshift(math.floor(math.clamp(v.y, 0, 1) * 255), 8),
-		bit.lshift(math.floor(math.clamp(v.z, 0, 1) * 255), 16),
-		0xff000000
-	)
-end
-
-function Player:init(args)
-	self.index = args.index
-	self.app = args.app
-	self.color = baseColors[self.index]
-	self.keyPress = {}
-	self.keyPressLast = {}
-
-	if self.index == 1 then
-		self.keys = {
-			up = sdl.SDLK_UP,
-			down = sdl.SDLK_DOWN,
-			left = sdl.SDLK_LEFT,
-			right = sdl.SDLK_RIGHT,
-		}
-	elseif self.index == 2 then
-		self.keys = {
-			up = ('w'):byte(),
-			down = ('s'):byte(),
-			left = ('a'):byte(),
-			right = ('d'):byte(),
-		}
-	end
-	assert(self.keys, "failed to find key mapping for player "..self.index)
-	self.pieceTex = makeTexWithImage(pieceSize)
-	-- give pieces an outline so you can tell players apart
-	self.pieceOutlineTex = makeTexWithImage(pieceSize)
-end
-
-function Player:handleKeyUpDown(sym, down)
-	for k,v in pairs(self.keys) do
-		if sym == v then
-			self.keyPress[k] = down
-		end
-	end
-end
-
-local App = class(ImGuiApp)
-
-App.title = 'Sand Tetris'
+-- board size is 80 x 144 visible
+-- piece is 4 blocks arranged
+-- blocks are 8 x 8
+App.voxelsPerBlock = 8	-- original
+--App.voxelsPerBlock = 16
+App.pieceSizeInBlocks = vec2i(4,4)
+App.pieceSize = App.pieceSizeInBlocks * App.voxelsPerBlock
 
 App.maxAudioDist = 10
 
@@ -145,10 +305,13 @@ function App:initGL(...)
 
 	math.randomseed(os.time())
 
+	self.state = SplashScreenState(self)
+
 	self.numPlayers = 1
 	self.numColors = 4
-	self.numNextPieces = 9
+	self.numNextPieces = 3
 	self.toppleChance = 1
+	self.level = 1
 
 	self.fps = 0
 	self.numSandVoxels = 0
@@ -257,59 +420,39 @@ void main() {
 	glreport'here'
 end
 
-function App:loadSound(filename)
-	if not filename then error("warning: couldn't find sound file "..searchfilename) end
-
-	local sound = self.sounds[filename]
-	if not sound then
-		sound = AudioBuffer(filename)
-		self.sounds[filename] = sound
-	end
-	return sound
-end
-
-function App:getNextAudioSource()
-	if #self.audioSources == 0 then return end
-	local startIndex = self.audioSourceIndex
-	repeat
-		self.audioSourceIndex = self.audioSourceIndex % #self.audioSources + 1
-		local source = self.audioSources[self.audioSourceIndex]
-		if not source:isPlaying() then
-			return source
-		end
-	until self.audioSourceIndex == startIndex
-end
-
-function App:playSound(name, volume, pitch)
-	if not useAudio then return end
-	local source = self:getNextAudioSource()
-	if not source then
-		print('all audio sources used')
-		return
-	end
-
-	local sound = self:loadSound(name)
-	source:setBuffer(sound)
-	source.volume = volume	-- save for later
-	source:setGain((volume or 1) * self.audioConfig.effectVolume)
-	source:setPitch(pitch or 1)
-	source:setPosition(0, 0, 0)
-	source:setVelocity(0, 0, 0)
-	source:play()
-
-	return source
+-- static method
+function App:makeTexWithImage(size)
+	local img = Image(size.x, size.y, 4, 'unsigned char')
+	ffi.fill(img.buffer, 4 * size.x * size.y)
+	local tex = GLTex2D{
+		internalFormat = gl.GL_RGBA,
+		width = tonumber(size.x),
+		height = tonumber(size.y),
+		format = gl.GL_RGBA,
+		type = gl.GL_UNSIGNED_BYTE,
+		wrap = {
+			s = gl.GL_CLAMP_TO_EDGE,
+			t = gl.GL_CLAMP_TO_EDGE,
+		},
+		minFilter = gl.GL_NEAREST,
+		magFilter = gl.GL_NEAREST,
+		data = img.buffer,	-- stored
+	}
+	tex.image = img
+	-- TODO store tex.image as img?
+	return tex
 end
 
 local function makePieceImage(s)
 	s = string.split(s, '\n')
-	local img = Image(pieceSize.x, pieceSize.y, 4, 'unsigned char')
+	local img = Image(App.pieceSize.x, App.pieceSize.y, 4, 'unsigned char')
 	ffi.fill(img.buffer, 4 * img.width * img.height)
-	for j=0,pieceSizeInBlocks.y-1 do
-		for i=0,pieceSizeInBlocks.x-1 do
+	for j=0,App.pieceSizeInBlocks.y-1 do
+		for i=0,App.pieceSizeInBlocks.x-1 do
 			if s[j+1]:sub(i+1,i+1) == '#' then
-				for u=0,voxelsPerBlock-1 do
-					for v=0,voxelsPerBlock-1 do
-						ffi.cast('uint32_t*', img.buffer)[(u + voxelsPerBlock * i) + img.width * (v + voxelsPerBlock * j)] = 0xffffffff
+				for u=0,App.voxelsPerBlock-1 do
+					for v=0,App.voxelsPerBlock-1 do
+						ffi.cast('uint32_t*', img.buffer)[(u + App.voxelsPerBlock * i) + img.width * (v + App.voxelsPerBlock * j)] = 0xffffffff
 					end
 				end
 			end
@@ -363,19 +506,62 @@ local pieceImages = table{
 ]],
 }
 
+function App:loadSound(filename)
+	if not filename then error("warning: couldn't find sound file "..searchfilename) end
+
+	local sound = self.sounds[filename]
+	if not sound then
+		sound = AudioBuffer(filename)
+		self.sounds[filename] = sound
+	end
+	return sound
+end
+
+function App:getNextAudioSource()
+	if #self.audioSources == 0 then return end
+	local startIndex = self.audioSourceIndex
+	repeat
+		self.audioSourceIndex = self.audioSourceIndex % #self.audioSources + 1
+		local source = self.audioSources[self.audioSourceIndex]
+		if not source:isPlaying() then
+			return source
+		end
+	until self.audioSourceIndex == startIndex
+end
+
+function App:playSound(name, volume, pitch)
+	if not useAudio then return end
+	local source = self:getNextAudioSource()
+	if not source then
+		print('all audio sources used')
+		return
+	end
+
+	local sound = self:loadSound(name)
+	source:setBuffer(sound)
+	source.volume = volume	-- save for later
+	source:setGain((volume or 1) * self.audioConfig.effectVolume)
+	source:setPitch(pitch or 1)
+	source:setPosition(0, 0, 0)
+	source:setVelocity(0, 0, 0)
+	source:play()
+
+	return source
+end
+
 function App:reset()
 	self.sandSize = vec2i(self.nextSandSize)
 
 	local w, h = self.sandSize:unpack()
 
 	-- I only really need to recreate the sand & flash texs if the board size changes ...
-	self.sandTex = makeTexWithImage(self.sandSize)
-	self.flashTex = makeTexWithImage(self.sandSize)
+	self.sandTex = self:makeTexWithImage(self.sandSize)
+	self.flashTex = self:makeTexWithImage(self.sandSize)
 
 	-- and I only really need to recreate these if the piece size changes ...
-	self.rotPieceTex = makeTexWithImage(pieceSize)
+	self.rotPieceTex = self:makeTexWithImage(self.pieceSize)
 	self.nextPieces = range(self.numNextPieces):mapi(function(i)
-		local tex = makeTexWithImage(pieceSize)
+		local tex = self:makeTexWithImage(self.pieceSize)
 		return {tex=tex}
 	end)
 
@@ -385,12 +571,13 @@ function App:reset()
 	self.sandTex:bind():subimage():unbind()
 
 	-- populate # colors
-	while #baseColors < 255 do
-		baseColors:insert(vec3f():map(function() return math.random() end):normalize())
+	while #self.baseColors < 255 do
+		self.baseColors:insert(vec3f():map(function() return math.random() end):normalize())
 	end
+	
 	self.gameColors = table(self.nextColors)		-- colors used now
 	while #self.gameColors < self.numColors do
-		self.gameColors[#self.gameColors+1] = baseColors[#self.gameColors+1]
+		self.gameColors[#self.gameColors+1] = self.baseColors[#self.gameColors+1]
 	end
 	self.nextColors = table(self.gameColors)		-- colors used in next game
 
@@ -413,14 +600,16 @@ function App:reset()
 	self.flashTime = -math.huge
 	self.score = 0
 	self.lines = 0
-	self:updateLevel()
+	self:upateFallSpeed()
+	self.paused = true
 end
 
-function App:updateLevel()
-	self.level = math.floor(self.lines/10)+1
-	-- the official tetris speed curve:
-	local secondsPerRow = (.8 - ((self.level-1)*.007))^(self.level-1)
-	local secondsPerLine = secondsPerRow / voxelsPerBlock 
+function App:upateFallSpeed()
+	-- https://harddrop.com/wiki/Tetris_Worlds
+	local maxSpeedLevel = 13 -- fastest level .. no faster is permitted
+	local effectiveLevel = math.min(self.level, maxSpeedLevel)
+	local secondsPerRow = (.8 - ((effectiveLevel-1)*.007))^(effectiveLevel-1)
+	local secondsPerLine = secondsPerRow / self.voxelsPerBlock
 	-- how many ticks to wait before dropping a piece
 	self.ticksToFall = secondsPerLine / updateInterval
 end
@@ -433,15 +622,15 @@ function App:populatePiece(args)
 	alpha = bit.lshift(alpha, 24)
 	local srcp = ffi.cast('uint32_t*', srcimage.buffer)
 	local dstp = ffi.cast('uint32_t*', args.tex.image.buffer)
-	for j=0,pieceSize.y-1 do
-		for i=0,pieceSize.x-1 do
-			local u = i % voxelsPerBlock + .5
-			local v = j % voxelsPerBlock + .5
+	for j=0,self.pieceSize.y-1 do
+		for i=0,self.pieceSize.x-1 do
+			local u = i % self.voxelsPerBlock + .5
+			local v = j % self.voxelsPerBlock + .5
 			local c = math.max(
-				math.abs(u - voxelsPerBlock/2),
-				math.abs(v - voxelsPerBlock/2)
-			) / (voxelsPerBlock/2)
-			local k = i + pieceSize.x * j
+				math.abs(u - self.voxelsPerBlock/2),
+				math.abs(v - self.voxelsPerBlock/2)
+			) / (self.voxelsPerBlock/2)
+			local k = i + self.pieceSize.x * j
 			if srcp[0] ~= 0 then
 				local l = math.random() * .25 + .75
 				l = l * (.25 + .75 * math.sqrt(1 - c*c))
@@ -481,7 +670,7 @@ function App:newPiece(player)
 
 	--]]
 	self:updatePieceTex(player)
-	player.piecePos = vec2i(bit.rshift(w-pieceSize.x,1), h-1)
+	player.piecePos = vec2i(bit.rshift(w-self.pieceSize.x,1), h-1)
 	player.pieceLastPos = vec2i(player.piecePos)
 	if self:testPieceMerge(player) then
 		print("YOU LOSE!!!")
@@ -489,17 +678,26 @@ function App:newPiece(player)
 	end
 end
 
+local function vec3fto4ub(v)
+	return bit.bor(
+		math.floor(math.clamp(v.x, 0, 1) * 255),
+		bit.lshift(math.floor(math.clamp(v.y, 0, 1) * 255), 8),
+		bit.lshift(math.floor(math.clamp(v.z, 0, 1) * 255), 16),
+		0xff000000
+	)
+end
+
 function App:updatePieceTex(player)
 	-- while we're here, find the first and last cols with content
 	for _,info in ipairs{
-		{0,pieceSize.x-1,1, 'pieceColMin'},
-		{pieceSize.x-1,0,-1, 'pieceColMax'},
+		{0,self.pieceSize.x-1,1, 'pieceColMin'},
+		{self.pieceSize.x-1,0,-1, 'pieceColMax'},
 	} do
 		local istart, iend, istep, ifield = table.unpack(info)
 		for i=istart,iend,istep do
 			local found
-			for j=0,pieceSize.y-1 do
-				if ffi.cast('uint32_t*', player.pieceTex.image.buffer)[i + pieceSize.x * j] ~= 0 then
+			for j=0,self.pieceSize.y-1 do
+				if ffi.cast('uint32_t*', player.pieceTex.image.buffer)[i + self.pieceSize.x * j] ~= 0 then
 					found = true
 					break
 				end
@@ -514,15 +712,15 @@ function App:updatePieceTex(player)
 
 	-- [[ update the piece outline
 	local outlineRadius = 5
-	ffi.fill(player.pieceOutlineTex.image.buffer, 4 * pieceSize.x * pieceSize.y)
-	for j=0,pieceSize.y-1 do
-		for i=0,pieceSize.x-1 do
+	ffi.fill(player.pieceOutlineTex.image.buffer, 4 * self.pieceSize.x * self.pieceSize.y)
+	for j=0,self.pieceSize.y-1 do
+		for i=0,self.pieceSize.x-1 do
 			local bestDistSq = math.huge
 			for ofy=-outlineRadius,outlineRadius do
 				for ofx=-outlineRadius,outlineRadius do
-					local x = math.clamp(i + ofx, 0, pieceSize.x-1)
-					local y = math.clamp(j + ofy, 0, pieceSize.y-1)
-					if ffi.cast('uint32_t*', player.pieceTex.image.buffer)[x + pieceSize.x * y] ~= 0 then
+					local x = math.clamp(i + ofx, 0, self.pieceSize.x-1)
+					local y = math.clamp(j + ofy, 0, self.pieceSize.y-1)
+					if ffi.cast('uint32_t*', player.pieceTex.image.buffer)[x + self.pieceSize.x * y] ~= 0 then
 						local distSq = math.max(1, ofx*ofx + ofy*ofy)
 						bestDistSq = math.min(bestDistSq, distSq)
 					end
@@ -531,7 +729,7 @@ function App:updatePieceTex(player)
 			if bestDistSq < math.huge then
 				--bestDistSq = math.sqrt(bestDistSq)
 				local frac = 1 / bestDistSq
-				ffi.cast('uint32_t*', player.pieceOutlineTex.image.buffer)[i + pieceSize.x * j] = vec3fto4ub(player.color * frac)
+				ffi.cast('uint32_t*', player.pieceOutlineTex.image.buffer)[i + self.pieceSize.x * j] = vec3fto4ub(player.color * frac)
 			end
 		end
 	end
@@ -541,11 +739,11 @@ end
 
 function App:rotatePiece(player)
 	if not player.pieceTex then return end
-	for j=0,pieceSize.x-1 do
-		for i=0,pieceSize.y-1 do
+	for j=0,self.pieceSize.x-1 do
+		for i=0,self.pieceSize.y-1 do
 			for ch=0,3 do
-				self.rotPieceTex.image.buffer[ch + 4 * (i + pieceSize.x * j)]
-				= player.pieceTex.image.buffer[ch + 4 * ((pieceSize.x - 1 - j) + pieceSize.x * i)]
+				self.rotPieceTex.image.buffer[ch + 4 * (i + self.pieceSize.x * j)]
+				= player.pieceTex.image.buffer[ch + 4 * ((self.pieceSize.x - 1 - j) + self.pieceSize.x * i)]
 			end
 		end
 	end
@@ -572,9 +770,9 @@ local vtxs = {
 
 function App:testPieceMerge(player)
 	local w, h = self.sandSize:unpack()
-	for j=0,pieceSize.y-1 do
-		for i=0,pieceSize.x-1 do
-			local k = i + pieceSize.x * j
+	for j=0,self.pieceSize.y-1 do
+		for i=0,self.pieceSize.x-1 do
+			local k = i + self.pieceSize.x * j
 			local color = ffi.cast('uint32_t*', player.pieceTex.image.buffer)[k]
 			if color ~= 0 then
 				local x = player.piecePos.x + i
@@ -703,9 +901,9 @@ function App:updateGame()
 			anyMerged = true
 			self:playSound'sfx/place.wav'
 			needsCheckLine = true
-			for j=0,pieceSize.y-1 do
-				for i=0,pieceSize.x-1 do
-					local k =  i + pieceSize.x * j
+			for j=0,self.pieceSize.y-1 do
+				for i=0,self.pieceSize.x-1 do
+					local k =  i + self.pieceSize.x * j
 					local color = ffi.cast('uint32_t*', player.pieceTex.image.buffer)[k]
 					if color ~= 0 then
 						local x = player.piecePos.x + i
@@ -757,7 +955,10 @@ function App:updateGame()
 			anyCleared = true
 			self.score = self.score + clearedCount
 			self.lines = self.lines + 1
-			self:updateLevel()
+			if self.lines % 10 == 0 then
+				self.level = self.level + 1
+				self:upateFallSpeed()
+			end
 
 			self:playSound'sfx/line.wav'
 			self.flashTex:bind():subimage()
@@ -785,117 +986,122 @@ end
 function App:update(...)
 	local t =
 	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+	
+	if self.state.update then
+		self.state:update()
+	end
 
 	local w, h = self.sandSize:unpack()
 
 	if not self.paused then
 		self:updateGame()
-	end
 
-	--[[ pouring sand
-	self.sandCPU[bit.rshift(w,1) + w * (h - 1)] = bit.bor(
-		math.random(0,16777215),
-		0xff000000,
-	)
-	--]]
+		--[[ pouring sand
+		self.sandCPU[bit.rshift(w,1) + w * (h - 1)] = bit.bor(
+			math.random(0,16777215),
+			0xff000000,
+		)
+		--]]
 
-	-- draw
+		-- draw
 
-	local aspectRatio = self.width / self.height
-	local s = w / h
+		local aspectRatio = self.width / self.height
+		local s = w / h
 
-	self.projMat:setOrtho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
+		self.projMat:setOrtho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
 
-	self.displayShader:use()
-	self.displayShader.vao:use()
+		self.displayShader:use()
+		self.displayShader.vao:use()
 
-	self.mvMat:setTranslate(-.5 * s, -.5)
-		:applyScale(s, 1)
-	self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-	gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
-
-	self.sandTex:bind()
-	gl.glDrawArrays(gl.GL_QUADS, 0, 4)
-
-	-- draw the current piece
-	for _,player in ipairs(self.players) do
-		for i=1,2 do
-			local tex
-			if i == 1 then
-				tex = player.pieceOutlineTex
-				gl.glEnable(gl.GL_BLEND)
-				gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
-			else
-				tex = player.pieceTex
-				gl.glEnable(gl.GL_ALPHA_TEST)
-			end
-
-			self.mvMat:setTranslate(
-					(player.piecePos.x / w - .5) * s,
-					player.piecePos.y / h - .5
-				)
-				:applyScale(pieceSize.x / w * s, pieceSize.y / h)
-			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
-
-			tex:bind()
-			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
-
-			if i == 1 then
-				gl.glDisable(gl.GL_BLEND)
-			else
-				gl.glDisable(gl.GL_ALPHA_TEST)
-			end
-		end
-	end
-
-	-- draw flashing background if necessary
-	local flashDuration = 1
-	local numFlashes = 5
-	local flashDt = self.gameTime - self.flashTime
-	if flashDt < flashDuration then
-		self.wasFlashing = true
-		gl.glEnable(gl.GL_ALPHA_TEST)
-		local flashInt = bit.band(math.floor(flashDt * numFlashes * 2), 1) == 0
-		if flashInt then
-			self.mvMat
-				:setTranslate(-.5 * s, -.5)
-				:applyScale(s, 1)
-			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
-
-			self.flashTex:bind()
-			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
-		end
-		gl.glDisable(gl.GL_ALPHA_TEST)
-	elseif self.wasFlashing then
-		-- clear once we're done flashing
-		self.wasFlashing = false
-		ffi.fill(self.flashTex.image.buffer, 4 * w * h)
-		assert(self.flashTex.data == self.flashTex.image.buffer)
-		self.flashTex:bind():subimage()
-	end
-
-	local nextPieceSize = .1
-	for i=#self.nextPieces,1,-1 do
-		local it = self.nextPieces[i]
-		local dy = #self.nextPieces == 1 and 0 or (1 - nextPieceSize)/(#self.nextPieces-1)
-		dy = math.min(dy, nextPieceSize * 1.1)
-
-		self.mvMat
-			:setTranslate(aspectRatio * .5 - nextPieceSize, .5 - (i-1) * dy)
-			:applyScale(nextPieceSize, -nextPieceSize)
+		self.mvMat:setTranslate(-.5 * s, -.5)
+			:applyScale(s, 1)
 		self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 		gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
-		it.tex:bind()
+		self.sandTex:bind()
 		gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+
+		-- draw the current piece
+		for _,player in ipairs(self.players) do
+			for i=1,2 do
+				local tex
+				if i == 1 then
+					tex = player.pieceOutlineTex
+					gl.glEnable(gl.GL_BLEND)
+					gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
+				else
+					tex = player.pieceTex
+					gl.glEnable(gl.GL_ALPHA_TEST)
+				end
+
+				self.mvMat:setTranslate(
+						(player.piecePos.x / w - .5) * s,
+						player.piecePos.y / h - .5
+					)
+					:applyScale(self.pieceSize.x / w * s, self.pieceSize.y / h)
+				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
+				gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+
+				tex:bind()
+				gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+
+				if i == 1 then
+					gl.glDisable(gl.GL_BLEND)
+				else
+					gl.glDisable(gl.GL_ALPHA_TEST)
+				end
+			end
+		end
+
+		-- draw flashing background if necessary
+		local flashDuration = 1
+		local numFlashes = 5
+		local flashDt = self.gameTime - self.flashTime
+		if flashDt < flashDuration then
+			self.wasFlashing = true
+			gl.glEnable(gl.GL_ALPHA_TEST)
+			local flashInt = bit.band(math.floor(flashDt * numFlashes * 2), 1) == 0
+			if flashInt then
+				self.mvMat
+					:setTranslate(-.5 * s, -.5)
+					:applyScale(s, 1)
+				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
+				gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+
+				self.flashTex:bind()
+				gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+			end
+			gl.glDisable(gl.GL_ALPHA_TEST)
+		elseif self.wasFlashing then
+			-- clear once we're done flashing
+			self.wasFlashing = false
+			ffi.fill(self.flashTex.image.buffer, 4 * w * h)
+			assert(self.flashTex.data == self.flashTex.image.buffer)
+			self.flashTex:bind():subimage()
+		end
+
+		local nextPieceSize = .1
+		for i=#self.nextPieces,1,-1 do
+			local it = self.nextPieces[i]
+			local dy = #self.nextPieces == 1 and 0 or (1 - nextPieceSize)/(#self.nextPieces-1)
+			dy = math.min(dy, nextPieceSize * 1.1)
+
+			self.mvMat
+				:setTranslate(aspectRatio * .5 - nextPieceSize, .5 - (i-1) * dy)
+				:applyScale(nextPieceSize, -nextPieceSize)
+			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
+			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+
+			it.tex:bind()
+			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+		end
+
+		self.displayShader.vao:useNone()
+		GLTex2D:unbind()
+		self.displayShader:useNone()
 	end
 
-	self.displayShader.vao:useNone()
-	GLTex2D:unbind()
-	self.displayShader:useNone()
-
+	-- update GUI
 	App.super.update(self, ...)
 	glreport'here'
 
@@ -929,7 +1135,14 @@ function App:flipBoard()
 end
 
 function App:event(e, ...)
+	-- handle UI
 	App.super.event(self, e, ...)
+	-- TODO if ui handling then return
+
+	if self.state.event then
+		if self.state:event(e, ...) then return end
+	end
+
 	if e.type == sdl.SDL_KEYDOWN
 	or e.type == sdl.SDL_KEYUP
 	then
@@ -953,162 +1166,18 @@ function App:event(e, ...)
 			if down then self:reset() end
 		else
 		--]]
+		if e.key.keysym.sym == sdl.SDLK_ESCAPE then
+			self.paused = not self.paused
+		end
 		if e.key.keysym.sym == ('f'):byte() then
 			if down then self:flipBoard() end
 		end
 	end
 end
 
-local function modalBegin(title, t, k)
-	return ig.luatableBegin(title, t, k, bit.bor(
-			ig.ImGuiWindowFlags_NoTitleBar,
-			ig.ImGuiWindowFlags_NoResize,
-			ig.ImGuiWindowFlags_NoCollapse,
-			ig.ImGuiWindowFlags_AlwaysAutoResize,
-			ig.ImGuiWindowFlags_Modal,
-		0))
-end
-
-local tmpcolor = ig.ImVec4()
-local modalsOpened = {}
-App.paused = false
 function App:updateGUI()
-	-- [[
-	ig.igSetNextWindowPos(ig.ImVec2(0, 0), 0, ig.ImVec2())
-	ig.igSetNextWindowSize(ig.ImVec2(150, -1), 0)
-	ig.igBegin('x', nil, bit.bor(
-		ig.ImGuiWindowFlags_NoMove,
-		ig.ImGuiWindowFlags_NoResize,
-		ig.ImGuiWindowFlags_NoCollapse,
-		ig.ImGuiWindowFlags_NoDecoration
-	))
-	--]]
-	--[[
-	ig.igBegin('cfg', nil, 0)
-	--]]
-
-	if ig.igButton'...' then
-		self.menuOpen = not self.menuOpen
-	end
-	if self.menuOpen then
-		if showFPS then ig.igText('fps: '..self.fps) end
-		ig.igText('num voxels: '..self.numSandVoxels)
-		ig.igText('level: '..tostring(self.level))
-		ig.igText('score: '..tostring(self.score))
-		ig.igText('lines: '..tostring(self.lines))
-		ig.igText('ticks to fall: '..tostring(self.ticksToFall))
-
-		ig.luatableTooltipInputInt('num players', self, 'numPlayers')
-
-		ig.luatableTooltipInputInt('num next pieces', self, 'numNextPieces')
-
-		self.colortest = self.colortest or ig.ImVec4()
-		--ig.igColorPicker3('test', self.colortest.s, 0)
-		if ig.igButton'+' then
-			self.numColors = self.numColors + 1
-			self.nextColors = baseColors:sub(1, self.numColors)
-		end
-		ig.igSameLine()
-		if self.numColors > 1 and ig.igButton'-' then
-			self.numColors = self.numColors - 1
-			self.nextColors = baseColors:sub(1, self.numColors)
-		end
-		ig.igSameLine()
-
-		for i=1,self.numColors do
-			local c = self.nextColors[i]
-			tmpcolor.x = c.x
-			tmpcolor.y = c.y
-			tmpcolor.z = c.z
-			tmpcolor.w = 1
-			if ig.igColorButton('color '..i, tmpcolor) then
-				modalsOpened.colorPicker = true
-				self.paused = true
-				self.currentColorEditing = i
-			end
-			if i % 6 ~= 4 and i < self.numColors then
-				ig.igSameLine()
-			end
-		end
-
-		ig.luatableTooltipInputInt('board width', self.nextSandSize, 'x')
-		ig.luatableTooltipInputInt('board height', self.nextSandSize, 'y')
-		ig.luatableTooltipSliderFloat('topple chance', self, 'toppleChance', 0, 1)
-
-		if ig.igButton'New Game' then
-			self:reset()
-		end
-
-		local url = 'https://github.com/thenumbernine/sand-tetris'
-		if ig.igButton'about' then
-			if ffi.os == 'Windows' then
-				os.execute('explorer "'..url..'"')
-			elseif ffi.os == 'OSX' then
-				os.execute('open "'..url..'"')
-			else
-				os.execute('xdg-open "'..url..'"')
-			end
-			print'clicked'
-		end
-		if ig.igIsItemHovered(ig.ImGuiHoveredFlags_None) then
-			ig.igSetMouseCursor(ig.ImGuiMouseCursor_Hand)
-			ig.igBeginTooltip()
-			ig.igText('by Christopher Moore')
-			ig.igText('click to go to')
-			ig.igText(url)
-			ig.igEndTooltip()
-		end
-
-		if useAudio and ig.igButton'Audio...' then
-			modalsOpened.audio = true
-			self.paused = true
-		end
-
-		if ig.igButton(self.paused and 'resume' or 'pause') then
-			self.paused = not self.paused
-		end
-	end
-	ig.igEnd()
-
-	if modalsOpened.audio then
-		modalBegin('Audio', nil)
-		if ig.luatableSliderFloat('fx volume', self.audioConfig, 'effectVolume', 0, 1) then
-			--[[ if you want, update all previous audio sources...
-			for _,src in ipairs(self.audioSources) do
-				-- TODO if the gameplay sets the gain down then we'll want to multiply by their default gain
-				src:setGain(audioConfig.effectVolume * src.gain)
-			end
-			--]]
-		end
-		if ig.luatableSliderFloat('bg volume', self.audioConfig, 'backgroundVolume', 0, 1) then
-			self.bgAudioSource:setGain(self.audioConfig.backgroundVolume)
-		end
-		if ig.igButton'Done' then
-			modalsOpened.audio = false
-			self.paused = false
-		end
-		ig.igEnd()
-	end
-	if modalsOpened.colorPicker then
-		modalBegin('Color', nil)
-		ig.igText'colors updated upon new game'
-		if #self.nextColors > 1 then
-			if ig.igButton'Delete' then
-				self.nextColors:remove(self.currentColorEditing)
-				self.numColors = self.numColors - 1
-				modalsOpened.colorPicker = false
-				self.paused = false
-			end
-		end
-		if ig.igColorPicker3('edit color', self.nextColors[self.currentColorEditing].s, 0) then
-			-- TODO update the other pieces in realtime?
-			-- or nah?
-		end
-		if ig.igButton'Done' then
-			modalsOpened.colorPicker = false
-			self.paused = false
-		end
-		ig.igEnd()
+	if self.state.updateGUI then
+		self.state:updateGUI()
 	end
 end
 
