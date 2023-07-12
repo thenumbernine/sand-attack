@@ -91,6 +91,7 @@ function App:initGL(...)
 	self.cfg.effectVolume = self.cfg.effectVolume or 1
 	self.cfg.backgroundVolume = self.cfg.backgroundVolume or .3
 	self.cfg.startLevel = self.cfg.startLevel or 1
+	-- TODO this shouldn't be in the config ... should it?
 	self.cfg.toppleChance = self.cfg.toppleChance or 1
 	-- TODO add colors to config?
 	self.cfg.highscores = self.cfg.highscores or {}
@@ -1003,10 +1004,10 @@ function App:event(e, ...)
 			if down then self:reset() end
 		else
 		--]]
-		if e.key.keysym.sym == sdl.SDLK_ESCAPE then
+		if down and e.key.keysym.sym == sdl.SDLK_ESCAPE then
 			self.paused = not self.paused
 		end
-		if e.key.keysym.sym == ('f'):byte() then
+		if down and e.key.keysym.sym == ('f'):byte() then
 			if down then self:flipBoard() end
 		end
 	end

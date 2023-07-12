@@ -21,12 +21,18 @@ Tetris with abelian sandpile models.  Jk it's with sand.
 
 ## TODO:
 
-- option for multipalyer sharing next-pieces vs separate next-pieces 
+- option for multipalyer-coop sharing next-pieces vs separate next-pieces 
+- multiplayer-versus where you can drop sand on your opponent
+	and a color that they have to clear-touching to reveal to other random colors
+	like that other etris game ...
+- notification of score-modifier for chaining lines
 - varying board width for # of players
-- gameplay mode for higher # colors goes up for # of lines made / score
+- save custom colors in config
+- gameplay mode using higher # colors 
 - SPH stuff, exploding pieces, tilting board, obstacles in the board, etc
 - dif music per level
 - faster blob detection
+- submit high scores? meh.
 
 ## Music Credit:
 

@@ -52,7 +52,9 @@ function PlayingState:updateGUI()
 		app.paused = not app.paused
 	end
 	if ig.igButton'End Game' then
-		app.state = GameState.MainMenuState(app)
+		app.loseTime = nil
+		app.paused = true
+		app.state = GameState.HighScoreState(app, true)
 	end
 	
 	ig.igEnd()
