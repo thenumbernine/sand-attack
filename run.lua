@@ -62,11 +62,6 @@ local updateInterval = 1/60
 --local updateInterval = 1/120
 --local updateInterval = 0
 
--- fall every 5 ticks
--- TODO something about speeding up with levels
--- TODO level
-local ticksToFall = 5
-
 local function makeTexWithImage(size)
 	local img = Image(size.x, size.y, 4, 'unsigned char')
 	ffi.fill(img.buffer, 4 * size.x * size.y)
@@ -373,7 +368,6 @@ function App:reset()
 
 	local w, h = self.sandSize:unpack()
 
-
 	-- I only really need to recreate the sand & flash texs if the board size changes ...
 	self.sandTex = makeTexWithImage(self.sandSize)
 	self.flashTex = makeTexWithImage(self.sandSize)
@@ -418,6 +412,17 @@ function App:reset()
 	self.fallTick = 0
 	self.flashTime = -math.huge
 	self.score = 0
+	self.lines = 0
+	self:updateLevel()
+end
+
+function App:updateLevel()
+	self.level = math.floor(self.lines/10)+1
+	-- the official tetris speed curve:
+	local secondsPerRow = (.8 - ((self.level-1)*.007))^(self.level-1)
+	local secondsPerLine = secondsPerRow / voxelsPerBlock 
+	-- how many ticks to wait before dropping a piece
+	self.ticksToFall = secondsPerLine / updateInterval
 end
 
 function App:populatePiece(args)
@@ -654,7 +659,7 @@ function App:updateGame()
 	-- test piece for collision with sand
 	-- if it collides then merge it
 	local movedx = 1
-	local movedy = 3
+	local dropdy = 5
 	for _,player in ipairs(self.players) do
 		-- TODO key updates at higher interval than drop rate ...
 		-- but test collision for both
@@ -666,7 +671,7 @@ function App:updateGame()
 		end
 		self:constrainPiecePos(player)
 		if player.keyPress.down then
-			player.piecePos.y = player.piecePos.y - movedy
+			player.piecePos.y = player.piecePos.y - dropdy
 		end
 		if player.keyPress.up and not player.keyPressLast.up then
 			self:rotatePiece(player)
@@ -674,10 +679,11 @@ function App:updateGame()
 	end
 
 	self.fallTick = self.fallTick + 1
-	if self.fallTick >= ticksToFall then
+	if self.fallTick >= self.ticksToFall then
 		self.fallTick = 0
+		local falldy = math.max(1, 1/self.ticksToFall)
 		for _,player in ipairs(self.players) do
-			player.piecePos.y = player.piecePos.y - movedx
+			player.piecePos.y = player.piecePos.y - falldy
 		end
 	end
 
@@ -750,6 +756,9 @@ function App:updateGame()
 		if clearedCount ~= 0 then
 			anyCleared = true
 			self.score = self.score + clearedCount
+			self.lines = self.lines + 1
+			self:updateLevel()
+
 			self:playSound'sfx/line.wav'
 			self.flashTex:bind():subimage()
 			self.flashTime = self.gameTime
@@ -984,7 +993,10 @@ function App:updateGUI()
 	if self.menuOpen then
 		if showFPS then ig.igText('fps: '..self.fps) end
 		ig.igText('num voxels: '..self.numSandVoxels)
+		ig.igText('level: '..tostring(self.level))
 		ig.igText('score: '..tostring(self.score))
+		ig.igText('lines: '..tostring(self.lines))
+		ig.igText('ticks to fall: '..tostring(self.ticksToFall))
 
 		ig.luatableTooltipInputInt('num players', self, 'numPlayers')
 
