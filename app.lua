@@ -66,6 +66,10 @@ App.pieceSize = App.pieceSizeInBlocks * App.voxelsPerBlock
 
 App.maxAudioDist = 10
 
+App.chainDuration = 2
+App.lineFlashDuration = 1
+App.lineNumFlashes = 5
+
 App.cfgfilename = 'config.lua'
 
 function App:initGL(...)
@@ -394,10 +398,11 @@ function App:reset()
 	self.lastUpdateTime = getTime()
 	self.gameTime = 0
 	self.fallTick = 0
-	self.flashTime = -math.huge
+	self.lastLineTime = -math.huge
 	self.score = 0
 	self.lines = 0
 	self.level = self.cfg.startLevel
+	self.scoreChain = 0
 	self:upateFallSpeed()
 	self.paused = true
 end
@@ -749,16 +754,29 @@ function App:updateGame()
 		end
 		if clearedCount ~= 0 then
 			anyCleared = true
-			self.score = self.score + self.level * clearedCount
+			
+			if self.gameTime - self.lastLineTime < self.chainDuration then
+				self.scoreChain = self.scoreChain + 1
+			else
+				self.scoreChain = 0
+			end
+			-- piece chain count, score multipliers, etc
+			-- https://tetris.fandom.com/wiki/Scoring
+			-- 2 => x2*5/4, 3 => x3*2*5/4, 4 => x4*3*2*5/4
+			local modifier = self.scoreChain == 0 and 1 or math.factorial(self.scoreChain+1) * 5/4
+			print('scoreChain '..self.scoreChain, 'modifier', modifier)
+
+			self.score = self.score + math.ceil(self.level * clearedCount * modifier)
 			self.lines = self.lines + 1
 			if self.lines % 10 == 0 then
 				self.level = self.level + 1
 				self:upateFallSpeed()
 			end
-
+			
 			self:playSound'sfx/line.wav'
 			self.flashTex:bind():subimage()
-			self.flashTime = self.gameTime
+			self.lastLineTime = self.gameTime
+		
 		end
 	end
 
@@ -853,13 +871,11 @@ function App:update(...)
 		end
 
 		-- draw flashing background if necessary
-		local flashDuration = 1
-		local numFlashes = 5
-		local flashDt = self.gameTime - self.flashTime
-		if flashDt < flashDuration then
+		local flashDt = self.gameTime - self.lastLineTime
+		if flashDt < self.lineFlashDuration then
 			self.wasFlashing = true
 			gl.glEnable(gl.GL_ALPHA_TEST)
-			local flashInt = bit.band(math.floor(flashDt * numFlashes * 2), 1) == 0
+			local flashInt = bit.band(math.floor(flashDt * self.lineNumFlashes * 2), 1) == 0
 			if flashInt then
 				self.mvMat
 					:setTranslate(-.5 * s, -.5)
