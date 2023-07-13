@@ -823,7 +823,7 @@ function App:updateGame()
 			-- https://tetris.fandom.com/wiki/Scoring
 			-- 2 => x2*5/4, 3 => x3*2*5/4, 4 => x4*3*2*5/4
 			local modifier = self.scoreChain == 0 and 1 or math.factorial(self.scoreChain+1) * 5/4
-			print('scoreChain '..self.scoreChain, 'modifier', modifier)
+--print('scoreChain '..self.scoreChain, 'modifier', modifier)
 
 			self.score = self.score + math.ceil(self.level * clearedCount * modifier)
 			self.lines = self.lines + 1

@@ -39,8 +39,17 @@ function GameState:beginFullView(name, estheight)
 	if estheight and estheight < viewheight then
 		ig.igSetCursorPosY(viewheight - .5 * estheight)
 	end
+
+	--[[ TODO how to enable this?
+	local io = ig.igGetIO()
+print('FontAllowUserScaling', io[0].FontAllowUserScaling)
+	-- ... false
+	--]]
+
 end
 function GameState:endFullView()
+	-- how to make buttons tab-able?
+	--ig.igSetItemDefaultFocus()
 	ig.igEnd()
 	ig.igPopStyleVar(1)
 end
