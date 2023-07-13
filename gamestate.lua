@@ -128,6 +128,7 @@ function PlayingState:updateGUI()
 	ig.igText('Level: '..tostring(app.level))
 	ig.igText('Score: '..tostring(app.score))
 	ig.igText('Lines: '..tostring(app.lines))
+
 	if app.showFPS then ig.igText('FPS: '..app.fps) end
 	if showDebug then
 		ig.igText('Num Voxels: '..app.numSandVoxels)
@@ -141,6 +142,11 @@ function PlayingState:updateGUI()
 		app.loseTime = nil
 		app.paused = true
 		app.state = GameState.HighScoreState(app, true)
+	end
+
+	-- where on the screen to put this?
+	if app.gameTime - app.lastLineTime < app.chainDuration then
+		ig.igText('chain x'..tostring(app.scoreChain + 1))
 	end
 
 	ig.igEnd()
