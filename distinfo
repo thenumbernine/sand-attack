@@ -44,6 +44,7 @@ luajitLibs = {
 	win = {
 		'png',	-- TODO which dir is it pulling png from? do i need z or zlib? doen't matter, no pngs in this so far
 		'SDL2',
+		--'GLESv2' ?
 		'cimgui_sdl',
 		'ogg',
 		'vorbis',
@@ -53,7 +54,7 @@ luajitLibs = {
 	linux = {
 		'png',			-- /usr/lib/x86_64-linux-gnu/libpng16.so.16.39.0
 		'SDL2',			-- /usr/lib/x86_64-linux-gnu/libSDL2-2.0.so.0.2600.3
-		'GL',			-- /usr/lib/x86_64-linux-gnu/libGL.so.1.7.0
+		'GLESv2',		-- /usr/lib/x86_64-linux-gnu/libGLESv2.so.2.1.0
 		'cimgui_sdl',	-- /usr/local/lib/libcimgui_sdl-1.87dock.so
 		'vorbisfile',
 		'vorbis',

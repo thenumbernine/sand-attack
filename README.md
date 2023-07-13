@@ -9,15 +9,28 @@ Tetris with abelian sandpile models.  Jk it's with sand.
 
 ## Dependencies:
 
+other repos of mine:
 - https://github.com/thenumbernine/lua-template
 - https://github.com/thenumbernine/lua-ext
 - https://github.com/thenumbernine/lua-ffi-bindings
 - https://github.com/thenumbernine/vec-ffi-lua
+- https://github.com/thenumbernine/lua-matrix
 - https://github.com/thenumbernine/lua-image
 - https://github.com/thenumbernine/lua-gl
 - https://github.com/thenumbernine/lua-glapp
 - https://github.com/thenumbernine/lua-imgui
 - https://github.com/thenumbernine/lua-imguiapp
+- https://github.com/thenumbernine/lua-audio
+
+external libraries required:
+- libpng
+- SDL2
+- cimgui w/ OpenGL+SDL backend (build process described in my lua-imgui readme)
+- libogg
+- libvorbis
+- libvorbisfile
+- OpenAL-Soft
+
 
 ## TODO:
 
