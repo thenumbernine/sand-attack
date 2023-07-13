@@ -1,6 +1,9 @@
 local class = require 'ext.class'
+local table = require 'ext.table'
+local range = require 'ext.range'
 local math = require 'ext.math'
 local tolua = require 'ext.tolua'
+local ops = require 'ext.op'
 local gl = require 'gl'
 local GLTex2D = require 'gl.tex2d'
 local ig = require 'imgui'
@@ -278,6 +281,19 @@ function HighScoreState:init(app, needsName)
 	self.needsName = needsName
 	self.name = ''
 end
+-- save state info pertinent to the gameplay
+-- TODO save recording of all keystrokes and game rand seed?
+HighScoreState.fields = table{
+	'name',
+	'lines',
+	'level',
+	'score',
+	'numColors',
+	'numPlayers',
+	'toppleCoeff',
+	'boardWidth',
+	'boardHeight',
+}
 function HighScoreState:updateGUI()
 	local app = self.app
 	ig.igBegin('High Scores:', nil, 0)
@@ -287,13 +303,21 @@ function HighScoreState:updateGUI()
 		ig.luatableInputText('Your Name:', self, 'name')
 		if ig.igButton'Ok' then
 			self.needsName = false
-			table.insert(app.cfg.highscores, {
-				name = self.name,
-				lines = app.lines,
-				level = app.level,
-				score = app.score,
-				numColors = app.numColors,
-			})
+			local record = {}
+			for _,field in ipairs(self.fields) do
+				if field == 'name' then
+					record[field] = self[field]
+				elseif field == 'toppleCoeff' then
+					record[field] = app.cfg[field]
+				elseif field == 'boardWidth' then
+					record[field] = tonumber(app.sandSize.x)
+				elseif field == 'boardHeight' then
+					record[field] = tonumber(app.sandSize.y)
+				else
+					record[field] = app[field]
+				end
+			end
+			table.insert(app.cfg.highscores, record)
 			table.sort(app.cfg.highscores, function(a,b)
 				return a.score > b.score
 			end)
@@ -301,8 +325,89 @@ function HighScoreState:updateGUI()
 		end
 	end
 
-	for i,score in ipairs(app.cfg.highscores) do
-		ig.igText(tolua(score))
+	if ig.igBeginTable('High Scores', #self.fields, bit.bor(
+		--[[
+		ig.ImGuiTableFlags_SizingFixedFit,
+		ig.ImGuiTableFlags_ScrollX,
+		ig.ImGuiTableFlags_ScrollY,
+		ig.ImGuiTableFlags_RowBg,
+		ig.ImGuiTableFlags_BordersOuter,
+		ig.ImGuiTableFlags_BordersV,
+		ig.ImGuiTableFlags_Resizable,
+		ig.ImGuiTableFlags_Reorderable,
+		ig.ImGuiTableFlags_Hideable,
+		ig.ImGuiTableFlags_Sortable
+		--]]
+		-- [[
+		ig.ImGuiTableFlags_Resizable,
+		ig.ImGuiTableFlags_Reorderable,
+		ig.ImGuiTableFlags_Hideable,
+		ig.ImGuiTableFlags_Sortable,
+		ig.ImGuiTableFlags_SortMulti,
+		ig.ImGuiTableFlags_RowBg,
+		ig.ImGuiTableFlags_BordersOuter,
+		ig.ImGuiTableFlags_BordersV,
+		ig.ImGuiTableFlags_NoBordersInBody,
+		ig.ImGuiTableFlags_ScrollY
+		--]]
+	), ig.ImVec2(0,0), 0) then
+		
+		for i,field in ipairs(self.fields) do
+			ig.igTableSetupColumn(tostring(field), bit.bor(
+					ig.ImGuiTableColumnFlags_DefaultSort
+				),
+				0,
+				i	-- ColumnUserID in the sort
+			)
+		end
+		ig.igTableHeadersRow()
+		local sortSpecs = ig.igTableGetSortSpecs()
+		if not self.rowindexes or #self.rowindexes ~= #app.cfg.highscores then 
+			self.rowindexes = range(#app.cfg.highscores)
+		end
+		if sortSpecs[0].SpecsDirty then
+			local typescore = {
+				string = 1,
+				number = 2,
+				table = 3,
+				['nil'] = math.huge,
+			}
+			-- sort from imgui_demo.cpp CompareWithSortSpecs
+			-- TODO maybe put this in lua-imgui
+			table.sort(self.rowindexes, function(ia,ib)
+				local a = app.cfg.highscores[ia]
+				local b = app.cfg.highscores[ib]
+				for n=0,sortSpecs[0].SpecsCount-1 do
+					local sortSpec = sortSpecs[0].Specs[n]
+					local col = sortSpec.ColumnUserID
+					local field = self.fields[tonumber(col)]
+					local afield = a[field]
+					local bfield = b[field]
+					local tafield = type(afield)
+					local tbfield = type(bfield)
+					print('testing', afield, bfield, tafield, tbfield)
+					if afield ~= bfield then 
+						local op = sortSpec.SortDirection == ig.ImGuiSortDirection_Ascending and ops.lt or ops.gt
+						if tafield ~= tbfield then
+							-- put nils last ... score for type?
+							return op(typescore[tafield], typescore[tbfield])
+						end
+						return op(afield, bfield)
+					end
+				end
+				return ia < ib
+			end)
+			sortSpecs[0].SpecsDirty = false
+		end
+		for _,i in ipairs(self.rowindexes) do
+			local score = app.cfg.highscores[i]
+			ig.igTableNextRow(0, 0)
+			for _,field in ipairs(self.fields) do
+				ig.igTableNextColumn()
+				ig.igText(tostring(score[field]))
+			end
+		end
+		ig.igEndTable()
 	end
 	if ig.igButton'Done' then
 		app.state = MainMenuState(app)
