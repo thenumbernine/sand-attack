@@ -1,4 +1,5 @@
 local ffi = require 'ffi'
+local sdl = require 'ffi.sdl'
 local class = require 'ext.class'
 local table = require 'ext.table'
 local range = require 'ext.range'
@@ -18,11 +19,90 @@ function GameState:init(app)
 	assert(App:isa(app))
 	self.app = assert(app)
 end
+-- TODO change the style around
+function GameState:beginFullView(name, estheight)
+	-- TODO put in lua-imgui
+	local viewport = ig.igGetMainViewport()
+	ig.igSetNextWindowPos(viewport.WorkPos, 0, ig.ImVec2())
+	ig.igSetNextWindowSize(viewport.WorkSize, 0)
+	ig.igPushStyleVar_Float(ig.ImGuiStyleVar_WindowRounding, 0)
+	ig.igBegin('Main Menu', nil, bit.bor(
+		ig.ImGuiWindowFlags_NoMove,
+		ig.ImGuiWindowFlags_NoResize,
+		ig.ImGuiWindowFlags_NoCollapse,
+		ig.ImGuiWindowFlags_NoDecoration
+	))
+	self.viewCenterX = viewport.WorkSize.x * .5
+	local viewheight = viewport.WorkSize.y * .5
+
+	-- TODO calc this?
+	if estheight and estheight < viewheight then
+		ig.igSetCursorPosY(viewheight - .5 * estheight)
+	end
+end
+function GameState:endFullView()
+	ig.igEnd()
+	ig.igPopStyleVar(1)
+end
+local tmp = ffi.new('ImVec2[1]')
+function GameState:centerGUI(fn, text, ...)
+	-- TODO put in lua-imgui
+	-- TODO TODO for buttons and text this is fine, but for inputs the width can be *much wider* than the text width.
+	local textwidth
+	if self.overrideTextWidth ~= nil then
+		textwidth = self.overrideTextWidth
+	else
+		ig.igCalcTextSize(tmp, text, nil, false, -1)
+		textwidth = tmp[0].x
+	end
+	ig.igSetCursorPosX(self.viewCenterX - .5 * textwidth)
+	return fn(text, ...)
+end
+function GameState:centerText(...)
+	return self:centerGUI(ig.igText, ...)
+end
+function GameState:centerButton(...)
+	return self:centerGUI(ig.igButton, ...)
+end
+
+-- is ugly enough i have to fix this often enough so:
+-- TODO fix somehow
+function GameState:centerLuatableInputInt(...)
+	self.overrideTextWidth = 360
+	self:centerGUI(ig.luatableInputInt, ...)
+	self.overrideTextWidth = nil
+end
+function GameState:centerLuatableTooltipInputInt(...)
+	self.overrideTextWidth = 360
+	self:centerGUI(ig.luatableTooltipInputInt, ...)
+	self.overrideTextWidth = nil
+end
+function GameState:centerLuatableInputFloat(...)
+	self.overrideTextWidth = 360
+	self:centerGUI(ig.luatableInputFloat, ...)
+	self.overrideTextWidth = nil
+end
+function GameState:centerLuatableTooltipInputFloat(...)
+	self.overrideTextWidth = 360
+	self:centerGUI(ig.luatableTooltipInputFloat, ...)
+	self.overrideTextWidth = nil
+end
+function GameState:centerLuatableSliderFloat(...)
+	self.overrideTextWidth = 360
+	self:centerGUI(ig.luatableSliderFloat, ...)
+	self.overrideTextWidth = nil
+end
+function GameState:centerLuatableTooltipSliderFloat(...)
+	self.overrideTextWidth = 360
+	self:centerGUI(ig.luatableTooltipSliderFloat, ...)
+	self.overrideTextWidth = nil
+end
 
 
 local LoseScreen = class(GameState)
 
 local PlayingState = class(GameState)
+GameState.PlayingState = PlayingState
 function PlayingState:init(app)
 	PlayingState.super.init(self, app)
 	app.paused = false
@@ -62,7 +142,7 @@ function PlayingState:updateGUI()
 		app.paused = true
 		app.state = GameState.HighScoreState(app, true)
 	end
-	
+
 	ig.igEnd()
 end
 
@@ -72,11 +152,11 @@ local ConfigState = class(GameState)
 local tmpcolor = ig.ImVec4()
 function ConfigState:updateGUI()
 	local app = self.app
-	ig.igBegin('Config', nil, 0)
-	ig.luatableInputInt('Num Next Pieces', app, 'numNextPieces')
-	ig.luatableInputFloat('Drop Speed', app, 'dropSpeed')
+	self:beginFullView('Config', 6 * 32)
+	self:centerLuatableInputInt('Number of Next Pieces', app, 'numNextPieces')
+	self:centerLuatableInputFloat('Drop Speed', app, 'dropSpeed')
 
-	ig.igText'Colors:'
+	self:centerText'Colors:'
 	if ig.igButton'+' then
 		app.numColors = app.numColors + 1
 		app.nextColors = app.baseColors:sub(1, app.numColors)
@@ -126,14 +206,14 @@ function ConfigState:updateGUI()
 		ig.igEnd()
 	end
 
-	ig.igText'Board:'
-	ig.luatableTooltipInputInt('Board Width', app.nextSandSize, 'x')
-	ig.luatableTooltipInputInt('Board Height', app.nextSandSize, 'y')
-	ig.luatableTooltipSliderFloat('Topple Chance', app.cfg, 'toppleChance', 0, 1)
+	self:centerText'Board:'
+	self:centerLuatableTooltipInputInt('Board Width', app.nextSandSize, 'x')
+	self:centerLuatableTooltipInputInt('Board Height', app.nextSandSize, 'y')
+	self:centerLuatableTooltipSliderFloat('Topple Chance', app.cfg, 'toppleChance', 0, 1)
 
 	if app.useAudio then
-		ig.igText'Audio:'
-		if ig.luatableSliderFloat('FX Volume', app.cfg, 'effectVolume', 0, 1) then
+		self:centerText'Audio:'
+		if self:centerLuatableSliderFloat('FX Volume', app.cfg, 'effectVolume', 0, 1) then
 			--[[ if you want, update all previous audio sources...
 			for _,src in ipairs(app.audioSources) do
 				-- TODO if the gameplay sets the gain down then we'll want to multiply by their default gain
@@ -141,17 +221,17 @@ function ConfigState:updateGUI()
 			end
 			--]]
 		end
-		if ig.luatableSliderFloat('BG Volume', app.cfg, 'backgroundVolume', 0, 1) then
+		if self:centerLuatableSliderFloat('BG Volume', app.cfg, 'backgroundVolume', 0, 1) then
 			app.bgAudioSource:setGain(app.cfg.backgroundVolume)
 		end
 	end
 
 
-	if ig.igButton'Done' then
+	if self:centerButton'Done' then
 		app:saveConfig()
 		app.state = GameState.MainMenuState(app)
 	end
-	ig.igEnd()
+	self:endFullView()
 end
 
 local StartNewGameState = class(GameState)
@@ -167,27 +247,30 @@ end
 function StartNewGameState:updateGUI()
 	local app = self.app
 
+	self:beginFullView(self.multiplayer and 'New Game Multiplayer' or 'New Game', 3 * 32)
+
 	if self.multiplayer then
-		ig.igBegin('New Game Multiplayer', nil, 0)
-		ig.luatableInputInt('Num Players', app, 'numPlayers')
+		self:centerText'Number of Players:'
+		self:centerLuatableTooltipInputInt('Number of Players', app, 'numPlayers')
 		app.numPlayers = math.max(app.numPlayers, 2)
-	else
-		ig.igBegin('New Game', nil, 0)
 	end
 
-	ig.luatableInputInt('Level:', app.cfg, 'startLevel')
+	self:centerText'Level:'
+	self:centerLuatableTooltipInputInt('Level', app.cfg, 'startLevel')
 	app.cfg.startLevel = math.clamp(app.cfg.startLevel, 1, 20)
 
-	if ig.igButton'Back' then
+	if self:centerButton'Back' then
 		app.state = GameState.MainMenuState(app)
 	end
-	ig.igSameLine()
-	if ig.igButton'Go!' then
+	--ig.igSameLine() -- how to work with centered multiple widgets...
+	if self:centerButton'Go!' then
 		app:reset()
 		app.state = PlayingState(app)	-- sets paused=false
 	end
-	ig.igEnd()
+
+	self:endFullView()
 end
+
 
 local MainMenuState = class(GameState)
 GameState.MainMenuState = MainMenuState
@@ -197,24 +280,25 @@ function MainMenuState:init(...)
 end
 function MainMenuState:updateGUI()
 	local app = self.app
-	ig.igBegin('Main Menu', nil, 0)
-	if ig.igButton'New Game' then
+	self:beginFullView('Main Menu', 6 * 32)
+
+	if self:centerButton'New Game' then
 		-- TODO choose gametype and choose level
 		app.state = StartNewGameState(app)
 	end
-	if ig.igButton'New Game Co-op' then
+	if self:centerButton'New Game Co-op' then
 		app.state = StartNewGameState(app, true)
 		-- TODO pick same as before except pick # of players
 	end
 	-- TODO RESUME GAME here
-	if ig.igButton'Config' then
+	if self:centerButton'Config' then
 		app.state = ConfigState(app)
 	end
-	if ig.igButton'High Scores' then
+	if self:centerButton'High Scores' then
 		app.state = GameState.HighScoreState(app)
 	end
 	local url = 'https://github.com/thenumbernine/sand-tetris'
-	if ig.igButton'About' then
+	if self:centerButton'About' then
 		if ffi.os == 'Windows' then
 			os.execute('explorer "'..url..'"')
 		elseif ffi.os == 'OSX' then
@@ -232,24 +316,29 @@ function MainMenuState:updateGUI()
 		ig.igEndTooltip()
 	end
 
-	if ig.igButton'Exit' then
+	if self:centerButton'Exit' then
 		app:requestExit()
 	end
-	ig.igEnd()
+
+	self:endFullView()
 end
 
 local SplashScreenState = class(GameState)
 GameState.SplashScreenState = SplashScreenState
 SplashScreenState.duration = 3
-SplashScreenState.startTime = getTime()
+-- TODO cool sand effect or something
+function SplashScreenState:init(...)
+	SplashScreenState.super.init(self, ...)
+	self.startTime = getTime()
+end
 function SplashScreenState:update()
 	local app = self.app
-	
+
 	local w, h = app.sandSize:unpack()
-		
+
 	local aspectRatio = app.width / app.height
 	local s = w / h
-	
+
 	app.projMat:setOrtho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
 	app.displayShader:use()
 	app.displayShader.vao:use()
@@ -271,6 +360,15 @@ function SplashScreenState:update()
 
 
 	if getTime() - self.startTime > self.duration then
+		app.state = MainMenuState(app)
+	end
+end
+function SplashScreenState:event(e)
+	local app = self.app
+	if e.type == sdl.SDL_KEYDOWN
+	or e.type == sdl.SDL_MOUSEBUTTONDOWN
+	or e.type == sdl.SDL_JOYBUTTONDOWN
+	then
 		app.state = MainMenuState(app)
 	end
 end
@@ -297,7 +395,7 @@ HighScoreState.fields = table{
 }
 function HighScoreState:updateGUI()
 	local app = self.app
-	ig.igBegin('High Scores:', nil, 0)
+	self:beginFullView'High Scores:'
 
 	-- TODO separate state for this?
 	if self.needsName then
@@ -342,17 +440,17 @@ function HighScoreState:updateGUI()
 		-- [[
 		ig.ImGuiTableFlags_Resizable,
 		ig.ImGuiTableFlags_Reorderable,
-		ig.ImGuiTableFlags_Hideable,
+		--ig.ImGuiTableFlags_Hideable,
 		ig.ImGuiTableFlags_Sortable,
 		ig.ImGuiTableFlags_SortMulti,
-		ig.ImGuiTableFlags_RowBg,
+		--ig.ImGuiTableFlags_RowBg,
 		ig.ImGuiTableFlags_BordersOuter,
 		ig.ImGuiTableFlags_BordersV,
-		ig.ImGuiTableFlags_NoBordersInBody,
-		ig.ImGuiTableFlags_ScrollY
+		--ig.ImGuiTableFlags_NoBordersInBody,
+		--ig.ImGuiTableFlags_ScrollY,
 		--]]
-	), ig.ImVec2(0,0), 0) then
-		
+	0), ig.ImVec2(0,0), 0) then
+
 		for i,field in ipairs(self.fields) do
 			ig.igTableSetupColumn(tostring(field), bit.bor(
 					ig.ImGuiTableColumnFlags_DefaultSort
@@ -363,7 +461,7 @@ function HighScoreState:updateGUI()
 		end
 		ig.igTableHeadersRow()
 		local sortSpecs = ig.igTableGetSortSpecs()
-		if not self.rowindexes or #self.rowindexes ~= #app.cfg.highscores then 
+		if not self.rowindexes or #self.rowindexes ~= #app.cfg.highscores then
 			self.rowindexes = range(#app.cfg.highscores)
 		end
 		if sortSpecs[0].SpecsDirty then
@@ -386,8 +484,8 @@ function HighScoreState:updateGUI()
 					local bfield = b[field]
 					local tafield = type(afield)
 					local tbfield = type(bfield)
-					print('testing', afield, bfield, tafield, tbfield)
-					if afield ~= bfield then 
+--print('testing', afield, bfield, tafield, tbfield)
+					if afield ~= bfield then
 						local op = sortSpec.SortDirection == ig.ImGuiSortDirection_Ascending and ops.lt or ops.gt
 						if tafield ~= tbfield then
 							-- put nils last ... score for type?
@@ -418,7 +516,7 @@ function HighScoreState:updateGUI()
 	if ig.igButton'Done' then
 		app.state = MainMenuState(app)
 	end
-	ig.igEnd()
+	self:endFullView()
 end
 
 return GameState

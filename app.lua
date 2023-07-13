@@ -28,16 +28,11 @@ local AudioBuffer = require 'audio.buffer'
 local Player = require 'sandtetris.player'
 local GameState = require 'sandtetris.gamestate'
 
--- TODO put this in ext.math
---local DBL_EPSILON = 2.220446049250313080847e-16
-local FLT_EPSILON = 1.1920928955078125e-7
-
-
 local App = class(ImGuiApp)
 
 App.useAudio = true	-- set to false to disable audio altogether
 App.showFPS = false	-- show fps in gui
-local dontCheck = false	-- means don't ever ever check for lines.  used for fps testing the sand topple simulation.
+local dontCheckForLinesEver = false	-- means don't ever ever check for lines.  used for fps testing the sand topple simulation.
 
 local updateInterval = 1/60
 --local updateInterval = 1/120
@@ -786,7 +781,7 @@ function App:updateGame()
 		end
 	end
 
-	if dontCheck then needsCheckLine = false end
+	if dontCheckForLinesEver then needsCheckLine = false end
 
 	-- try to find a connection from left to right
 	local anyCleared
@@ -1066,7 +1061,10 @@ function App:event(e, ...)
 			if down then self:reset() end
 		else
 		--]]
-		if down and e.key.keysym.sym == sdl.SDLK_ESCAPE then
+		if down
+		and e.key.keysym.sym == sdl.SDLK_ESCAPE
+		and GameState.PlayingState:isa(self.state)
+		then
 			self.paused = not self.paused
 		end
 		if down and e.key.keysym.sym == ('f'):byte() then
