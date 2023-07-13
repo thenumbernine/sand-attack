@@ -6,14 +6,28 @@ files = {
 	['.'] = {
 		'run.lua',
 		'README.md',
+		'tex',
 		'music',
 		'sfx',
+		'font',
 	},
 	['..'] = table{
+		-- hmm better way to do this?
+		-- scripts (other than run.lua) are relative to parent dir
+		-- resources and run.lua are relative to sandtetris/
+		-- option #1: put all individual script files here:
+		'sandtetris/app.lua',
+		'sandtetris/gamestate.lua',
+		'sandtetris/player.lua',
+		-- option #2: copy this dir and reference all resources from 'sandtetris/'
+		-- (this'll require a 'cd ..' every time you playtest it from within its cwd ...)
+		--'sandtetris',
+
 		'template',
 		'ext',
 		'ffi',
 		'vec-ffi',
+		'matrix',
 		'image',
 		'gl',
 		'glapp',
@@ -31,7 +45,7 @@ luajitLibs = {
 		'png',	-- TODO which dir is it pulling png from? do i need z or zlib? doen't matter, no pngs in this so far
 		'SDL2',
 		'cimgui_sdl',
-		'z',	-- needed by png ... or is it zlib?  which png am I using? ufo's (z) or my own build of libpng (zlib)?
+		'zlib',	-- needed by png ... or is it zlib?  which png am I using? ufo's (z) or my own build of libpng (zlib)?
 		-- of these 4, i'm only explicitly ffi.load'ing vorbisfile, but idk about interdependencies...
 		'ogg',
 		'vorbis',
