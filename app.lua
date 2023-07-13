@@ -155,7 +155,7 @@ function App:initGL(...)
 	--self.nextSandSize = vec2i(512, 512)
 
 	self.loseScreenDuration = 5
-	
+
 	self.youloseTex = GLTex2D{
 		image = Image'tex/youlose.png':flip(),
 		wrap = {
@@ -198,9 +198,12 @@ function App:initGL(...)
 		data = vtxbufCPU,
 	}
 
+	--local glslVersion = 460	-- too new?
+	local glslVersion = 430
 	self.displayShader = GLProgram{
 		vertexCode = [[
-#version 460
+#version ]]..glslVersion..[[
+
 in vec2 vertex;
 out vec2 texcoordv;
 uniform mat4 modelViewProjMat;
@@ -210,7 +213,8 @@ void main() {
 }
 ]],
 		fragmentCode = [[
-#version 460
+#version ]]..glslVersion..[[
+
 in vec2 texcoordv;
 out vec4 fragColor;
 uniform sampler2D tex;
@@ -230,36 +234,42 @@ void main() {
 	self.sounds = {}
 
 	if self.useAudio then
-		self.audio = Audio()
-		self.audioSources = table()
-		self.audioSourceIndex = 0
-		self.audio:setDistanceModel'linear clamped'
-		for i=1,31 do	-- 31 for DirectSound, 32 for iphone, infinite for all else?
-			local src = AudioSource()
-			src:setReferenceDistance(1)
-			src:setMaxDistance(self.maxAudioDist)
-			src:setRolloffFactor(1)
-			self.audioSources[i] = src
-		end
+		xpcall(function()
+			self.audio = Audio()
+			self.audioSources = table()
+			self.audioSourceIndex = 0
+			self.audio:setDistanceModel'linear clamped'
+			for i=1,31 do	-- 31 for DirectSound, 32 for iphone, infinite for all else?
+				local src = AudioSource()
+				src:setReferenceDistance(1)
+				src:setMaxDistance(self.maxAudioDist)
+				src:setRolloffFactor(1)
+				self.audioSources[i] = src
+			end
 
-		self.bgMusicFiles = table{
-			'music/Desert-City.ogg',
-			'music/Exotic-Plains.ogg',
-			'music/Ibn-Al-Noor.ogg',
-			'music/Market_Day.ogg',
-			'music/Return-of-the-Mummy.ogg',
-			'music/temple-of-endless-sands.ogg',
-			'music/wombat-noises-audio-the-legend-of-narmer.ogg',
-		}
-		self.bgMusicFileName = self.bgMusicFiles:pickRandom()
-		if self.bgMusicFileName then
-			self.bgMusic = self:loadSound(self.bgMusicFileName)
-			self.bgAudioSource = AudioSource()
-			self.bgAudioSource:setBuffer(self.bgMusic)
-			self.bgAudioSource:setLooping(true)
-			self.bgAudioSource:setGain(self.cfg.backgroundVolume)
-			self.bgAudioSource:play()
-		end
+			self.bgMusicFiles = table{
+				'music/Desert-City.ogg',
+				'music/Exotic-Plains.ogg',
+				'music/Ibn-Al-Noor.ogg',
+				'music/Market_Day.ogg',
+				'music/Return-of-the-Mummy.ogg',
+				'music/temple-of-endless-sands.ogg',
+				'music/wombat-noises-audio-the-legend-of-narmer.ogg',
+			}
+			self.bgMusicFileName = self.bgMusicFiles:pickRandom()
+			if self.bgMusicFileName then
+				self.bgMusic = self:loadSound(self.bgMusicFileName)
+				self.bgAudioSource = AudioSource()
+				self.bgAudioSource:setBuffer(self.bgMusic)
+				self.bgAudioSource:setLooping(true)
+				self.bgAudioSource:setGain(self.cfg.backgroundVolume)
+				self.bgAudioSource:play()
+			end
+		end, function(err)
+			print(err..'\n'..debug.traceback())
+			self.audio = nil
+			self.useAudio = false	-- or just test audio's existence?
+		end)
 	end
 
 	self.state = GameState.SplashScreenState(self)
@@ -429,7 +439,7 @@ function App:reset()
 	while #self.baseColors < 255 do
 		self.baseColors:insert(vec3f():map(function() return math.random() end):normalize())
 	end
-	
+
 	self.gameColors = table(self.nextColors)		-- colors used now
 	while #self.gameColors < self.numColors do
 		self.gameColors[#self.gameColors+1] = self.baseColors[#self.gameColors+1]
@@ -808,7 +818,7 @@ function App:updateGame()
 		end
 		if clearedCount ~= 0 then
 			anyCleared = true
-			
+
 			if self.gameTime - self.lastLineTime < self.chainDuration then
 				self.scoreChain = self.scoreChain + 1
 			else
@@ -826,11 +836,11 @@ function App:updateGame()
 				self.level = self.level + 1
 				self:upateFallSpeed()
 			end
-			
+
 			self:playSound'sfx/line.wav'
 			self.flashTex:bind():subimage()
 			self.lastLineTime = self.gameTime
-		
+
 		end
 	end
 
@@ -854,7 +864,7 @@ end
 function App:update(...)
 	self.thisTime = getTime()
 	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
-	
+
 	if self.state.update then
 		self.state:update()
 	end
@@ -1074,7 +1084,9 @@ function App:updateGUI()
 end
 
 function App:exit()
-	self.audio:shutdown()
+	if self.useAudio then
+		self.audio:shutdown()
+	end
 	App.super.exit(self)
 end
 
