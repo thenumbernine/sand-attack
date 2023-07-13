@@ -70,3 +70,9 @@ Creative Commons Attribution 3.0 Unported License
 https://creativecommons.org/licenses/by/3.0/
 Music promoted by https://www.chosic.com/free-music/all/
 ```
+
+## Font Credit:
+
+```
+https://www.1001freefonts.com/billow-twril.font
+```

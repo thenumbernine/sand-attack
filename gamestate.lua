@@ -1,3 +1,4 @@
+local ffi = require 'ffi'
 local class = require 'ext.class'
 local table = require 'ext.table'
 local range = require 'ext.range'
@@ -409,6 +410,11 @@ function HighScoreState:updateGUI()
 		end
 		ig.igEndTable()
 	end
+	if ig.igButton'Clear' then
+		app.cfg.highscores = {}
+		app:saveConfig()
+	end
+	ig.igSameLine()
 	if ig.igButton'Done' then
 		app.state = MainMenuState(app)
 	end
