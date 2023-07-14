@@ -64,7 +64,10 @@ function GameState:centerGUI(fn, text, ...)
 		ig.igCalcTextSize(tmp, text, nil, false, -1)
 		textwidth = tmp[0].x
 	end
-	ig.igSetCursorPosX(self.viewCenterX - .5 * textwidth)
+	local x = self.viewCenterX - .5 * textwidth
+	if x >= 0 then
+		ig.igSetCursorPosX(x)
+	end
 	return fn(text, ...)
 end
 function GameState:centerText(...)
@@ -164,62 +167,11 @@ end
 
 -- TODO save config
 local ConfigState = class(GameState)
-local tmpcolor = ig.ImVec4()
 function ConfigState:updateGUI()
 	local app = self.app
 	self:beginFullView('Config', 6 * 32)
 	self:centerLuatableInputInt('Number of Next Pieces', app, 'numNextPieces')
 	self:centerLuatableInputFloat('Drop Speed', app, 'dropSpeed')
-
-	self:centerText'Colors:'
-	if ig.igButton'+' then
-		app.numColors = app.numColors + 1
-		app.nextColors = app.baseColors:sub(1, app.numColors)
-	end
-	ig.igSameLine()
-	if app.numColors > 1 and ig.igButton'-' then
-		app.numColors = app.numColors - 1
-		app.nextColors = app.baseColors:sub(1, app.numColors)
-	end
-	ig.igSameLine()
-
-	for i=1,app.numColors do
-		local c = app.nextColors[i]
-		tmpcolor.x = c.x
-		tmpcolor.y = c.y
-		tmpcolor.z = c.z
-		tmpcolor.w = 1
-		if ig.igColorButton('Color '..i, tmpcolor) then
-			self.currentColorEditing = i
-		end
-		if i % 6 ~= 4 and i < app.numColors then
-			ig.igSameLine()
-		end
-	end
-
-	if self.currentColorEditing then
-		ig.igBegin('Color', nil, bit.bor(
-			ig.ImGuiWindowFlags_NoTitleBar,
-			ig.ImGuiWindowFlags_NoResize,
-			ig.ImGuiWindowFlags_NoCollapse,
-			ig.ImGuiWindowFlags_AlwaysAutoResize,
-			ig.ImGuiWindowFlags_Modal
-		))
-		if #app.nextColors > 1 then
-			if ig.igButton'Delete Color' then
-				app.nextColors:remove(self.currentColorEditing)
-				app.numColors = app.numColors - 1
-				self.currentColorEditing = nil
-			end
-		end
-		if self.currentColorEditing then
-			ig.igColorPicker3('Edit Color', app.nextColors[self.currentColorEditing].s, 0)
-		end
-		if ig.igButton'Done' then
-			self.currentColorEditing = nil
-		end
-		ig.igEnd()
-	end
 
 	self:centerText'Board:'
 	self:centerLuatableTooltipInputInt('Board Width', app.nextSandSize, 'x')
@@ -259,7 +211,9 @@ function StartNewGameState:init(app, multiplayer)
 		app.numPlayers = 1
 	end
 end
+local tmpcolor = ig.ImVec4()
 function StartNewGameState:updateGUI()
+	local Player = require 'sandtetris.player'
 	local app = self.app
 
 	self:beginFullView(self.multiplayer and 'New Game Multiplayer' or 'New Game', 3 * 32)
@@ -270,9 +224,109 @@ function StartNewGameState:updateGUI()
 		app.numPlayers = math.max(app.numPlayers, 2)
 	end
 
+	-- should player keys be here or config?
+	-- config: because it is in every other game
+	-- here: because key config is based on # players, and # players is set here.
+	for i=1,app.numPlayers do
+		if not app.cfg.playerKeys[i] then
+			app.cfg.playerKeys[i] = {}
+			local defaultsrc = Player.defaultKeys[i]
+			for _,keyname in ipairs(Player.keyNames) do
+				app.cfg.playerKeys[i][keyname] = defaultsrc and defaultsrc[keyname] or unknownKey
+			end
+		end
+		if ig.igButton(not self.multiplayer and 'change keys' or 'change player '..i..' keys') then
+			self.currentPlayerIndex = i
+			ig.igOpenPopup_Str('Edit Keys', 0)
+		end
+	end
+	if self.currentPlayerIndex then
+		assert(self.currentPlayerIndex >= 1 and self.currentPlayerIndex <= app.numPlayers)
+		if ig.igBeginPopupModal'Edit Keys' then
+			for _,keyname in ipairs(Player.keyNames) do
+				ig.igPushID_Str(keyname)
+				ig.igText(keyname)
+				ig.igSameLine()
+				local ev = app.cfg.playerKeys[self.currentPlayerIndex][keyname]
+				if ig.igButton(
+					waitingForEvent
+					and waitingForEvent.key == keyname
+					and waitingForEvent.playerIndex == self.currentPlayerIndex
+					and 'Press Button...' or (ev and ev.name) or '?')
+				then
+					waitingForEvent = {
+						key = keyname,
+						playerIndex = self.currentPlayerIndex,
+						callback = function(ev)
+							app.cfg.playerKeys[self.currentPlayerIndex][keyname] = ev
+						end,
+					}
+				end
+				ig.igPopID()
+			end
+			if ig.igButton'Done' then
+				app:saveConfig()
+				ig.igCloseCurrentPopup()
+				self.currentPlayerIndex = nil
+			end
+			ig.igEnd()
+		end
+	end
+
+
 	self:centerText'Level:'
 	self:centerLuatableTooltipInputInt('Level', app.cfg, 'startLevel')
 	app.cfg.startLevel = math.clamp(app.cfg.startLevel, 1, 20)
+
+	-- [[ allow modifying colors
+	self:centerText'Colors:'
+	if ig.igButton'+' then
+		app.numColors = app.numColors + 1
+		app.nextColors = app.baseColors:sub(1, app.numColors)
+	end
+	ig.igSameLine()
+	if app.numColors > 1 and ig.igButton'-' then
+		app.numColors = app.numColors - 1
+		app.nextColors = app.baseColors:sub(1, app.numColors)
+	end
+	ig.igSameLine()
+
+	for i=1,app.numColors do
+		local c = app.nextColors[i]
+		tmpcolor.x = c.x
+		tmpcolor.y = c.y
+		tmpcolor.z = c.z
+		tmpcolor.w = 1
+		if ig.igColorButton('Color '..i, tmpcolor) then
+			self.currentColorEditing = i
+			-- name maches 'BeginPopupModal' name below:
+			ig.igOpenPopup_Str('Edit Color', 0)
+		end
+		if i % 6 ~= 4 and i < app.numColors then
+			ig.igSameLine()
+		end
+	end
+
+	if self.currentColorEditing then
+		if ig.igBeginPopupModal('Edit Color', nil, 0) then
+			if self.currentColorEditing then
+				ig.igColorPicker3('Color', app.nextColors[self.currentColorEditing].s, 0)
+			end
+			if #app.nextColors > 1 then
+				if ig.igButton'Delete Color' then
+					app.nextColors:remove(self.currentColorEditing)
+					app.numColors = app.numColors - 1
+					self.currentColorEditing = nil
+				end
+			end
+			if ig.igButton'Done' then
+				ig.igCloseCurrentPopup()
+				self.currentColorEditing = nil
+			end
+			ig.igEnd()
+		end
+	end
+	--]]
 
 	if self:centerButton'Back' then
 		app.state = GameState.MainMenuState(app)
@@ -414,7 +468,8 @@ function HighScoreState:updateGUI()
 
 	-- TODO separate state for this?
 	if self.needsName then
-		ig.luatableInputText('Your Name:', self, 'name')
+		ig.igText'Your Name:'
+		ig.luatableTooltipInputText('Your Name', self, 'name')
 		if ig.igButton'Ok' then
 			self.needsName = false
 			local record = {}
@@ -437,6 +492,7 @@ function HighScoreState:updateGUI()
 			end)
 			app:saveConfig()
 		end
+		ig.igNewLine()
 	end
 
 	if ig.igBeginTable('High Scores', #self.fields, bit.bor(

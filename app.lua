@@ -1,6 +1,5 @@
 local ffi = require 'ffi'
 local sdl = require 'ffi.sdl'
-local template = require 'template'
 local table = require 'ext.table'
 local file = require 'ext.file'
 local class = require 'ext.class'
@@ -132,8 +131,8 @@ function App:initGL(...)
 	-- TODO this shouldn't be in the config ... should it?
 	self.cfg.toppleChance = self.cfg.toppleChance or 1
 	-- TODO add colors to config?
+	self.cfg.playerKeys = self.cfg.playerKeys or {}
 	self.cfg.highscores = self.cfg.highscores or {}
-
 
 	self.numPlayers = 1
 	self.numColors = 4
@@ -1029,6 +1028,40 @@ function App:flipBoard()
 	self.sandTex:bind():subimage()
 end
 
+function App:processButtonEvent(press, ...)
+	-- TODO put the callback somewhere, not a global
+	-- it's used by the New Game menu
+	if waitingForEvent then
+		if press then
+			local ev = {...}
+			ev.name = Player:getEventName(...)
+			waitingForEvent.callback(ev)
+			waitingForEvent = nil
+		end
+	else
+		local descLen = select('#', ...)
+		for playerIndex, playerConfig in ipairs(self.cfg.playerKeys) do
+			for buttonName, buttonDesc in pairs(playerConfig) do
+				if descLen == #buttonDesc then
+					local match = true
+					for i=1,descLen do
+						if select(i, ...) ~= buttonDesc[i] then
+							match = false
+							break
+						end
+					end
+					if match then
+						local player = self.players[playerIndex]
+						if player then
+							player.keyPress[buttonName] = press
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
 function App:event(e, ...)
 	-- handle UI
 	App.super.event(self, e, ...)
@@ -1038,29 +1071,51 @@ function App:event(e, ...)
 		if self.state:event(e, ...) then return end
 	end
 
+	-- handle any kind of sdl button event
+	if e.type == sdl.SDL_JOYHATMOTION then
+		--if e.jhat.value ~= 0 then
+			-- TODO make sure all hat value bits are cleared
+			-- or keep track of press/release
+			for i=0,3 do
+				local dirbit = bit.lshift(1,i)
+				local press = bit.band(dirbit, e.jhat.value) ~= 0
+				self:processButtonEvent(press, sdl.SDL_JOYHATMOTION, e.jhat.which, e.jhat.hat, dirbit)
+			end
+			--[[
+			if e.jhat.value == sdl.SDL_HAT_CENTERED then
+				for i=0,3 do
+					local dirbit = bit.lshift(1,i)
+					self:processButtonEvent(false, sdl.SDL_JOYHATMOTION, e.jhat.which, e.jhat.hat, dirbit)
+				end
+			end
+			--]]
+		--end
+	elseif e.type == sdl.SDL_JOYAXISMOTION then
+		-- -1,0,1 depend on the axis press
+		local lr = math.floor(3 * (tonumber(e.jaxis.value) + 32768) / 65536) - 1
+		local press = lr ~= 0
+		if not press then
+			-- clear both left and right movement
+			self:processButtonEvent(press, sdl.SDL_JOYAXISMOTION, e.jaxis.which, e.jaxis.axis, -1)
+			self:processButtonEvent(press, sdl.SDL_JOYAXISMOTION, e.jaxis.which, e.jaxis.axis, 1)
+		else
+			-- set movement for the lr direction
+			self:processButtonEvent(press, sdl.SDL_JOYAXISMOTION, e.jaxis.which, e.jaxis.axis, lr)
+		end
+	elseif e.type == sdl.SDL_JOYBUTTONDOWN or e.type == sdl.SDL_JOYBUTTONUP then
+		-- e.jbutton.state is 0/1 for up/down, right?
+		local press = e.type == sdl.SDL_JOYBUTTONDOWN
+		self:processButtonEvent(press, sdl.SDL_JOYBUTTONDOWN, e.jbutton.which, e.jbutton.button)
+	elseif e.type == sdl.SDL_KEYDOWN or e.type == sdl.SDL_KEYUP then
+		local press = e.type == sdl.SDL_KEYDOWN
+		self:processButtonEvent(press, sdl.SDL_KEYDOWN, e.key.keysym.sym)
+	-- else mouse buttons?
+	-- else mouse motion / position?
+	end
+
 	if e.type == sdl.SDL_KEYDOWN
 	or e.type == sdl.SDL_KEYUP
 	then
-		local down = e.type == sdl.SDL_KEYDOWN
-		for _,player in ipairs(self.players) do
-			player:handleKeyUpDown(e.key.keysym.sym, down)
-		end
-		--[[
-		if e.key.keysym.sym == sdl.SDLK_LEFT then
-			self.keyPress.left = down
-		elseif e.key.keysym.sym == sdl.SDLK_RIGHT then
-			self.keyPress.right = down
-		elseif e.key.keysym.sym == sdl.SDLK_DOWN then
-			self.keyPress.down = down
-		elseif e.key.keysym.sym == sdl.SDLK_UP then
-			if down then self:rotatePiece() end
-		else
-		--]]
-		--[[
-		if e.key.keysym.sym == ('r'):byte() then
-			if down then self:reset() end
-		else
-		--]]
 		if down
 		and e.key.keysym.sym == sdl.SDLK_ESCAPE
 		and GameState.PlayingState:isa(self.state)
