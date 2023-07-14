@@ -173,7 +173,7 @@ function App:initGL(...)
 	--self.nextSandSize = vec2i(80, 360)
 	--self.nextSandSize = vec2i(512, 512)
 
-	self.loseScreenDuration = 5
+	self.loseScreenDuration = 3
 
 	self.youloseTex = GLTex2D{
 		image = Image'tex/youlose.png':flip(),
@@ -760,6 +760,9 @@ function App:updateGame()
 		if player.keyPress.up and not player.keyPressLast.up then
 			self:rotatePiece(player)
 		end
+		if player.keyPress.pause and not player.keyPressLast.pause then
+			self.paused = true
+		end
 	end
 
 	self.fallTick = self.fallTick + 1
@@ -1144,16 +1147,11 @@ function App:event(e, ...)
 	-- else mouse motion / position?
 	end
 
+	-- TODO how to incorporate this into the gameplay ...
 	if e.type == sdl.SDL_KEYDOWN
 	or e.type == sdl.SDL_KEYUP
 	then
 		local down = e.type == sdl.SDL_KEYDOWN
-		if down
-		and e.key.keysym.sym == sdl.SDLK_ESCAPE
-		and GameState.PlayingState:isa(self.state)
-		then
-			self.paused = not self.paused
-		end
 		if down and e.key.keysym.sym == ('f'):byte() then
 			if down then self:flipBoard() end
 		end

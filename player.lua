@@ -11,6 +11,7 @@ Player.keyNames = {
 	'down',
 	'left',
 	'right',
+	'pause',
 }
 
 function Player:init(args)
@@ -28,6 +29,7 @@ end
 
 -- static, used by gamestate and app
 function Player:getEventName(sdlEventID, a,b,c)
+	if not a then return '?' end
 	local function dir(d)
 		local s = table()
 		local ds = 'udlr'
@@ -59,12 +61,14 @@ Player.defaultKeys = {
 		down = {sdl.SDL_KEYDOWN, sdl.SDLK_DOWN},
 		left = {sdl.SDL_KEYDOWN, sdl.SDLK_LEFT},
 		right = {sdl.SDL_KEYDOWN, sdl.SDLK_RIGHT},
+		pause = {sdl.SDL_KEYDOWN, sdl.SDLK_ESCAPE},
 	},
 	{
 		up = {sdl.SDL_KEYDOWN, ('w'):byte()},
 		down = {sdl.SDL_KEYDOWN, ('s'):byte()},
 		left = {sdl.SDL_KEYDOWN, ('a'):byte()},
 		right = {sdl.SDL_KEYDOWN, ('d'):byte()},
+		pause = {},	-- sorry keypad player 2
 	},
 }
 for _,keyEvents in ipairs(Player.defaultKeys) do

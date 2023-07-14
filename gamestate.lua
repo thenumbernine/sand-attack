@@ -161,7 +161,7 @@ function PlayingState:updateGUI()
 	if app.paused then
         local size = ig.igGetMainViewport().WorkSize
         ig.igSetNextWindowPos(ig.ImVec2(size.x/2, size.y/2), ig.ImGuiCond_Appearing, ig.ImVec2(.5, .5));
-		ig.igBegin'Paused' 
+		ig.igBegin'Paused'
 		if ig.igButton(app.paused and 'Resume' or 'Pause') then
 			app.paused = not app.paused
 		end
@@ -271,11 +271,12 @@ function StartNewGameState:updateGUI()
 						key = keyname,
 						playerIndex = self.currentPlayerIndex,
 						callback = function(ev)
-							if ev[1] == sdl.SDL_KEYDOWN and ev[2] == sdl.SDLK_ESCAPE then
-								app.cfg.playerKeys[self.currentPlayerIndex][keyname] = {}
-							else
+							-- always reserve escape?  or allow player to configure it as the pause key?
+							--if ev[1] == sdl.SDL_KEYDOWN and ev[2] == sdl.SDLK_ESCAPE then
+							--	app.cfg.playerKeys[self.currentPlayerIndex][keyname] = {}
+							--else
 								app.cfg.playerKeys[self.currentPlayerIndex][keyname] = ev
-							end
+							--end
 						end,
 					}
 				end
