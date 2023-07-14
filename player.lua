@@ -2,6 +2,7 @@ local ffi = require 'ffi'
 local sdl = require 'ffi.sdl'
 local template = require 'template'
 local class = require 'ext.class'
+local vec3f = require 'vec-ffi.vec3f'
 
 local Player = class()
 
@@ -16,21 +17,13 @@ function Player:init(args)
 	self.index = args.index
 	local app = assert(args.app)
 	self.app = app
-	self.color = app.baseColors[self.index]
+	self.color = vec3f(app.cfg.colors[self.index])
 	self.keyPress = {}
 	self.keyPressLast = {}
 
 	self.pieceTex = app:makeTexWithImage(app.pieceSize)
 	-- give pieces an outline so you can tell players apart
 	self.pieceOutlineTex = app:makeTexWithImage(app.pieceSize)
-end
-
-function Player:writeKeysToCfg()
-	local app = self.app
-	app.cfg.playerKeys[self.index] = {}
-	for _,keyname in ipairs(self.keyNames) do
-		app.cfg.playerKeys[self.index][keyname] = self.keys[keyname]
-	end
 end
 
 -- static, used by gamestate and app
@@ -46,7 +39,6 @@ function Player:getEventName(sdlEventID, a,b,c)
 		return s:concat()
 	end
 	local function key(k)
-		--return a
 		return ffi.string(sdl.SDL_GetKeyName(k))
 	end
 	return template(({

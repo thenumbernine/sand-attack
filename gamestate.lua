@@ -6,6 +6,7 @@ local range = require 'ext.range'
 local math = require 'ext.math'
 local tolua = require 'ext.tolua'
 local ops = require 'ext.op'
+local vec3f = require 'vec-ffi.vec3f'
 local gl = require 'gl'
 local GLTex2D = require 'gl.tex2d'
 local ig = require 'imgui'
@@ -211,7 +212,8 @@ function StartNewGameState:init(app, multiplayer)
 		app.numPlayers = 1
 	end
 end
-local tmpcolor = ig.ImVec4()
+local tmpcolor = ig.ImVec4()	-- for imgui button
+local tmpcolorv = vec3f()		-- for imgui color picker
 function StartNewGameState:updateGUI()
 	local Player = require 'sandtetris.player'
 	local app = self.app
@@ -281,49 +283,61 @@ function StartNewGameState:updateGUI()
 	-- [[ allow modifying colors
 	self:centerText'Colors:'
 	if ig.igButton'+' then
-		app.numColors = app.numColors + 1
-		app.nextColors = app.baseColors:sub(1, app.numColors)
+		app.cfg.numColors = app.cfg.numColors + 1
 	end
 	ig.igSameLine()
-	if app.numColors > 1 and ig.igButton'-' then
-		app.numColors = app.numColors - 1
-		app.nextColors = app.baseColors:sub(1, app.numColors)
+	if app.cfg.numColors > 1 and ig.igButton'-' then
+		app.cfg.numColors = app.cfg.numColors - 1
 	end
 	ig.igSameLine()
 
-	for i=1,app.numColors do
-		local c = app.nextColors[i]
-		tmpcolor.x = c.x
-		tmpcolor.y = c.y
-		tmpcolor.z = c.z
+	for i=1,app.cfg.numColors do
+		local c = app.cfg.colors[i]
+		tmpcolor.x = c[1]
+		tmpcolor.y = c[2]
+		tmpcolor.z = c[3]
 		tmpcolor.w = 1
 		if ig.igColorButton('Color '..i, tmpcolor) then
-			self.currentColorEditing = i
+			tmpcolorv:set(table.unpack(c))
+			self.currentColorIndex = i
 			-- name maches 'BeginPopupModal' name below:
 			ig.igOpenPopup_Str('Edit Color', 0)
 		end
-		if i % 6 ~= 4 and i < app.numColors then
+		if i % 6 ~= 4 and i < app.cfg.numColors then
 			ig.igSameLine()
 		end
 	end
 
-	if self.currentColorEditing then
+	if self.currentColorIndex then
+		assert(self.currentColorIndex >= 1 and self.currentColorIndex <= app.cfg.numColors)
+		assert(app.cfg.numColors >= 1 and app.cfg.numColors <= #app.defaultColors)
 		if ig.igBeginPopupModal('Edit Color', nil, 0) then
-			if self.currentColorEditing then
-				ig.igColorPicker3('Color', app.nextColors[self.currentColorEditing].s, 0)
+			if ig.igColorPicker3('Color', tmpcolorv.s, 0) then
+				local c = app.cfg.colors[self.currentColorIndex]
+				c[1], c[2], c[3] = tmpcolorv:unpack()
 			end
-			if #app.nextColors > 1 then
+			if app.cfg.numColors > 1 then
 				if ig.igButton'Delete Color' then
-					app.nextColors:remove(self.currentColorEditing)
-					app.numColors = app.numColors - 1
-					self.currentColorEditing = nil
+					table.remove(app.cfg.colors, self.currentColorIndex)
+					table.insert(app.cfg.colors, {table.unpack(app.defaultColors:last())})
+					app.cfg.numColors = app.cfg.numColors - 1
+					self.currentColorIndex = nil
 				end
 			end
 			if ig.igButton'Done' then
 				ig.igCloseCurrentPopup()
-				self.currentColorEditing = nil
+				self.currentColorIndex = nil
+				app:saveConfig()
 			end
 			ig.igEnd()
+		end
+	end
+	if self:centerButton'Reset Colors' then
+		for i,dstc in ipairs(app.cfg.colors) do
+			local srcc = app.defaultColors[i]
+			for j=1,3 do
+				dstc[j] = srcc[j]
+			end
 		end
 	end
 	--]]
@@ -476,7 +490,9 @@ function HighScoreState:updateGUI()
 			for _,field in ipairs(self.fields) do
 				if field == 'name' then
 					record[field] = self[field]
-				elseif field == 'toppleCoeff' then
+				elseif field == 'toppleCoeff' 
+				or field == 'numColors'
+				then
 					record[field] = app.cfg[field]
 				elseif field == 'boardWidth' then
 					record[field] = tonumber(app.sandSize.x)
@@ -579,13 +595,15 @@ function HighScoreState:updateGUI()
 		end
 		ig.igEndTable()
 	end
-	if ig.igButton'Clear' then
-		app.cfg.highscores = {}
-		app:saveConfig()
-	end
-	ig.igSameLine()
-	if ig.igButton'Done' then
-		app.state = MainMenuState(app)
+	if not self.needsName then
+		if ig.igButton'Clear' then
+			app.cfg.highscores = {}
+			app:saveConfig()
+		end
+		ig.igSameLine()
+		if ig.igButton'Done' then
+			app.state = MainMenuState(app)
+		end
 	end
 	self:endFullView()
 end

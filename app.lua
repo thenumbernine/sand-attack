@@ -37,15 +37,22 @@ local updateInterval = 1/60
 --local updateInterval = 1/120
 --local updateInterval = 0
 
-App.baseColors = table{
-	vec3f(1,0,0),
-	vec3f(0,0,1),
-	vec3f(0,1,0),
-	vec3f(1,1,0),
-	vec3f(1,0,1),
-	vec3f(0,1,1),
-	vec3f(1,1,1),
+App.defaultColors = table{
+	{1,0,0},
+	{0,0,1},
+	{0,1,0},
+	{1,1,0},
+	{1,0,1},
+	{0,1,1},
+	{1,1,1},
 }
+-- populate # colors
+while #App.defaultColors < 255 do
+	App.defaultColors:insert{vec3f():map(function()
+		return math.random()
+	end):normalize():unpack()}
+end
+
 -- ... but not all 8 bit alpha channels are really 8 bits ...
 
 
@@ -130,12 +137,17 @@ function App:initGL(...)
 	self.cfg.startLevel = self.cfg.startLevel or 1
 	-- TODO this shouldn't be in the config ... should it?
 	self.cfg.toppleChance = self.cfg.toppleChance or 1
-	-- TODO add colors to config?
 	self.cfg.playerKeys = self.cfg.playerKeys or {}
 	self.cfg.highscores = self.cfg.highscores or {}
+	self.cfg.numColors = self.cfg.numColors or 4
+	if not self.cfg.colors then
+		self.cfg.colors = {}
+		for i,color in ipairs(self.defaultColors) do
+			self.cfg.colors[i] = {table.unpack(color)}
+		end
+	end
 
 	self.numPlayers = 1
-	self.numColors = 4
 	self.numNextPieces = 3
 	self.dropSpeed = 5
 
@@ -429,16 +441,8 @@ function App:reset()
 	assert(self.sandTex.data == self.sandTex.image.buffer)
 	self.sandTex:bind():subimage():unbind()
 
-	-- populate # colors
-	while #self.baseColors < 255 do
-		self.baseColors:insert(vec3f():map(function() return math.random() end):normalize())
-	end
-
-	self.gameColors = table(self.nextColors)		-- colors used now
-	while #self.gameColors < self.numColors do
-		self.gameColors[#self.gameColors+1] = self.baseColors[#self.gameColors+1]
-	end
-	self.nextColors = table(self.gameColors)		-- colors used in next game
+	self.gameColors = table.sub(self.cfg.colors, 1, self.cfg.numColors):mapi(function(c) return vec3f(c) end)		-- colors used now
+	assert(#self.gameColors == self.cfg.numColors)	-- menu system should handle this
 
 	self.players = range(self.numPlayers):mapi(function(i)
 		return Player{index=i, app=self}
