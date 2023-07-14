@@ -472,7 +472,7 @@ HighScoreState.fields = table{
 	'score',
 	'numColors',
 	'numPlayers',
-	'toppleCoeff',
+	'toppleChance',
 	'boardWidth',
 	'boardHeight',
 }
@@ -490,7 +490,7 @@ function HighScoreState:updateGUI()
 			for _,field in ipairs(self.fields) do
 				if field == 'name' then
 					record[field] = self[field]
-				elseif field == 'toppleCoeff' 
+				elseif field == 'toppleChance'
 				or field == 'numColors'
 				then
 					record[field] = app.cfg[field]
