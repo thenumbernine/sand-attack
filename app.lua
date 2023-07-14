@@ -89,6 +89,7 @@ function App:initGL(...)
 		ig.ImGuiConfigFlags_NavEnableKeyboard,
 		ig.ImGuiConfigFlags_NavEnableGamepad
 	)
+	io[0].FontGlobalScale = 2
 
 -- [[ imgui custom font
 	--local fontfile = 'font/moenstrum.ttf'				-- no numbers
@@ -149,6 +150,9 @@ function App:initGL(...)
 	self.cfg.playerKeys = self.cfg.playerKeys or {}
 	self.cfg.highscores = self.cfg.highscores or {}
 	self.cfg.numColors = self.cfg.numColors or 4
+	if self.cfg.continuousDrop == nil then
+		self.cfg.continuousDrop = true
+	end
 	if not self.cfg.colors then
 		self.cfg.colors = {}
 		for i,color in ipairs(self.defaultColors) do
@@ -740,7 +744,17 @@ function App:updateGame()
 			player.piecePos.x = player.piecePos.x + movedx
 		end
 		self:constrainPiecePos(player)
-		if player.keyPress.down then
+		
+		-- don't allow holding down through multiple drops ... ?
+		if player.keyPress.down
+		and not player.keyPressLast.down
+		then
+			player.droppingPiece = true
+		end
+		if not player.keyPress.down then
+			player.droppingPiece = false
+		end
+		if player.droppingPiece then
 			player.piecePos.y = player.piecePos.y - self.dropSpeed
 		end
 		if player.keyPress.up and not player.keyPressLast.up then
@@ -772,6 +786,9 @@ function App:updateGame()
 		if merge then
 			anyMerged = true
 			self:playSound'sfx/place.wav'
+			if not self.cfg.continuousDrop then
+				player.droppingPiece = false	-- stop dropping piece
+			end
 			needsCheckLine = true
 			for j=0,self.pieceSize.y-1 do
 				for i=0,self.pieceSize.x-1 do

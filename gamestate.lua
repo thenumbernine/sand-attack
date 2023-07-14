@@ -22,6 +22,7 @@ function GameState:init(app)
 end
 -- TODO change the style around
 function GameState:beginFullView(name, estheight)
+estheight = nil
 	-- TODO put in lua-imgui
 	local viewport = ig.igGetMainViewport()
 	ig.igSetNextWindowPos(viewport.WorkPos, 0, ig.ImVec2())
@@ -41,12 +42,9 @@ function GameState:beginFullView(name, estheight)
 		ig.igSetCursorPosY(viewheight - .5 * estheight)
 	end
 
-	--[[ TODO how to enable this?
-	local io = ig.igGetIO()
-print('FontAllowUserScaling', io[0].FontAllowUserScaling)
-	-- ... false
-	--]]
-
+	ig.igSetWindowFontScale(2)
+	self:centerText(name)
+	ig.igSetWindowFontScale(1)
 end
 function GameState:endFullView()
 	-- how to make buttons tab-able?
@@ -77,6 +75,9 @@ end
 function GameState:centerButton(...)
 	return self:centerGUI(ig.igButton, ...)
 end
+function GameState:centerLuatableCheckbox(...)
+	return self:centerGUI(ig.luatableCheckbox, ...)
+end
 
 -- is ugly enough i have to fix this often enough so:
 -- TODO fix somehow
@@ -91,11 +92,13 @@ function GameState:centerLuatableTooltipInputInt(...)
 	self.overrideTextWidth = nil
 end
 function GameState:centerLuatableInputFloat(...)
+	print"WARNING imgui gamepad nav can't change input float"
 	self.overrideTextWidth = 360
 	self:centerGUI(ig.luatableInputFloat, ...)
 	self.overrideTextWidth = nil
 end
 function GameState:centerLuatableTooltipInputFloat(...)
+	print"WARNING imgui gamepad nav can't change input float"
 	self.overrideTextWidth = 360
 	self:centerGUI(ig.luatableTooltipInputFloat, ...)
 	self.overrideTextWidth = nil
@@ -171,17 +174,19 @@ local ConfigState = class(GameState)
 function ConfigState:updateGUI()
 	local app = self.app
 	self:beginFullView('Config', 6 * 32)
-	self:centerLuatableInputInt('Number of Next Pieces', app, 'numNextPieces')
-	self:centerLuatableInputFloat('Drop Speed', app, 'dropSpeed')
+	self:centerLuatableTooltipInputInt('Number of Next Pieces', app, 'numNextPieces')
+	self:centerLuatableTooltipSliderFloat('Drop Speed', app, 'dropSpeed', .1, 100, nil, ig.ImGuiSliderFlags_Logarithmic)
+	self:centerLuatableCheckbox('Continuous Drop', app.cfg, 'continuousDrop')
 
 	self:centerText'Board:'
 	self:centerLuatableTooltipInputInt('Board Width', app.nextSandSize, 'x')
 	self:centerLuatableTooltipInputInt('Board Height', app.nextSandSize, 'y')
 	self:centerLuatableTooltipSliderFloat('Topple Chance', app.cfg, 'toppleChance', 0, 1)
 
+
 	if app.useAudio then
 		self:centerText'Audio:'
-		if self:centerLuatableSliderFloat('FX Volume', app.cfg, 'effectVolume', 0, 1) then
+		if self:centerLuatableTooltipSliderFloat('FX Volume', app.cfg, 'effectVolume', 0, 1) then
 			--[[ if you want, update all previous audio sources...
 			for _,src in ipairs(app.audioSources) do
 				-- TODO if the gameplay sets the gain down then we'll want to multiply by their default gain
@@ -189,7 +194,7 @@ function ConfigState:updateGUI()
 			end
 			--]]
 		end
-		if self:centerLuatableSliderFloat('BG Volume', app.cfg, 'backgroundVolume', 0, 1) then
+		if self:centerLuatableTooltipSliderFloat('BG Volume', app.cfg, 'backgroundVolume', 0, 1) then
 			app.bgAudioSource:setGain(app.cfg.backgroundVolume)
 		end
 	end
@@ -234,7 +239,7 @@ function StartNewGameState:updateGUI()
 			app.cfg.playerKeys[i] = {}
 			local defaultsrc = Player.defaultKeys[i]
 			for _,keyname in ipairs(Player.keyNames) do
-				app.cfg.playerKeys[i][keyname] = defaultsrc and defaultsrc[keyname] or unknownKey
+				app.cfg.playerKeys[i][keyname] = defaultsrc and defaultsrc[keyname] or {}
 			end
 		end
 		if ig.igButton(not self.multiplayer and 'change keys' or 'change player '..i..' keys') then
@@ -260,7 +265,11 @@ function StartNewGameState:updateGUI()
 						key = keyname,
 						playerIndex = self.currentPlayerIndex,
 						callback = function(ev)
-							app.cfg.playerKeys[self.currentPlayerIndex][keyname] = ev
+							if ev[1] == sdl.SDL_KEYDOWN and ev[2] == sdl.SDLK_ESCAPE then
+								app.cfg.playerKeys[self.currentPlayerIndex][keyname] = {}
+							else
+								app.cfg.playerKeys[self.currentPlayerIndex][keyname] = ev
+							end
 						end,
 					}
 				end
@@ -363,7 +372,7 @@ function MainMenuState:init(...)
 end
 function MainMenuState:updateGUI()
 	local app = self.app
-	self:beginFullView('Main Menu', 6 * 32)
+	self:beginFullView('SAMD ATTACK', 6 * 32)
 
 	if self:centerButton'New Game' then
 		-- TODO choose gametype and choose level

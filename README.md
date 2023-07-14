@@ -46,6 +46,10 @@ external libraries required:
 - dif music per level
 - faster blob detection
 - submit high scores? meh.
+- imgui:
+- - with gamepad navigation, tooltips only work with Slider.  with Input they only show after you select the text (which you can't type) or for a brief moment after pushing + or -.
+- - centering stuff horizontally is painful at best.  then try adding more than one item on the same line ...
+- - InputFloat can't be edited with gamepad navigation
 
 ## Music Credit:
 
