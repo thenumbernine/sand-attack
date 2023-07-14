@@ -2,6 +2,7 @@ local ffi = require 'ffi'
 local sdl = require 'ffi.sdl'
 local template = require 'template'
 local class = require 'ext.class'
+local vec2i = require 'vec-ffi.vec2i'
 local vec3f = require 'vec-ffi.vec3f'
 
 local Player = class()
@@ -24,7 +25,10 @@ function Player:init(args)
 
 	self.pieceTex = app:makeTexWithImage(app.pieceSize)
 	-- give pieces an outline so you can tell players apart
-	self.pieceOutlineTex = app:makeTexWithImage(app.pieceSize)
+	self.pieceOutlineTex = app:makeTexWithImage(vec2i(
+		app.pieceSize.x + 2 * app.pieceOutlineRadius,
+		app.pieceSize.y + 2 * app.pieceOutlineRadius
+	))
 end
 
 -- static, used by gamestate and app

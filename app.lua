@@ -565,6 +565,7 @@ local function vec3fto4ub(v)
 	)
 end
 
+App.pieceOutlineRadius = 5
 function App:updatePieceTex(player)
 	-- while we're here, find the first and last cols with content
 	for _,info in ipairs{
@@ -589,25 +590,32 @@ function App:updatePieceTex(player)
 	player.pieceTex:bind():subimage()
 
 	-- [[ update the piece outline
-	local outlineRadius = 5
-	ffi.fill(player.pieceOutlineTex.image.buffer, 4 * self.pieceSize.x * self.pieceSize.y)
-	for j=0,self.pieceSize.y-1 do
-		for i=0,self.pieceSize.x-1 do
+	assert(player.pieceOutlineTex.width == self.pieceSize.x + 2 * self.pieceOutlineRadius)
+	assert(player.pieceOutlineTex.height == self.pieceSize.y + 2 * self.pieceOutlineRadius)
+	ffi.fill(player.pieceOutlineTex.image.buffer, 4 * player.pieceOutlineTex.width * player.pieceOutlineTex.height)
+	for j=0,player.pieceOutlineTex.height-1 do
+		for i=0,player.pieceOutlineTex.width-1 do
 			local bestDistSq = math.huge
-			for ofy=-outlineRadius,outlineRadius do
-				for ofx=-outlineRadius,outlineRadius do
-					local x = math.clamp(i + ofx, 0, self.pieceSize.x-1)
-					local y = math.clamp(j + ofy, 0, self.pieceSize.y-1)
-					if ffi.cast('uint32_t*', player.pieceTex.image.buffer)[x + self.pieceSize.x * y] ~= 0 then
-						local distSq = math.max(1, ofx*ofx + ofy*ofy)
-						bestDistSq = math.min(bestDistSq, distSq)
+			for ofy=-self.pieceOutlineRadius,self.pieceOutlineRadius do
+				for ofx=-self.pieceOutlineRadius,self.pieceOutlineRadius do
+					local x = i - self.pieceOutlineRadius + ofx
+					local y = j - self.pieceOutlineRadius + ofy
+					if x >= 0
+					and x < self.pieceSize.x
+					and y >= 0
+					and y < self.pieceSize.y
+					then
+						if ffi.cast('uint32_t*', player.pieceTex.image.buffer)[x + self.pieceSize.x * y] ~= 0 then
+							local distSq = math.max(1, ofx*ofx + ofy*ofy)
+							bestDistSq = math.min(bestDistSq, distSq)
+						end
 					end
 				end
 			end
 			if bestDistSq < math.huge then
 				--bestDistSq = math.sqrt(bestDistSq)
 				local frac = 1 / bestDistSq
-				ffi.cast('uint32_t*', player.pieceOutlineTex.image.buffer)[i + self.pieceSize.x * j] = vec3fto4ub(player.color * frac)
+				ffi.cast('uint32_t*', player.pieceOutlineTex.image.buffer)[i + player.pieceOutlineTex.width * j] = vec3fto4ub(player.color * frac)
 			end
 		end
 	end
@@ -744,7 +752,7 @@ function App:updateGame()
 			player.piecePos.x = player.piecePos.x + movedx
 		end
 		self:constrainPiecePos(player)
-		
+
 		-- don't allow holding down through multiple drops ... ?
 		if player.keyPress.down
 		and not player.keyPressLast.down
@@ -926,39 +934,57 @@ function App:update(...)
 		self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 		gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
+		--[[ transparent for the background for sand area?
+		gl.glAlphaFunc(gl.GL_GREATER, 0)
+		gl.glEnable(gl.GL_ALPHA_TEST)
+		--]]
+
 		self.sandTex:bind()
 		gl.glDrawArrays(gl.GL_QUADS, 0, 4)
 
+		--[[ transparent for the background for sand area?
+		gl.glDisable(gl.GL_ALPHA_TEST)
+		--]]
+
 		-- draw the current piece
 		for _,player in ipairs(self.players) do
-			for i=1,2 do
-				local tex
-				if i == 1 then
-					tex = player.pieceOutlineTex
-					gl.glEnable(gl.GL_BLEND)
-					gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
-				else
-					tex = player.pieceTex
-					gl.glEnable(gl.GL_ALPHA_TEST)
-				end
-
+			-- draw outline for multiplayer
+			if self.numPlayers > 1 then
 				self.mvMat:setTranslate(
-						(player.piecePos.x / w - .5) * s,
-						player.piecePos.y / h - .5
+						((player.piecePos.x - self.pieceOutlineRadius) / w - .5) * s,
+						(player.piecePos.y - self.pieceOutlineRadius) / h - .5
 					)
-					:applyScale(self.pieceSize.x / w * s, self.pieceSize.y / h)
+					:applyScale(
+						(self.pieceSize.x + 2 * self.pieceOutlineRadius) / w * s,
+						(self.pieceSize.y + 2 * self.pieceOutlineRadius) / h)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 				gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
-				tex:bind()
+				gl.glEnable(gl.GL_BLEND)
+				gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
+
+				player.pieceOutlineTex:bind()
 				gl.glDrawArrays(gl.GL_QUADS, 0, 4)
 
-				if i == 1 then
-					gl.glDisable(gl.GL_BLEND)
-				else
-					gl.glDisable(gl.GL_ALPHA_TEST)
-				end
+				gl.glDisable(gl.GL_BLEND)
 			end
+
+			-- draw piece
+
+			self.mvMat:setTranslate(
+					(player.piecePos.x / w - .5) * s,
+					player.piecePos.y / h - .5
+				)
+				:applyScale(self.pieceSize.x / w * s, self.pieceSize.y / h)
+			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
+			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+
+			gl.glEnable(gl.GL_ALPHA_TEST)
+
+			player.pieceTex:bind()
+			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+
+			gl.glDisable(gl.GL_ALPHA_TEST)
 		end
 
 		-- draw flashing background if necessary
