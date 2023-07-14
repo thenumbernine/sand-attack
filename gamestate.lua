@@ -129,7 +129,7 @@ function PlayingState:updateGUI()
 	local app = self.app
 	-- [[
 	ig.igSetNextWindowPos(ig.ImVec2(0, 0), 0, ig.ImVec2())
-	ig.igSetNextWindowSize(ig.ImVec2(150, -1), 0)
+	ig.igSetNextWindowSize(ig.ImVec2(-1, -1), 0)
 	ig.igBegin('X', nil, bit.bor(
 		ig.ImGuiWindowFlags_NoMove,
 		ig.ImGuiWindowFlags_NoResize,
@@ -140,6 +140,7 @@ function PlayingState:updateGUI()
 	--[[
 	ig.igBegin('Config', nil, 0)
 	--]]
+	ig.igSetWindowFontScale(.5)
 
 	ig.igText('Level: '..tostring(app.level))
 	ig.igText('Score: '..tostring(app.score))
@@ -155,6 +156,7 @@ function PlayingState:updateGUI()
 	if app.gameTime - app.lastLineTime < app.chainDuration then
 		ig.igText('chain x'..tostring(app.scoreChain + 1))
 	end
+	ig.igSetWindowFontScale(1)
 
 	ig.igEnd()
 
