@@ -80,6 +80,15 @@ function App:initGL(...)
 	gl.glClearColor(.5, .5, .5, 1)
 	gl.glAlphaFunc(gl.GL_GREATER, 0)
 
+	-- allow keys to navigate menu
+	-- TODO how to make it so player keys choose menus, not just space bar/
+	-- or meh?
+	local io = ig.igGetIO()
+	io[0].ConfigFlags = bit.bor(
+		io[0].ConfigFlags,
+		ig.ImGuiConfigFlags_NavEnableKeyboard,
+		ig.ImGuiConfigFlags_NavEnableGamepad
+	)
 
 -- [[ imgui custom font
 	--local fontfile = 'font/moenstrum.ttf'				-- no numbers
