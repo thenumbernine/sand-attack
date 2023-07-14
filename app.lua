@@ -858,6 +858,7 @@ function App:updateGame()
 			self.lines = self.lines + 1
 			if self.lines % 10 == 0 then
 				self.level = self.level + 1
+				self:playSound'sfx/levelup.wav'
 				self:upateFallSpeed()
 			end
 
@@ -1146,6 +1147,7 @@ function App:event(e, ...)
 	if e.type == sdl.SDL_KEYDOWN
 	or e.type == sdl.SDL_KEYUP
 	then
+		local down = e.type == sdl.SDL_KEYDOWN
 		if down
 		and e.key.keysym.sym == sdl.SDLK_ESCAPE
 		and GameState.PlayingState:isa(self.state)

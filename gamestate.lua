@@ -151,21 +151,27 @@ function PlayingState:updateGUI()
 		ig.igText('Ticks to fall: '..tostring(app.ticksToFall))
 	end
 
-	if ig.igButton(app.paused and 'Resume' or 'Pause') then
-		app.paused = not app.paused
-	end
-	if ig.igButton'End Game' then
-		app.loseTime = nil
-		app.paused = true
-		app.state = GameState.HighScoreState(app, true)
-	end
-
 	-- where on the screen to put this?
 	if app.gameTime - app.lastLineTime < app.chainDuration then
 		ig.igText('chain x'..tostring(app.scoreChain + 1))
 	end
 
 	ig.igEnd()
+
+	if app.paused then
+        local size = ig.igGetMainViewport().WorkSize
+        ig.igSetNextWindowPos(ig.ImVec2(size.x/2, size.y/2), ig.ImGuiCond_Appearing, ig.ImVec2(.5, .5));
+		ig.igBegin'Paused' 
+		if ig.igButton(app.paused and 'Resume' or 'Pause') then
+			app.paused = not app.paused
+		end
+		if ig.igButton'End Game' then
+			app.loseTime = nil
+			app.paused = true
+			app.state = GameState.HighScoreState(app, true)
+		end
+		ig.igEnd()
+	end
 end
 
 
@@ -605,13 +611,13 @@ function HighScoreState:updateGUI()
 		ig.igEndTable()
 	end
 	if not self.needsName then
+		if ig.igButton'Done' then
+			app.state = MainMenuState(app)
+		end
+		ig.igSameLine()
 		if ig.igButton'Clear' then
 			app.cfg.highscores = {}
 			app:saveConfig()
-		end
-		ig.igSameLine()
-		if ig.igButton'Done' then
-			app.state = MainMenuState(app)
 		end
 	end
 	self:endFullView()
