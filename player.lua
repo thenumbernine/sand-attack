@@ -1,3 +1,4 @@
+local ffi = require 'ffi'
 local sdl = require 'ffi.sdl'
 local template = require 'template'
 local class = require 'ext.class'
@@ -45,13 +46,14 @@ function Player:getEventName(sdlEventID, a,b,c)
 		return s:concat()
 	end
 	local function key(k)
-		return a	--string.char(k)
+		--return a
+		return ffi.string(sdl.SDL_GetKeyName(k))
 	end
 	return template(({
 		[sdl.SDL_JOYHATMOTION] = 'joy<?=a?> hat<?=b?> <?=dir(c)?>',
 		[sdl.SDL_JOYAXISMOTION] = 'joy<?=a?> axis<?=b?> <?=c?>',
 		[sdl.SDL_JOYBUTTONDOWN] = 'joy<?=a?> button<?=b?>',
-		[sdl.SDL_KEYDOWN] = 'key<?=key(a)?>',
+		[sdl.SDL_KEYDOWN] = 'key <?=key(a)?>',
 	})[sdlEventID], {
 		a=a, b=b, c=c,
 		dir=dir, key=key,
