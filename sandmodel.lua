@@ -293,6 +293,8 @@ function LBMSand:update()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 	local dt = app.updateInterval
+
+	-- advect 
 end
 
 SandModel.subclasses = table{

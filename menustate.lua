@@ -186,12 +186,12 @@ function ConfigState:updateGUI()
 	self:beginFullView('Config', 6 * 32)
 
 	self:centerLuatableTooltipInputInt('Number of Next Pieces', app, 'numNextPieces')
-	self:centerLuatableTooltipSliderFloat('Drop Speed', app, 'dropSpeed', .1, 100, nil, ig.ImGuiSliderFlags_Logarithmic)
+	self:centerLuatableTooltipSliderFloat('Drop Speed', app.cfg, 'dropSpeed', .1, 100, nil, ig.ImGuiSliderFlags_Logarithmic)
 	self:centerLuatableCheckbox('Continuous Drop', app.cfg, 'continuousDrop')
 
 	self:centerText'Board:'
-	self:centerLuatableTooltipInputInt('Board Width', app.nextSandSize, 'x')
-	self:centerLuatableTooltipInputInt('Board Height', app.nextSandSize, 'y')
+	self:centerLuatableTooltipInputInt('Board Width', app.cfg.boardSize, 'x')
+	self:centerLuatableTooltipInputInt('Board Height', app.cfg.boardSize, 'y')
 	self:centerLuatableTooltipSliderFloat('Topple Chance', app.cfg, 'toppleChance', 0, 1)
 
 	ig.luatableCombo('Sand Model', app.cfg, 'sandModel', SandModel.subclassNames)
@@ -530,9 +530,9 @@ function HighScoreState:updateGUI()
 				then
 					record[field] = app.cfg[field]
 				elseif field == 'boardWidth' then
-					record[field] = tonumber(app.sandSize.x)
+					record[field] = tonumber(app.cfg.boardSize.x)
 				elseif field == 'boardHeight' then
-					record[field] = tonumber(app.sandSize.y)
+					record[field] = tonumber(app.cfg.boardSize.y)
 				else
 					record[field] = app[field]
 				end

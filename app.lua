@@ -58,7 +58,7 @@ end
 -- but is only a singleton...
 local RNG = class()
 function RNG:init(seed)
-	math.randomseed(seed)
+	math.randomseed(seed or os.time())
 end
 function RNG:__call(...)
 	return math.random(...)
@@ -181,6 +181,7 @@ function App:initGL(...)
 	self.cfg.effectVolume = self.cfg.effectVolume or 1
 	self.cfg.backgroundVolume = self.cfg.backgroundVolume or .3
 	self.cfg.startLevel = self.cfg.startLevel or 1
+	self.cfg.dropSpeed = self.cfg.dropSpeed or 5
 	self.cfg.sandModel = self.cfg.sandModel or 1
 	self.cfg.toppleChance = self.cfg.toppleChance or 1
 	self.cfg.playerKeys = self.cfg.playerKeys or {}
@@ -195,19 +196,18 @@ function App:initGL(...)
 			self.cfg.colors[i] = {table.unpack(color)}
 		end
 	end
+	self.cfg.boardSize = self.cfg.boardSize or {x=80, y=144}	-- original
+	--self.cfg.boardSize = self.cfg.boardSize or {x=160, y=200}
+	--self.cfg.boardSize = self.cfg.boardSize or {x=160, y=288}
+	--self.cfg.boardSize = self.cfg.boardSize or {x=80, y=360}
+	--self.cfg.boardSize = self.cfg.boardSize or {x=512, y=512}
+
 
 	self.numPlayers = 1
 	self.numNextPieces = 3
-	self.dropSpeed = 5
 
 	self.fps = 0
 	self.numSandVoxels = 0
-
-	self.nextSandSize = vec2i(80, 144)	-- original:
-	--self.nextSandSize = vec2i(160, 200)
-	--self.nextSandSize = vec2i(160, 288)
-	--self.nextSandSize = vec2i(80, 360)
-	--self.nextSandSize = vec2i(512, 512)
 
 	self.loseScreenDuration = 3
 
@@ -386,37 +386,31 @@ local pieceImages = table{
  #
  #
  ##
-
 ]],
 	makePieceImage[[
    #
    #
   ##
-
 ]],
 	makePieceImage[[
 
  ##
  ##
-
 ]],
 	makePieceImage[[
 
  #
 ###
-
 ]],
 	makePieceImage[[
  #
  ##
   #
-
 ]],
 	makePieceImage[[
   #
  ##
  #
-
 ]],
 }
 
@@ -474,11 +468,14 @@ function App:reset()
 	ffi.C.srand(ffi.C.time(nil))
 	self.seed = ffi.C.rand()
 	--]]
-	-- [[
+	--[[
 	self.rng = RNG(2106791791)
 	--]]
+	-- [[
+	self.rng = RNG()
+	--]]
 
-	self.sandSize = vec2i(self.nextSandSize)
+	self.sandSize = vec2i(self.cfg.boardSize)
 	local w, h = self.sandSize:unpack()
 
 	self.loseTime = nil
@@ -718,8 +715,11 @@ function App:testPieceMerge(player)
 			if color ~= 0 then
 				local x = player.piecePos.x + i
 				local y = player.piecePos.y + j
+				-- if the piece hit the bottom, consider it a merge for the sake of converting to sand
+				if y < 0 then return true end
+				-- otherwise test vs pixels
 				if x >= 0 and x < w
-				and y >= 0 and y < h
+				and y < h
 				and ffi.cast('uint32_t*',self.sandTex.image.buffer)[x + w * y] ~= 0
 				then
 					return true
@@ -774,7 +774,7 @@ function App:updateGame()
 			player.droppingPiece = false
 		end
 		if player.droppingPiece then
-			player.piecePos.y = player.piecePos.y - self.dropSpeed
+			player.piecePos.y = player.piecePos.y - self.cfg.dropSpeed
 		end
 		if player.keyPress.up and not player.keyPressLast.up then
 			self:rotatePiece(player)
@@ -796,12 +796,20 @@ function App:updateGame()
 	local anyMerged
 	for _,player in ipairs(self.players) do
 		local merge
-		if player.piecePos.y <= 0 then
-			player.piecePos.y = 0
+		if player.piecePos.y <= -self.pieceSize.y then
+			player.piecePos.x = player.pieceLastPos.x
+			for y=-self.pieceSize.y,player.pieceLastPos.y do
+				player.piecePos.y = y
+				if not self:testPieceMerge(player) then break end
+			end
 			merge = true
 		else
 			if self:testPieceMerge(player) then
-				player.piecePos:set(player.pieceLastPos:unpack())
+				player.piecePos.x = player.pieceLastPos.x
+				for y=player.piecePos.y+1,player.pieceLastPos.y do
+					player.piecePos.y = y
+					if not self:testPieceMerge(player) then break end
+				end
 				merge = true
 			end
 		end
