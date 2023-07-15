@@ -14,14 +14,14 @@ local getTime = require 'ext.timer'.getTime
 
 local showDebug = false	-- show debug info in gui
 
-local GameState = class()
-function GameState:init(app)
+local MenuState = class()
+function MenuState:init(app)
 	local App = require 'sandtetris.app'
 	assert(App:isa(app))
 	self.app = assert(app)
 end
 -- TODO change the style around
-function GameState:beginFullView(name, estheight)
+function MenuState:beginFullView(name, estheight)
 estheight = nil
 	-- TODO put in lua-imgui
 	local viewport = ig.igGetMainViewport()
@@ -46,14 +46,14 @@ estheight = nil
 	self:centerText(name)
 	ig.igSetWindowFontScale(1)
 end
-function GameState:endFullView()
+function MenuState:endFullView()
 	-- how to make buttons tab-able?
 	--ig.igSetItemDefaultFocus()
 	ig.igEnd()
 	ig.igPopStyleVar(1)
 end
 local tmp = ffi.new('ImVec2[1]')
-function GameState:centerGUI(fn, text, ...)
+function MenuState:centerGUI(fn, text, ...)
 	-- TODO put in lua-imgui
 	-- TODO TODO for buttons and text this is fine, but for inputs the width can be *much wider* than the text width.
 	local textwidth
@@ -69,56 +69,56 @@ function GameState:centerGUI(fn, text, ...)
 	end
 	return fn(text, ...)
 end
-function GameState:centerText(...)
+function MenuState:centerText(...)
 	return self:centerGUI(ig.igText, ...)
 end
-function GameState:centerButton(...)
+function MenuState:centerButton(...)
 	return self:centerGUI(ig.igButton, ...)
 end
-function GameState:centerLuatableCheckbox(...)
+function MenuState:centerLuatableCheckbox(...)
 	return self:centerGUI(ig.luatableCheckbox, ...)
 end
 
 -- is ugly enough i have to fix this often enough so:
 -- TODO fix somehow
-function GameState:centerLuatableInputInt(...)
+function MenuState:centerLuatableInputInt(...)
 	self.overrideTextWidth = 360
 	self:centerGUI(ig.luatableInputInt, ...)
 	self.overrideTextWidth = nil
 end
-function GameState:centerLuatableTooltipInputInt(...)
+function MenuState:centerLuatableTooltipInputInt(...)
 	self.overrideTextWidth = 360
 	self:centerGUI(ig.luatableTooltipInputInt, ...)
 	self.overrideTextWidth = nil
 end
-function GameState:centerLuatableInputFloat(...)
+function MenuState:centerLuatableInputFloat(...)
 	print"WARNING imgui gamepad nav can't change input float"
 	self.overrideTextWidth = 360
 	self:centerGUI(ig.luatableInputFloat, ...)
 	self.overrideTextWidth = nil
 end
-function GameState:centerLuatableTooltipInputFloat(...)
+function MenuState:centerLuatableTooltipInputFloat(...)
 	print"WARNING imgui gamepad nav can't change input float"
 	self.overrideTextWidth = 360
 	self:centerGUI(ig.luatableTooltipInputFloat, ...)
 	self.overrideTextWidth = nil
 end
-function GameState:centerLuatableSliderFloat(...)
+function MenuState:centerLuatableSliderFloat(...)
 	self.overrideTextWidth = 360
 	self:centerGUI(ig.luatableSliderFloat, ...)
 	self.overrideTextWidth = nil
 end
-function GameState:centerLuatableTooltipSliderFloat(...)
+function MenuState:centerLuatableTooltipSliderFloat(...)
 	self.overrideTextWidth = 360
 	self:centerGUI(ig.luatableTooltipSliderFloat, ...)
 	self.overrideTextWidth = nil
 end
 
 
-local LoseScreen = class(GameState)
+local LoseScreen = class(MenuState)
 
-local PlayingState = class(GameState)
-GameState.PlayingState = PlayingState
+local PlayingState = class(MenuState)
+MenuState.PlayingState = PlayingState
 function PlayingState:init(app)
 	PlayingState.super.init(self, app)
 	app.paused = false
@@ -170,7 +170,7 @@ function PlayingState:updateGUI()
 		if ig.igButton'End Game' then
 			app.loseTime = nil
 			app.paused = true
-			app.state = GameState.HighScoreState(app, true)
+			app.menustate = MenuState.HighScoreState(app, true)
 		end
 		ig.igEnd()
 	end
@@ -178,7 +178,7 @@ end
 
 
 -- TODO save config
-local ConfigState = class(GameState)
+local ConfigState = class(MenuState)
 function ConfigState:updateGUI()
 	local app = self.app
 	self:beginFullView('Config', 6 * 32)
@@ -210,12 +210,12 @@ function ConfigState:updateGUI()
 
 	if self:centerButton'Done' then
 		app:saveConfig()
-		app.state = GameState.MainMenuState(app)
+		app.menustate = MenuState.MainMenuState(app)
 	end
 	self:endFullView()
 end
 
-local StartNewGameState = class(GameState)
+local StartNewGameState = class(MenuState)
 function StartNewGameState:init(app, multiplayer)
 	StartNewGameState.super.init(self, app)
 	self.multiplayer = multiplayer
@@ -361,20 +361,20 @@ function StartNewGameState:updateGUI()
 	--]]
 
 	if self:centerButton'Back' then
-		app.state = GameState.MainMenuState(app)
+		app.menustate = MenuState.MainMenuState(app)
 	end
 	--ig.igSameLine() -- how to work with centered multiple widgets...
 	if self:centerButton'Go!' then
 		app:reset()
-		app.state = PlayingState(app)	-- sets paused=false
+		app.menustate = PlayingState(app)	-- sets paused=false
 	end
 
 	self:endFullView()
 end
 
 
-local MainMenuState = class(GameState)
-GameState.MainMenuState = MainMenuState
+local MainMenuState = class(MenuState)
+MenuState.MainMenuState = MainMenuState
 function MainMenuState:init(...)
 	MainMenuState.super.init(self, ...)
 	self.app.paused = true
@@ -385,18 +385,18 @@ function MainMenuState:updateGUI()
 
 	if self:centerButton'New Game' then
 		-- TODO choose gametype and choose level
-		app.state = StartNewGameState(app)
+		app.menustate = StartNewGameState(app)
 	end
 	if self:centerButton'New Game Co-op' then
-		app.state = StartNewGameState(app, true)
+		app.menustate = StartNewGameState(app, true)
 		-- TODO pick same as before except pick # of players
 	end
 	-- TODO RESUME GAME here
 	if self:centerButton'Config' then
-		app.state = ConfigState(app)
+		app.menustate = ConfigState(app)
 	end
 	if self:centerButton'High Scores' then
-		app.state = GameState.HighScoreState(app)
+		app.menustate = MenuState.HighScoreState(app)
 	end
 	local url = 'https://github.com/thenumbernine/sand-tetris'
 	if self:centerButton'About' then
@@ -424,8 +424,8 @@ function MainMenuState:updateGUI()
 	self:endFullView()
 end
 
-local SplashScreenState = class(GameState)
-GameState.SplashScreenState = SplashScreenState
+local SplashScreenState = class(MenuState)
+MenuState.SplashScreenState = SplashScreenState
 SplashScreenState.duration = 3
 -- TODO cool sand effect or something
 function SplashScreenState:init(...)
@@ -461,7 +461,7 @@ function SplashScreenState:update()
 
 
 	if getTime() - self.startTime > self.duration then
-		app.state = MainMenuState(app)
+		app.menustate = MainMenuState(app)
 	end
 end
 function SplashScreenState:event(e)
@@ -470,12 +470,12 @@ function SplashScreenState:event(e)
 	or e.type == sdl.SDL_MOUSEBUTTONDOWN
 	or e.type == sdl.SDL_JOYBUTTONDOWN
 	then
-		app.state = MainMenuState(app)
+		app.menustate = MainMenuState(app)
 	end
 end
 
-local HighScoreState = class(GameState)
-GameState.HighScoreState = HighScoreState
+local HighScoreState = class(MenuState)
+MenuState.HighScoreState = HighScoreState
 function HighScoreState:init(app, needsName)
 	HighScoreState.super.init(self, app)
 	self.needsName = needsName
@@ -615,7 +615,7 @@ function HighScoreState:updateGUI()
 	end
 	if not self.needsName then
 		if ig.igButton'Done' then
-			app.state = MainMenuState(app)
+			app.menustate = MainMenuState(app)
 		end
 		ig.igSameLine()
 		if ig.igButton'Clear' then
@@ -626,4 +626,4 @@ function HighScoreState:updateGUI()
 	self:endFullView()
 end
 
-return GameState
+return MenuState

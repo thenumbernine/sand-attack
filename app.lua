@@ -25,7 +25,7 @@ local Audio = require 'audio'
 local AudioSource = require 'audio.source'
 local AudioBuffer = require 'audio.buffer'
 local Player = require 'sandtetris.player'
-local GameState = require 'sandtetris.gamestate'
+local MenuState = require 'sandtetris.menustate'
 
 local App = class(ImGuiApp)
 
@@ -130,9 +130,6 @@ function App:initGL(...)
 	ffi.C.free(outPixels[0])	-- just betting here I have to free this myself ...
 	ig.ImFontAtlas_SetTexID(self.fontAtlas, ffi.cast('ImTextureID', self.fontTex.id))
 --]]
-
-	-- TODO this upon every :reset, save seed, and save it in the high score as well
-	math.randomseed(os.time())
 
 	-- load config if it exists
 	xpcall(function()
@@ -291,7 +288,7 @@ void main() {
 		end)
 	end
 
-	self.state = GameState.SplashScreenState(self)
+	self.menustate = MenuState.SplashScreenState(self)
 
 	self:reset()
 
@@ -432,6 +429,19 @@ end
 
 function App:reset()
 	self:saveConfig()
+
+	--[=[ experimenting
+	--[[ do this upon every :reset, save seed, and save it in the high score as well
+	-- hmm, I need a rng object that is reproducible
+	ffi.C.srand(ffi.C.time(nil))
+	self.seed = ffi.C.rand()
+	--]]
+	-- [[
+	self.seed = 2106791791
+	--]]
+	math.randomseed(self.seed)
+	print(self.seed)
+	--]=]
 
 	self.sandSize = vec2i(self.nextSandSize)
 	local w, h = self.sandSize:unpack()
@@ -901,8 +911,8 @@ function App:update(...)
 	self.thisTime = getTime()
 	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 
-	if self.state.update then
-		self.state:update()
+	if self.menustate.update then
+		self.menustate:update()
 	end
 
 	local w, h = self.sandSize:unpack()
@@ -1053,7 +1063,7 @@ function App:update(...)
 		-- TODO maybe go to a high score screen instead?
 		self.loseTime = nil
 		self.paused = true
-		self.state = GameState.HighScoreState(self, true)
+		self.menustate = MenuState.HighScoreState(self, true)
 	end
 
 	-- update GUI
@@ -1127,8 +1137,8 @@ function App:event(e, ...)
 	App.super.event(self, e, ...)
 	-- TODO if ui handling then return
 
-	if self.state.event then
-		if self.state:event(e, ...) then return end
+	if self.menustate.event then
+		if self.menustate:event(e, ...) then return end
 	end
 
 	-- handle any kind of sdl button event
@@ -1163,7 +1173,7 @@ function App:event(e, ...)
 			self:processButtonEvent(press, sdl.SDL_JOYAXISMOTION, e.jaxis.which, e.jaxis.axis, lr)
 		end
 	elseif e.type == sdl.SDL_JOYBUTTONDOWN or e.type == sdl.SDL_JOYBUTTONUP then
-		-- e.jbutton.state is 0/1 for up/down, right?
+		-- e.jbutton.menustate is 0/1 for up/down, right?
 		local press = e.type == sdl.SDL_JOYBUTTONDOWN
 		self:processButtonEvent(press, sdl.SDL_JOYBUTTONDOWN, e.jbutton.which, e.jbutton.button)
 	elseif e.type == sdl.SDL_KEYDOWN or e.type == sdl.SDL_KEYUP then
@@ -1186,8 +1196,8 @@ end
 
 function App:updateGUI()
 	ig.igPushFont(self.font)
-	if self.state.updateGUI then
-		self.state:updateGUI()
+	if self.menustate.updateGUI then
+		self.menustate:updateGUI()
 	end
 	ig.igPopFont()
 end
