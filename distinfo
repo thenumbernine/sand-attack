@@ -17,7 +17,8 @@ files = {
 		-- resources and run.lua are relative to sandtetris/
 		-- option #1: put all individual script files here:
 		'sandtetris/app.lua',
-		'sandtetris/gamestate.lua',
+		'sandtetris/menustate.lua',
+		'sandtetris/sandmodel.lua',
 		'sandtetris/player.lua',
 		-- option #2: copy this dir and reference all resources from 'sandtetris/'
 		-- (this'll require a 'cd ..' every time you playtest it from within its cwd ...)
