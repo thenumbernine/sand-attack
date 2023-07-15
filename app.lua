@@ -1115,6 +1115,7 @@ App.fpsSampleCount = 0
 
 function App:flipBoard()
 	self.sandmodel:flipBoard()
+	self.sandTex:bind():subimage()
 end
 
 function App:processButtonEvent(press, ...)

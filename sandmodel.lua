@@ -3,6 +3,7 @@ local math = require 'ext.math'
 local class = require 'ext.class'
 local table = require 'ext.table'
 local vec4ub = require 'vec-ffi.vec4ub'
+local vec2f = require 'vec-ffi.vec2f'
 local Image = require 'image'
 
 local SandModel = class()
@@ -18,7 +19,7 @@ function AutomataSand:update()
 
 	local needsCheckLine = false
 	-- update
-	local prow = ffi.cast('int*', app.sandTex.image.buffer) + w
+	local prow = ffi.cast('int32_t*', app.sandTex.image.buffer) + w
 	for j=1,h-1 do
 		-- 50/50 cycling left-to-right vs right-to-left
 		local istart, iend, istep
@@ -80,7 +81,7 @@ end
 function AutomataSand:flipBoard()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	local p1 = ffi.cast('int*', app.sandTex.image.buffer)
+	local p1 = ffi.cast('int32_t*', app.sandTex.image.buffer)
 	local p2 = p1 + w * h - 1
 	for j=0,bit.rshift(h,1)-1 do
 		for i=0,w-1 do
@@ -89,7 +90,6 @@ function AutomataSand:flipBoard()
 			p2 = p2 - 1
 		end
 	end
-	app.sandTex:bind():subimage()
 end
 
 local vector = require 'ffi.cpp.vector'
@@ -204,6 +204,9 @@ function SPHSand:update()
 		end
 	end
 
+	-- TODO here blit velocity to a separate buffer,
+	-- then read back that buffer for advection of velocity
+
 	-- now clear and blit all grains onto the board
 	ffi.fill(app.sandTex.image.buffer, w * h * 4)
 	local pushForceTimesDT = 1
@@ -271,39 +274,185 @@ function SPHSand:flipBoard()
 		local g = self.grains.v+i
 		g[0].pos.y = h-g[0].pos.y-FLT_EPSILON
 	end
-	app.sandTex:bind():subimage()
 end
 function SPHSand:updateDebugGUI()
 	ig.igText('Num Grains: '..self.grains.size)
 end
 
 
-ffi.cdef[[
-typedef vec4ub_t cell_t;
-]]
-
-local LBMSand = class(SandModel)
-LBMSand.name = 'LBM'
-function LBMSand:init(app)
-	LBMSand.super.init(self, app)
+local CFDSand = class(SandModel)
+CFDSand.name = 'CFD'
+function CFDSand:init(app)
+	CFDSand.super.init(self, app)
 	local w, h = app.sandSize:unpack()
-	self.sandNbhdImage = Image(w, h, 9, 'cell_t')
+	self.vel = ffi.new('vec2f_t[?]', w * h)
+	self.nextvel = ffi.new('vec2f_t[?]', w * h)
+	ffi.fill(self.vel, ffi.sizeof'vec2f_t' * w * h)
+	ffi.fill(self.nextvel, ffi.sizeof'vec2f_t' * w * h)
 end
-function LBMSand:update()
+function CFDSand:update()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	local dt = app.updateInterval
 
-	-- advect 
-	for y=0,h-1 do
-		for x=0,w-1 do
-			for ofy=0,2 do
-				local cy = ofy - 1
-				for ofx=0,2 do
-					local cx = ofx - 1
-					--self.sandNbhdImage
+	local dt = app.updateInterval
+	local grav = -9.8 * tonumber(app.pieceSize.x)
+	
+	local needsCheckLine = false
+	-- update
+	local sandip = ffi.cast('int32_t*', app.sandTex.image.buffer)
+	local prow = sandip + w
+	local vrow = ffi.cast('vec2f_t*', self.vel) + w
+	for j=1,h-1 do
+		-- 50/50 cycling left-to-right vs right-to-left
+		local istart, iend, istep
+		if app.rng(2) == 2 then
+			istart,iend,istep = 0, w-1, 1
+		else
+			istart,iend,istep = w-1, 0, -1
+		end
+		local p = prow + istart
+		local v = vrow + istart
+		for i=istart,iend,istep do
+			-- if the cell is blank and there's a sand cell above us ... pull it down
+			if p[0] ~= 0 then
+				if p[-w] == 0 then
+					p[0], p[-w] = p[-w], p[0]
+					v[0], v[-w] = v[-w], v[0]
+					v[0].y = v[0].y + grav * dt
+					needsCheckLine = true
+				-- hmm symmetry? check left vs right first?
+				elseif app.rng() < app.cfg.toppleChance then
+					-- 50/50 check left then right, vs check right then left
+					if app.rng(2) == 2 then
+						if i > 0 and p[-w-1] == 0 then
+							p[0], p[-w-1] = p[-w-1], p[0]
+							v[0], v[-w-1] = v[-w-1], v[0]
+							v[0].x = v[0].x - grav * dt
+							v[0].y = v[0].y + grav * dt
+							needsCheckLine = true
+						elseif i < w-1 and p[-w+1] == 0 then
+							p[0], p[-w+1] = p[-w+1], p[0]
+							v[0], v[-w+1] = v[-w+1], v[0]
+							v[0].x = v[0].x + grav * dt
+							v[0].y = v[0].y + grav * dt
+							needsCheckLine = true
+						end
+					else
+						if i < w-1 and p[-w+1] == 0 then
+							p[0], p[-w+1] = p[-w+1], p[0]
+							v[0], v[-w+1] = v[-w+1], v[0]
+							v[0].x = v[0].x + grav * dt
+							v[0].y = v[0].y + grav * dt
+							needsCheckLine = true
+						elseif i > 0 and p[-w-1] == 0 then
+							p[0], p[-w-1] = p[-w-1], p[0]
+							v[0], v[-w-1] = v[-w-1], v[0]
+							v[0].x = v[0].x - grav * dt
+							v[0].y = v[0].y + grav * dt
+							needsCheckLine = true
+						end
+					end
 				end
 			end
+			p = p + istep
+			v = v + istep
+		end
+		prow = prow + w
+		vrow = vrow + w
+	end
+
+	-- external forces?
+	for j=0,h-1 do
+		for i=0,w-1 do
+			local f = i/(w-1)
+			local v = self.vel + (i + w * j)
+			v[0].y = v[0].y + 5 * math.cos(math.pi * f)
+		end
+	end
+
+	-- advect sand
+	for j=0,h-1 do
+		for i=0,w-1 do
+			local vx, vy = self.vel[i + w * j]:unpack()
+			local ni = i+.5 - vx
+			local nj = j+.5 - vy
+			ni = math.floor(math.clamp(ni, 0, w-1))
+			nj = math.floor(math.clamp(nj, 0, h-1))
+			if not (ni == i and nj == j) then
+--print('advecting sand', i, j)				
+				assert(i >= 0 and i < w and j >= 0 and j < h)
+				-- advect sand
+				sandip[i + w * j],
+				sandip[ni + w * nj]
+				--= 0xffffffff, 0xffffffff
+				=	sandip[i + w * j],
+					sandip[ni + w * nj]		
+			end	
+		end
+	end
+	
+	-- advect velocity
+	for j=0,h-1 do
+		for i=0,w-1 do
+			-- [[ advect
+			local vx, vy = self.vel[i + w * j]:unpack()
+			local ni = i+.5 - vx
+			local nj = j+.5 - vy
+			ni = math.floor(math.clamp(ni, 0, w-1))
+			nj = math.floor(math.clamp(nj, 0, h-1))
+			if not (ni == i and nj == j) then
+--print('advecting vel', i, j)				
+				assert(i >= 0 and i < w and j >= 0 and j < h)
+				self.nextvel[i + w * j],
+				self.nextvel[ni + w * nj]
+				=	self.vel[i + w * j],
+					self.vel[ni + w * nj]
+				needsCheckLine = true
+			end
+			--]]
+		end
+	end
+	
+	self.vel, self.nextvel = self.nextvel, self.vel
+
+	return needsCheckLine
+end
+function CFDSand:mergepixel(x,y,color)
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+	local v = self.vel + x + w * y
+	v[0].y = v[0].y - 1
+end
+function CFDSand:clearBlob(blob)
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+	local clearedCount = 0
+	for _,int in ipairs(blob) do
+		local iw = int.x2 - int.x1 + 1
+		clearedCount = clearedCount + iw
+		ffi.fill(app.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
+		for k=0,4*iw-1 do
+			app.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
+			self.vel[k + 4 * (int.x1 + w * int.y)] = vec2f()
+		end
+	end
+	return clearedCount
+end
+function CFDSand:flipBoard()
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+	local p1 = ffi.cast('int32_t*', app.sandTex.image.buffer)
+	local p2 = p1 + w * h - 1
+	local v1 = ffi.cast('vec2f_t*', self.vel)
+	local v2 = v1 + w * h - 1
+	for j=0,bit.rshift(h,1)-1 do
+		for i=0,w-1 do
+			p1[0], p2[0] = p2[0], p1[0]
+			p1 = p1 + 1
+			p2 = p2 - 1
+			v1[0], v2[0] = v2[0], v1[0]
+			v1 = v1 + 1
+			v2 = v2 - 1
 		end
 	end
 end
@@ -311,7 +460,7 @@ end
 SandModel.subclasses = table{
 	AutomataSand,
 	SPHSand,
-	--LBMSand,
+	--CFDSand,	-- crashing and doing nothing new
 }
 SandModel.subclassNames = SandModel.subclasses:mapi(function(cl) return cl.name end)
 
