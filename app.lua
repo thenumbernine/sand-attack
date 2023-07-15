@@ -27,6 +27,44 @@ local AudioBuffer = require 'audio.buffer'
 local Player = require 'sandtetris.player'
 local MenuState = require 'sandtetris.menustate'
 
+-- I'm trying to make reproducible random #s
+-- it is reproducible up to the generation of the next pieces
+-- but the very next piece after will always be dif
+-- this maybe is due to the sand toppling also using rand?
+-- but why wouldn't that random() call even be part of the determinism?
+-- seems something external must be contributing?
+--[[ TODO put this in ext? or its own lib?
+local RNG = class()
+-- TODO max and the + and % constants are bad, fix them
+RNG.max = 2147483647ull
+require 'ffi.c.time'
+function RNG:init(seed)
+	self.seed = ffi.cast('uint64_t', tonumber(seed) or ffi.C.time(nil))
+end
+function RNG:next(max)
+	self.seed = self.seed * 1103515245ull + 12345ull
+	return self.seed % (self.max + 1)
+end
+function RNG:__call(max)
+	if max then
+		return tonumber(self:next() % max) + 1	-- +1 for lua compat
+	else
+		return tonumber(self:next()) / tonumber(self.max)
+	end
+end
+--]]
+-- [[ Lua code says: xoshira256** algorithm
+-- but is only a singleton...
+local RNG = class()
+function RNG:init(seed)
+	math.randomseed(seed)
+end
+function RNG:__call(...)
+	return math.random(...)
+end
+--]]
+
+
 local App = class(ImGuiApp)
 
 App.useAudio = true	-- set to false to disable audio altogether
@@ -56,7 +94,7 @@ end
 -- ... but not all 8 bit alpha channels are really 8 bits ...
 
 
-App.title = 'Samd'
+App.title = 'Sand Attack'
 
 -- board size is 80 x 144 visible
 -- piece is 4 blocks arranged
@@ -430,18 +468,14 @@ end
 function App:reset()
 	self:saveConfig()
 
-	--[=[ experimenting
 	--[[ do this upon every :reset, save seed, and save it in the high score as well
 	-- hmm, I need a rng object that is reproducible
 	ffi.C.srand(ffi.C.time(nil))
 	self.seed = ffi.C.rand()
 	--]]
 	-- [[
-	self.seed = 2106791791
+	self.rng = RNG(2106791791)
 	--]]
-	math.randomseed(self.seed)
-	print(self.seed)
-	--]=]
 
 	self.sandSize = vec2i(self.nextSandSize)
 	local w, h = self.sandSize:unpack()
@@ -504,7 +538,7 @@ end
 
 function App:populatePiece(args)
 	local srcimage = pieceImages:pickRandom()
-	local colorIndex = math.random(#self.gameColors)
+	local colorIndex = self.rng(#self.gameColors)
 	local color = self.gameColors[colorIndex]
 	local alpha = math.floor(colorIndex/#self.gameColors*0xff)
 	alpha = bit.lshift(alpha, 24)
@@ -520,7 +554,7 @@ function App:populatePiece(args)
 			) / (self.voxelsPerBlock/2)
 			local k = i + self.pieceSize.x * j
 			if srcp[0] ~= 0 then
-				local l = math.random() * .25 + .75
+				local l = self.rng() * .25 + .75
 				l = l * (.25 + .75 * math.sqrt(1 - c*c))
 				dstp[0] = bit.bor(
 					math.floor(l * color.x * 255),
@@ -705,7 +739,7 @@ function App:updateGame()
 	for j=1,h-1 do
 		-- 50/50 cycling left-to-right vs right-to-left
 		local istart, iend, istep
-		if math.random(2) == 2 then
+		if self.rng(2) == 2 then
 			istart,iend,istep = 0, w-1, 1
 		else
 			istart,iend,istep = w-1, 0, -1
@@ -718,9 +752,9 @@ function App:updateGame()
 					p[0], p[-w] = p[-w], p[0]
 					needsCheckLine = true
 				-- hmm symmetry? check left vs right first?
-				elseif math.random() < self.cfg.toppleChance then
+				elseif self.rng() < self.cfg.toppleChance then
 					-- 50/50 check left then right, vs check right then left
-					if math.random(2) == 2 then
+					if self.rng(2) == 2 then
 						if i > 0 and p[-w-1] == 0 then
 							p[0], p[-w-1] = p[-w-1], p[0]
 							needsCheckLine = true
@@ -925,7 +959,7 @@ function App:update(...)
 
 		--[[ pouring sand
 		self.sandCPU[bit.rshift(w,1) + w * (h - 1)] = bit.bor(
-			math.random(0,16777215),
+			self.rng(0,16777215),
 			0xff000000,
 		)
 		--]]

@@ -47,8 +47,6 @@ estheight = nil
 	ig.igSetWindowFontScale(1)
 end
 function MenuState:endFullView()
-	-- how to make buttons tab-able?
-	--ig.igSetItemDefaultFocus()
 	ig.igEnd()
 	ig.igPopStyleVar(1)
 end
@@ -233,6 +231,15 @@ function StartNewGameState:updateGUI()
 
 	self:beginFullView(self.multiplayer and 'New Game Multiplayer' or 'New Game', 3 * 32)
 
+	--ig.igSameLine() -- how to work with centered multiple widgets...
+	if self:centerButton'Go!' then
+		app:reset()
+		app.menustate = PlayingState(app)	-- sets paused=false
+	end
+	if self:centerButton'Back' then
+		app.menustate = MenuState.MainMenuState(app)
+	end
+
 	if self.multiplayer then
 		self:centerText'Number of Players:'
 		self:centerLuatableTooltipInputInt('Number of Players', app, 'numPlayers')
@@ -360,15 +367,6 @@ function StartNewGameState:updateGUI()
 	end
 	--]]
 
-	if self:centerButton'Back' then
-		app.menustate = MenuState.MainMenuState(app)
-	end
-	--ig.igSameLine() -- how to work with centered multiple widgets...
-	if self:centerButton'Go!' then
-		app:reset()
-		app.menustate = PlayingState(app)	-- sets paused=false
-	end
-
 	self:endFullView()
 end
 
@@ -381,7 +379,18 @@ function MainMenuState:init(...)
 end
 function MainMenuState:updateGUI()
 	local app = self.app
-	self:beginFullView('SAMD ATTACK', 6 * 32)
+	self:beginFullView('Sand Attack', 6 * 32)
+
+	--[[ how to get default focus... smh imgui ...
+	-- i remember when this was called 'tabstop' and 'tabindex' and it is incrediblly easy to configure in windows...
+	--https://github.com/ocornut/imgui/issues/455
+	if ig.igIsWindowFocused(ig.ImGuiFocusedFlags_RootAndChildWindows)
+	and not ig.igIsAnyItemActive()
+	and not ig.igIsMouseClicked(0, false)
+	then
+		ig.igSetKeyboardFocusHere(0)
+	end
+	--]]
 
 	if self:centerButton'New Game' then
 		-- TODO choose gametype and choose level
