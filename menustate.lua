@@ -507,6 +507,7 @@ HighScoreState.fields = table{
 	'toppleChance',
 	'boardWidth',
 	'boardHeight',
+	'sandModel',
 }
 function HighScoreState:updateGUI()
 	local app = self.app
@@ -524,6 +525,7 @@ function HighScoreState:updateGUI()
 					record[field] = self[field]
 				elseif field == 'toppleChance'
 				or field == 'numColors'
+				or field == 'sandModel'
 				then
 					record[field] = app.cfg[field]
 				elseif field == 'boardWidth' then

@@ -27,6 +27,10 @@ local AudioBuffer = require 'audio.buffer'
 local Player = require 'sandtetris.player'
 local MenuState = require 'sandtetris.menustate'
 
+-- TODO put this in ext.math
+--local DBL_EPSILON = 2.220446049250313080847e-16
+local FLT_EPSILON = 1.1920928955078125e-7
+
 -- I'm trying to make reproducible random #s
 -- it is reproducible up to the generation of the next pieces
 -- but the very next piece after will always be dif
@@ -218,7 +222,7 @@ function SPHSand:update()
 				if p[-w] ~= 0 then
 					onground = true
 				end
-				if math.random() < app.toppleChance then
+				if math.random() < app.cfg.toppleChance then
 					-- hmm symmetry? check left vs right first?
 					-- 50/50 check left then right, vs check right then left
 					if math.random(2) == 2 then
