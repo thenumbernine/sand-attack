@@ -11,6 +11,7 @@ local gl = require 'gl'
 local GLTex2D = require 'gl.tex2d'
 local ig = require 'imgui'
 local getTime = require 'ext.timer'.getTime
+local SandModel = require 'sandtetris.sandmodel'
 
 local showDebug = false	-- show debug info in gui
 
@@ -193,7 +194,7 @@ function ConfigState:updateGUI()
 	self:centerLuatableTooltipInputInt('Board Height', app.nextSandSize, 'y')
 	self:centerLuatableTooltipSliderFloat('Topple Chance', app.cfg, 'toppleChance', 0, 1)
 
-	ig.luatableCombo('Sand Model', app.cfg, 'sandModel', app.sandModelNames)
+	ig.luatableCombo('Sand Model', app.cfg, 'sandModel', SandModel.subclassNames)
 
 	if app.useAudio then
 		self:centerText'Audio:'
