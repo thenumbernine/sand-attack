@@ -1,4 +1,5 @@
 local ffi = require 'ffi'
+local math = require 'ext.math'
 local class = require 'ext.class'
 local table = require 'ext.table'
 local vec4ub = require 'vec-ffi.vec4ub'
@@ -92,6 +93,10 @@ function AutomataSand:flipBoard()
 end
 
 local vector = require 'ffi.cpp.vector'
+
+-- TODO put this in ext.math
+--local DBL_EPSILON = 2.220446049250313080847e-16
+local FLT_EPSILON = 1.1920928955078125e-7
 
 ffi.cdef[[
 typedef struct {
@@ -271,6 +276,7 @@ end
 function SPHSand:updateDebugGUI()
 	ig.igText('Num Grains: '..self.grains.size)
 end
+
 
 ffi.cdef[[
 typedef vec4ub_t cell_t;
