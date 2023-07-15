@@ -5,7 +5,7 @@
 
 Tetris with abelian sandpile models.  Jk it's with sand.
 
-[![sand tetris](http://img.youtube.com/vi/CUb2mFn1CUY/0.jpg)](https://youtu.be/CUb2mFn1CUY)
+[![sand tetris](http://img.youtube.com/vi/L2Irjl3f8EY/0.jpg)](https://youtu.be/L2Irjl3f8EY)
 
 ## Dependencies:
 
