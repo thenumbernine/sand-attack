@@ -295,12 +295,23 @@ function LBMSand:update()
 	local dt = app.updateInterval
 
 	-- advect 
+	for y=0,h-1 do
+		for x=0,w-1 do
+			for ofy=0,2 do
+				local cy = ofy - 1
+				for ofx=0,2 do
+					local cx = ofx - 1
+					--self.sandNbhdImage
+				end
+			end
+		end
+	end
 end
 
 SandModel.subclasses = table{
 	AutomataSand,
 	SPHSand,
-	LBMSand,
+	--LBMSand,
 }
 SandModel.subclassNames = SandModel.subclasses:mapi(function(cl) return cl.name end)
 
