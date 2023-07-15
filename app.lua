@@ -71,10 +71,11 @@ function SandModel:init(app)
 end
 
 local AutomataSand = class(SandModel)
+AutomataSand.name = 'Automata'
 function AutomataSand:update()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	
+
 	local needsCheckLine = false
 	-- update
 	local prow = ffi.cast('int*', app.sandTex.image.buffer) + w
@@ -120,7 +121,7 @@ function AutomataSand:update()
 		prow = prow + w
 	end
 
-	return needsCheckLine 
+	return needsCheckLine
 end
 function AutomataSand:clearBlob(blob)
 	local app = self.app
@@ -134,7 +135,7 @@ function AutomataSand:clearBlob(blob)
 			app.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 		end
 	end
-	return clearedCount 
+	return clearedCount
 end
 function AutomataSand:flipBoard()
 	local app = self.app
@@ -163,6 +164,7 @@ typedef struct {
 ]]
 
 local SPHSand = class(SandModel)
+SPHSand.name = 'SPH'
 function SPHSand:init(app)
 	SPHSand.super.init(self, app)
 	self.grains = vector'grain_t'
@@ -174,8 +176,8 @@ end
 function SPHSand:update()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	local dt = updateInterval
-	
+	local dt = app.updateInterval
+
 	local needsCheckLine = false
 	local grav = -9.8 * tonumber(app.pieceSize.x)
 	local dragCoeff = .9
@@ -195,7 +197,7 @@ function SPHSand:update()
 			g.pos.x = w-.5
 		end
 		g.pos.y = math.clamp(g.pos.y, 0, h-FLT_EPSILON)
- 
+
 		local x = math.floor(g.pos.x)
 		local y = math.floor(g.pos.y)
 		local onground
@@ -203,7 +205,7 @@ function SPHSand:update()
 			onground = true
 		else
 			local p = ffi.cast('uint32_t*', app.sandTex.image.buffer) + (x + w * y)
- 
+
 			-- if the cell is blank and there's a sand cell above us ... pull it down
 			--if p[0] ~= 0 then -- should be true from blitting last frame?
 			if p[-w] ~= 0 then
@@ -258,7 +260,7 @@ function SPHSand:update()
 			g.vel.x = g.vel.x * groundFriction
 		end
 	end
- 
+
 	-- now clear and blit all grains onto the board
 	ffi.fill(app.sandTex.image.buffer, w * h * 4)
 	local pushForceTimesDT = 1
@@ -280,7 +282,7 @@ function SPHSand:update()
 	end
 	--print('numOverlaps ',numOverlaps)
 
-	return needsCheckLine 
+	return needsCheckLine
 end
 function SPHSand:mergepixel(x,y,color)
 	local app = self.app
@@ -304,7 +306,7 @@ function SPHSand:clearBlob(blob)
 			app.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 		end
 	end
-	return clearedCount 
+	return clearedCount
 end
 function SPHSand:doneClearingBlobs()
 	local app = self.app
@@ -335,13 +337,15 @@ end
 
 local App = class(ImGuiApp)
 
+App.title = 'Sand Attack'
+
 App.useAudio = true	-- set to false to disable audio altogether
 App.showFPS = false	-- show fps in gui
 local dontCheckForLinesEver = false	-- means don't ever ever check for lines.  used for fps testing the sand topple simulation.
 
-local updateInterval = 1/60
---local updateInterval = 1/120
---local updateInterval = 0
+App.updateInterval = 1/60
+--App.updateInterval = 1/120
+--App.updateInterval = 0
 
 App.defaultColors = table{
 	{1,0,0},
@@ -361,9 +365,6 @@ end
 
 -- ... but not all 8 bit alpha channels are really 8 bits ...
 
-
-App.title = 'Sand Attack'
-
 -- board size is 80 x 144 visible
 -- piece is 4 blocks arranged
 -- blocks are 8 x 8
@@ -379,6 +380,12 @@ App.lineFlashDuration = 1
 App.lineNumFlashes = 5
 
 App.cfgfilename = 'config.lua'
+
+App.sandModelClasses = table{
+	AutomataSand,
+	SPHSand,
+}
+App.sandModelNames = App.sandModelClasses:mapi(function(cl) return cl.name end)
 
 function App:initGL(...)
 	App.super.initGL(self, ...)
@@ -448,7 +455,7 @@ function App:initGL(...)
 	self.cfg.effectVolume = self.cfg.effectVolume or 1
 	self.cfg.backgroundVolume = self.cfg.backgroundVolume or .3
 	self.cfg.startLevel = self.cfg.startLevel or 1
-	-- TODO this shouldn't be in the config ... should it?
+	self.cfg.sandModel = self.cfg.sandModel or 1
 	self.cfg.toppleChance = self.cfg.toppleChance or 1
 	self.cfg.playerKeys = self.cfg.playerKeys or {}
 	self.cfg.highscores = self.cfg.highscores or {}
@@ -750,7 +757,8 @@ function App:reset()
 
 	self.loseTime = nil
 
-	self.sandmodel = AutomataSand(self)
+	local sandModelClass = assert(self.sandModelClasses[self.cfg.sandModel])
+	self.sandmodel = sandModelClass(self)
 
 	-- I only really need to recreate the sand & flash texs if the board size changes ...
 	-- sandTex is going to be handled by the sandmodel, but used by renderer also, so that's why it's here
@@ -810,7 +818,7 @@ function App:upateFallSpeed()
 	local secondsPerRow = (.8 - ((effectiveLevel-1)*.007))^(effectiveLevel-1)
 	local secondsPerLine = secondsPerRow / self.voxelsPerBlock
 	-- how many ticks to wait before dropping a piece
-	self.ticksToFall = secondsPerLine / updateInterval
+	self.ticksToFall = secondsPerLine / self.updateInterval
 end
 
 function App:populatePiece(args)
@@ -998,16 +1006,16 @@ end
 function App:updateGame()
 	local w, h = self.sandSize:unpack()
 	local dt = self.thisTime - self.lastUpdateTime
-	if dt <= updateInterval then return end
-	dt = updateInterval
+	if dt <= self.updateInterval then return end
+	dt = self.updateInterval
 
 	--[[ fast-forward to catch up? messes up with pause too
-	self.lastUpdateTime = self.lastUpdateTime + updateInterval
+	self.lastUpdateTime = self.lastUpdateTime + self.updateInterval
 	--]]
 	-- [[ stutter
 	self.lastUpdateTime = self.thisTime
 	--]]
-	self.gameTime = self.gameTime + updateInterval
+	self.gameTime = self.gameTime + self.updateInterval
 
 	local needsCheckLine = self.sandmodel:update()
 
@@ -1080,8 +1088,8 @@ function App:updateGame()
 			needsCheckLine = true
 			for j=0,self.pieceSize.y-1 do
 				-- I could abstract out the merge code to each sandmodel
-				-- but meh, sph wants random col order, automata doesn't care, 
-				-- so i'll just have it random ehre				
+				-- but meh, sph wants random col order, automata doesn't care,
+				-- so i'll just have it random ehre
 				--[[
 				for i=0,self.pieceSize.x-1 do
 				--]]

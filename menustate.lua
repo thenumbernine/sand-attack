@@ -183,6 +183,7 @@ local ConfigState = class(MenuState)
 function ConfigState:updateGUI()
 	local app = self.app
 	self:beginFullView('Config', 6 * 32)
+
 	self:centerLuatableTooltipInputInt('Number of Next Pieces', app, 'numNextPieces')
 	self:centerLuatableTooltipSliderFloat('Drop Speed', app, 'dropSpeed', .1, 100, nil, ig.ImGuiSliderFlags_Logarithmic)
 	self:centerLuatableCheckbox('Continuous Drop', app.cfg, 'continuousDrop')
@@ -192,6 +193,7 @@ function ConfigState:updateGUI()
 	self:centerLuatableTooltipInputInt('Board Height', app.nextSandSize, 'y')
 	self:centerLuatableTooltipSliderFloat('Topple Chance', app.cfg, 'toppleChance', 0, 1)
 
+	ig.luatableCombo('Sand Model', app.cfg, 'sandModel', app.sandModelNames)
 
 	if app.useAudio then
 		self:centerText'Audio:'
