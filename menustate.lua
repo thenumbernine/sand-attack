@@ -147,7 +147,10 @@ function PlayingState:updateGUI()
 	if app.showFPS then ig.igText('FPS: '..app.fps) end
 	if showDebug then
 		ig.igText('Num Voxels: '..app.numSandVoxels)
-		ig.igText('Ticks to fall: '..tostring(app.ticksToFall))
+		ig.igText('Ticks to Fall: '..tostring(app.ticksToFall))
+		if app.sandmodel.updateDebugGUI then
+			app.sandmodel:updateDebugGUI()
+		end
 	end
 
 	-- where on the screen to put this?
