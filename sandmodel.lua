@@ -309,6 +309,8 @@ function CFDSand:init(app)
 	--]]
 	self.div = make()
 	self.p = make()
+	
+	self.dx = 1/4
 end
 function CFDSand:update()
 	local app = self.app
@@ -382,10 +384,12 @@ function CFDSand:update()
 				end
 			end
 			p = p + istep
+			u = u + istep
 			v = v + istep
 		end
 		prow = prow + w
 		urow = urow + w
+		vrow = vrow + w
 	end
 
 	--[[ external forces?
@@ -393,7 +397,7 @@ function CFDSand:update()
 		for i=0,w-1 do
 			local f = i/(w-1)
 			local v = self.v + (i + w * j)
-			v[0] = v[0] + 5 * math.cos(math.pi * f)
+			v[0] = v[0] + grav * dt 
 		end
 	end
 	--]]
@@ -412,7 +416,7 @@ function CFDSand:update()
 
 	assert(dt)
 	local visc = .01
-	local diff = .01
+	local diff = .05
 	self:velocityStep(visc, dt)
 	self:densityStep(diff, dt)
 
@@ -476,8 +480,8 @@ end
 function CFDSand:diffuse(dir, dst, src, diff, dt)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	local dx = 1 --1 / w
-	local dy = 1 --1 / h
+	local dx = self.dx
+	local dy = dx
 	local dA = dx * dy
 	local a = diff * dt / dA
 	-- Jacobi implementation of Backward-Euler integration...
@@ -502,8 +506,8 @@ end
 function CFDSand:advect(dir, dst, src, u, v, dt)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	local dx = 1 -- 1/w
-	local dy = 1 -- 1/h
+	local dx = self.dx
+	local dy = dx
 	local dt_dx = dt / dx
 	local dt_dy = dt / dy
 	for j=1,h-2 do
@@ -536,8 +540,8 @@ function CFDSand:projectVel()
 	local v = self.v
 	local div = self.div
 	local p = self.p
-	local dx = 1	-- 1/w
-	local dy = 1	-- 1/h
+	local dx = self.dx
+	local dy = dx
 	for j=1,h-2 do
 		local jR = j+1
 		local jL = j-1
@@ -600,7 +604,7 @@ function CFDSand:mergepixel(x,y,color)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 	local v = self.v + x + w * y
-	v[0] = v[0] - 100
+	v[0] = v[0] - 1
 end
 function CFDSand:clearBlob(blob)
 	local app = self.app
