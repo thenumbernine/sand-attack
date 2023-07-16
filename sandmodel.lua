@@ -115,6 +115,11 @@ function SPHSand:init(app)
 	-- keep track of what is being cleared this frame
 	-- use this to test for what particles to remove
 	self.currentClearImage = Image(app.sandSize.x, app.sandSize.y, 4, 'unsigned char')
+
+	-- use for diffusing velocity
+	local w, h = app.sandSize:unpack()
+	-- x,y, weight
+	self.vel = ffi.new('vec3f_t[?]', w * h)
 end
 function SPHSand:update()
 	local app = self.app
@@ -204,8 +209,42 @@ function SPHSand:update()
 		end
 	end
 
+	--[[
 	-- TODO here blit velocity to a separate buffer,
 	-- then read back that buffer for advection of velocity
+	ffi.fill(self.vel, 0, ffi.sizeof'vec3f_t' * w * h)
+	local weights = {
+		[-1] = {[-1] = 1/36, [0]=4/36, [1]=1/36},
+		[0] = {[-1] = 4/36, [0]=16/36, [1]=4/36},
+		[1] = {[-1] = 1/36, [0]=4/36, [1]=1/36},
+	}
+	for gi=0,self.grains.size-1 do
+		local g = self.grains.v + gi
+		local x = math.floor(g[0].pos.x)
+		local y = math.floor(g[0].pos.y)
+		-- diffuse and accumulate
+		for ofx=-1,1 do
+			for ofy=-1,1 do
+				local weight = weights[ofx][ofy]
+				local xd = math.clamp(x + ofx, 0, w-1)
+				local yd = math.clamp(y + ofy, 0, h-1)
+				local v = self.vel + (xd + w * yd)
+				v[0].x = v[0].x + g[0].vel.x * weight
+				v[0].y = v[0].y + g[0].vel.y * weight
+				v[0].z = v[0].z + weight
+			end
+		end
+	end
+	-- read back
+	for gi=0,self.grains.size-1 do
+		local g = self.grains.v + gi
+		local x = math.floor(g[0].pos.x)
+		local y = math.floor(g[0].pos.y)
+		local v = self.vel + (x + w * y)
+		g[0].vel.x = v[0].x / v[0].z
+		g[0].vel.y = v[0].y / v[0].z
+	end	
+	--]]
 
 	-- now clear and blit all grains onto the board
 	ffi.fill(app.sandTex.image.buffer, w * h * 4)
@@ -234,9 +273,10 @@ function SPHSand:mergepixel(x,y,color)
 	local app = self.app
 	local g = self.grains:emplace_back()
 	g.pos:set(x+.5, y+.5)
-	--local vel = math.random() * 150 * (vec2f(0,1) + (vec2f(i+.5,j+.5)-vec2f(app.pieceSize:unpack())*.5) / tonumber(app.pieceSize.x))
-	--g.vel:set(vel:unpack())
-	g.vel:set(0,0)
+	--local vel = math.random() * 150 * (vec2f(0,-1) + (vec2f(x+.5,y+.5)-vec2f(app.pieceSize:unpack())*.5) / tonumber(app.pieceSize.x))
+	local vel = vec2f(0,-1)
+	g.vel:set(vel:unpack())
+	--g.vel:set(0,0)
 	g.color = color
 end
 function SPHSand:clearBlob(blob)
@@ -281,7 +321,7 @@ end
 
 
 local CFDSand = class(SandModel)
-CFDSand.name = 'CFD'
+CFDSand.name = 'CFD (experimental)'
 function CFDSand:init(app)
 	CFDSand.super.init(self, app)
 	local w, h = app.sandSize:unpack()
