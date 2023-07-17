@@ -1,7 +1,7 @@
 local ffi = require 'ffi'
 local sdl = require 'ffi.sdl'
 local table = require 'ext.table'
-local file = require 'ext.file'
+local path = require 'ext.path'
 local class = require 'ext.class'
 local math = require 'ext.math'
 local string = require 'ext.string'
@@ -172,7 +172,7 @@ function App:initGL(...)
 
 	-- load config if it exists
 	xpcall(function()
-		self.cfg = fromlua(assert(file(self.cfgfilename):read()))
+		self.cfg = fromlua(assert(path(self.cfgfilename):read()))
 	end, function(err)
 		print("failed to read config file: "..tostring(err))
 	end)
@@ -457,7 +457,7 @@ function App:playSound(name, volume, pitch)
 end
 
 function App:saveConfig()
-	file(self.cfgfilename):write(tolua(self.cfg))
+	path(self.cfgfilename):write(tolua(self.cfg))
 end
 
 function App:reset()
