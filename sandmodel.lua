@@ -334,19 +334,7 @@ function CFDSand:init(app)
 	self.v = make()
 	self.uprev = make()
 	self.vprev = make()
-	--[[ instead of rho and rhoprev I want sandtex ...
-	self.rho = make()
-	self.rhoprev = make()
-	--]]
-	--[[ hmm, how easy would this be to fit into the current framework?
 	self.sandTexPrev = app:makeTexWithImage(app.sandSize)
-	--]]
-	-- [[ I'll try for this way
-	self.r, self.rprev = make(), make()
-	self.g, self.gprev = make(), make()
-	self.b, self.bprev = make(), make()
-	self.a, self.aprev = make(), make()
-	--]]
 	self.div = make()
 	self.p = make()
 	
@@ -442,66 +430,25 @@ function CFDSand:update()
 	end
 	--]]
 
-	-- [[  copy color to our float buffers
-	-- TODO just use sandTex
-	for j=0,h-1 do
-		for i=0,w-1 do
-			self.r[i + w * j] = app.sandTex.image.buffer[0 + 4 * (i + w * j)]
-			self.g[i + w * j] = app.sandTex.image.buffer[1 + 4 * (i + w * j)]
-			self.b[i + w * j] = app.sandTex.image.buffer[2 + 4 * (i + w * j)]
-			self.a[i + w * j] = app.sandTex.image.buffer[3 + 4 * (i + w * j)]
-		end
-	end
-	--]]
-
 	assert(dt)
 	local visc = .01
 	local diff = .05
 	self:velocityStep(visc, dt)
 	self:densityStep(diff, dt)
 
-	-- [[  copy back
-	for j=0,h-1 do
-		for i=0,w-1 do
-			app.sandTex.image.buffer[0 + 4 * (i + w * j)] = math.clamp(self.r[i + w * j], 0, 255)
-			app.sandTex.image.buffer[1 + 4 * (i + w * j)] = math.clamp(self.g[i + w * j], 0, 255)
-			app.sandTex.image.buffer[2 + 4 * (i + w * j)] = math.clamp(self.b[i + w * j], 0, 255)
-			app.sandTex.image.buffer[3 + 4 * (i + w * j)] = math.clamp(self.a[i + w * j], 0, 255)
-		end
-	end
-	--]]
-
 	return needsCheckLine
 end
 function CFDSand:densityStep(diff, dt)
 	--self:addSource()
-	--[[
-	self.rho, self.rhoprev = self.rhoprev, self.rho
-	self:diffuse(0, self.rho, self.rhoprev, diff, dt)
-	self.rho, self.rhoprev = self.rhoprev, self.rho
-	self:advect(0, self.rho, self.rhoprev, self.u, self.v, dt)
-	--]]
-	-- [[
-	self.r, self.rprev = self.rprev, self.r
-	self:diffuse(0, self.r, self.rprev, diff, dt)
-	self.r, self.rprev = self.rprev, self.r
-	self:advect(0, self.r, self.rprev, self.u, self.v, dt)
-	
-	self.g, self.gprev = self.gprev, self.g
-	self:diffuse(0, self.g, self.gprev, diff, dt)
-	self.g, self.gprev = self.gprev, self.g
-	self:advect(0, self.g, self.gprev, self.u, self.v, dt)
-	
-	self.b, self.bprev = self.bprev, self.b
-	self:diffuse(0, self.b, self.bprev, diff, dt)
-	self.b, self.bprev = self.bprev, self.b
-	self:advect(0, self.b, self.bprev, self.u, self.v, dt)
-	
-	self.a, self.aprev = self.aprev, self.a
-	self:diffuse(0, self.a, self.aprev, diff, dt)
-	self.a, self.aprev = self.aprev, self.a
-	self:advect(0, self.a, self.aprev, self.u, self.v, dt)
-	--]]
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+	local rgbaImage = ffi.cast('uint32_t*', app.sandTex.image.buffer)
+	local rgbaPrevImage = ffi.cast('uint32_t*', self.sandTexPrev.image.buffer)
+	-- diffuse
+	--self:diffuse(0, rgbaPrevImage, rgbaImage, diff, dt)
+	-- or just copy?
+	ffi.copy(rgbaPrevImage, rgbaImage, 4 * w * h)
+	self:advect(0, rgbaImage, rgbaPrevImage, self.u, self.v, dt, true)
 end
 function CFDSand:velocityStep(visc, dt)
 	--self:addSource()
@@ -524,7 +471,7 @@ function CFDSand:diffuse(dir, dst, src, diff, dt)
 	local dy = dx
 	local dA = dx * dy
 	local a = diff * dt / dA
-	-- Jacobi implementation of Backward-Euler integration...
+	-- Gauss-Seidel implementation of Backward-Euler integration...
 	for k=1,20 do
 		for j=1,h-2 do
 			local jR = j+1
@@ -543,7 +490,7 @@ function CFDSand:diffuse(dir, dst, src, diff, dt)
 		self:updateBoundary(dir, dst)
 	end
 end
-function CFDSand:advect(dir, dst, src, u, v, dt)
+function CFDSand:advect(dir, dst, src, u, v, dt, nearest)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 	local dx = self.dx
@@ -557,17 +504,30 @@ function CFDSand:advect(dir, dst, src, u, v, dt)
 			local i0 = math.floor(x)
 			local i1 = i0 + 1
 			local s1 = x - i0
-			local s0 = 1 - s1
 			
-			local y = j - dt_dx * v[i + w * j]
+			local y = j - dt_dy * v[i + w * j]
 			y = math.clamp(y, .5, h + .5)
 			local j0 = math.floor(y)
 			local j1 = j0 + 1
 			local t1 = y - j0
-			local t0 = 1 - t1	
 		
-			dst[i + w * j] = s0 * (t0 * src[i0 + w * j0] + t1 * src[i0 + w * j1])
-							+ s1 * (t0 * src[i1 + w * j0] + t1 * src[i1 + w * j1])
+			if nearest then
+				dst[i + w * j] = 
+					s1 < .5 and (
+						t1 < .5 
+						and src[i0 + w * j0]
+						or src[i0 + w * j1]
+					) or (
+						t1 < .5
+						and src[i1 + w * j0]
+						or src[i1 + w * j1]
+					)
+			else
+				local s0 = 1 - s1
+				local t0 = 1 - t1
+				dst[i + w * j] = s0 * (t0 * src[i0 + w * j0] + t1 * src[i0 + w * j1])
+								+ s1 * (t0 * src[i1 + w * j0] + t1 * src[i1 + w * j1])
+			end
 		end
 	end
 	self:updateBoundary(dir, dst)
@@ -644,7 +604,7 @@ function CFDSand:mergepixel(x,y,color)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 	local v = self.v + x + w * y
-	v[0] = v[0] - 1
+	v[0] = v[0] - 0
 end
 function CFDSand:clearBlob(blob)
 	local app = self.app
