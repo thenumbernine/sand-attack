@@ -450,8 +450,9 @@ function SplashScreenState:update()
 	local aspectRatio = app.width / app.height
 
 	app.projMat:setOrtho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
-	app.displayShader:use()
-	app:enableDisplayAttrs()
+	app.displayShader
+		:use()
+		:enableAttrs()
 
 	app.mvMat
 		:setTranslate(-.5 * aspectRatio, -.5)
@@ -467,8 +468,9 @@ function SplashScreenState:update()
 	gl.glUniform1i(app.displayShader.uniforms.useAlpha.loc, 0)
 
 	app.splashTex:unbind()
-	app:disableDisplayAttrs()
-	app.displayShader:useNone()
+	app.displayShader
+		:disableAttrs()
+		:useNone()
 
 
 	if getTime() - self.startTime > self.duration then

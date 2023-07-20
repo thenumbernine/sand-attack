@@ -335,27 +335,6 @@ void main() {
 	glreport'here'
 end
 
--- TODO move these functions to shader?
-function App:enableDisplayAttrs()
-	if self.displayShader.vao then
-		self.displayShader.vao:use()
-	else
-		for _,attr in ipairs(self.displayShader.attrs) do
-			attr:setPointer()
-				:enable()
-		end
-	end
-end
-function App:disableDisplayAttrs()
-	if self.displayShader.vao then
-		self.displayShader.vao:useNone()
-	else
-		for _,attr in ipairs(self.displayShader.attrs) do
-			attr:disable()
-		end
-	end
-end
-
 -- static method
 function App:makeTexWithImage(size)
 	local img = Image(size.x, size.y, 4, 'unsigned char')
@@ -988,8 +967,9 @@ function App:update(...)
 		local s = w / h
 
 		self.projMat:setOrtho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
-		self.displayShader:use()
-		self:enableDisplayAttrs()
+		self.displayShader
+			:use()
+			:enableAttrs()
 
 		self.mvMat:setTranslate(-.5 * s, -.5)
 			:applyScale(s, 1)
@@ -1041,7 +1021,6 @@ function App:update(...)
 			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 			gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 1)
-
 			player.pieceTex:bind()
 			gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 
@@ -1105,9 +1084,10 @@ function App:update(...)
 			gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 		end
 
-		self:disableDisplayAttrs()
 		GLTex2D:unbind()
-		self.displayShader:useNone()
+		self.displayShader
+			:disableAttrs()
+			:useNone()
 	end
 
 	if self.loseTime and self.thisTime - self.loseTime > self.loseScreenDuration then
