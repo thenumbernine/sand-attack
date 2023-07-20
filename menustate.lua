@@ -453,15 +453,14 @@ function SplashScreenState:update()
 	local w, h = app.sandSize:unpack()
 
 	local aspectRatio = app.width / app.height
-	local s = w / h
 
 	app.projMat:setOrtho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
 	app.displayShader:use()
 	app.displayShader.vao:use()
 
 	app.mvMat
-		:setTranslate(-.5 * s, -.5)
-		:applyScale(s, 1)
+		:setTranslate(-.5 * aspectRatio, -.5)
+		:applyScale(aspectRatio, 1)
 	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
 	gl.glUniformMatrix4fv(app.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
 
@@ -510,6 +509,27 @@ HighScoreState.fields = table{
 	'boardHeight',
 	'sandModel',
 }
+function HighScoreState:makeNewRecord()
+	local app = self.app
+	local record = {}
+	for _,field in ipairs(self.fields) do
+		if field == 'name' then
+			record[field] = self[field]
+		elseif field == 'toppleChance'
+		or field == 'numColors'
+		or field == 'sandModel'
+		then
+			record[field] = app.cfg[field]
+		elseif field == 'boardWidth' then
+			record[field] = tonumber(app.cfg.boardSize.x)
+		elseif field == 'boardHeight' then
+			record[field] = tonumber(app.cfg.boardSize.y)
+		else
+			record[field] = app[field]
+		end
+	end
+	return record
+end
 function HighScoreState:updateGUI()
 	local app = self.app
 	self:beginFullView'High Scores:'
@@ -520,23 +540,7 @@ function HighScoreState:updateGUI()
 		ig.luatableTooltipInputText('Your Name', self, 'name')
 		if ig.igButton'Ok' then
 			self.needsName = false
-			local record = {}
-			for _,field in ipairs(self.fields) do
-				if field == 'name' then
-					record[field] = self[field]
-				elseif field == 'toppleChance'
-				or field == 'numColors'
-				or field == 'sandModel'
-				then
-					record[field] = app.cfg[field]
-				elseif field == 'boardWidth' then
-					record[field] = tonumber(app.cfg.boardSize.x)
-				elseif field == 'boardHeight' then
-					record[field] = tonumber(app.cfg.boardSize.y)
-				else
-					record[field] = app[field]
-				end
-			end
+			local record = self:makeNewRecord()
 			table.insert(app.cfg.highscores, record)
 			table.sort(app.cfg.highscores, function(a,b)
 				return a.score > b.score
