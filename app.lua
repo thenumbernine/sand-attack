@@ -117,7 +117,6 @@ function App:initGL(...)
 	App.super.initGL(self, ...)
 
 	gl.glClearColor(.5, .5, .5, 1)
-	gl.glAlphaFunc(gl.GL_GREATER, 0)
 
 	-- allow keys to navigate menu
 	-- TODO how to make it so player keys choose menus, not just space bar/
@@ -244,8 +243,8 @@ function App:initGL(...)
 	local vtxbufCPU = ffi.new('float[8]', {
 		0,0,
 		1,0,
-		1,1,
 		0,1,
+		1,1,
 	})
 	local vertexBuf = GLArrayBuffer{
 		size = ffi.sizeof(vtxbufCPU),
@@ -272,12 +271,15 @@ void main() {
 in vec2 texcoordv;
 out vec4 fragColor;
 uniform sampler2D tex;
+uniform bool useAlpha;
 void main() {
 	fragColor = texture(tex, texcoordv);
+	if (useAlpha && fragColor.a == 0.) discard;
 }
 ]],
 		uniforms = {
 			tex = 0,
+			useAlpha = false,
 		},
 
 		attrs = {
@@ -331,6 +333,27 @@ void main() {
 	self:reset()
 
 	glreport'here'
+end
+
+-- TODO move these functions to shader?
+function App:enableDisplayAttrs()
+	if self.displayShader.vao then
+		self.displayShader.vao:use()
+	else
+		for _,attr in ipairs(self.displayShader.attrs) do
+			attr:setPointer()
+				:enable()
+		end
+	end
+end
+function App:disableDisplayAttrs()
+	if self.displayShader.vao then
+		self.displayShader.vao:useNone()
+	else
+		for _,attr in ipairs(self.displayShader.attrs) do
+			attr:disable()
+		end
+	end
 end
 
 -- static method
@@ -966,7 +989,7 @@ function App:update(...)
 
 		self.projMat:setOrtho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
 		self.displayShader:use()
-		self.displayShader.vao:use()
+		self:enableDisplayAttrs()
 
 		self.mvMat:setTranslate(-.5 * s, -.5)
 			:applyScale(s, 1)
@@ -974,12 +997,11 @@ function App:update(...)
 		gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 		--[[ transparent for the background for sand area?
-		gl.glAlphaFunc(gl.GL_GREATER, 0)
 		gl.glEnable(gl.GL_ALPHA_TEST)
 		--]]
 
 		self.sandTex:bind()
-		gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+		gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 
 		--[[ transparent for the background for sand area?
 		gl.glDisable(gl.GL_ALPHA_TEST)
@@ -1003,7 +1025,7 @@ function App:update(...)
 				gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
 
 				player.pieceOutlineTex:bind()
-				gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+				gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 
 				gl.glDisable(gl.GL_BLEND)
 			end
@@ -1018,19 +1040,19 @@ function App:update(...)
 			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
-			gl.glEnable(gl.GL_ALPHA_TEST)
+			gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 1)
 
 			player.pieceTex:bind()
-			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+			gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 
-			gl.glDisable(gl.GL_ALPHA_TEST)
+			gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 0)
 		end
 
 		-- draw flashing background if necessary
 		local flashDt = self.gameTime - self.lastLineTime
 		if flashDt < self.lineFlashDuration then
 			self.wasFlashing = true
-			gl.glEnable(gl.GL_ALPHA_TEST)
+			gl.glUniform1i(app.displayShader.uniforms.useAlpha.loc, 1)
 			local flashInt = bit.band(math.floor(flashDt * self.lineNumFlashes * 2), 1) == 0
 			if flashInt then
 				self.mvMat
@@ -1040,9 +1062,9 @@ function App:update(...)
 				gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 				self.flashTex:bind()
-				gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+				gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 			end
-			gl.glDisable(gl.GL_ALPHA_TEST)
+			gl.glUniform1i(app.displayShader.uniforms.useAlpha.loc, 0)
 		elseif self.wasFlashing then
 			-- clear once we're done flashing
 			self.wasFlashing = false
@@ -1060,10 +1082,10 @@ function App:update(...)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 				gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
-				gl.glEnable(gl.GL_ALPHA_TEST)
+				gl.glUniform1i(app.displayShader.uniforms.useAlpha.loc, 1)
 				self.youloseTex:bind()
-				gl.glDrawArrays(gl.GL_QUADS, 0, 4)
-				gl.glDisable(gl.GL_ALPHA_TEST)
+				gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+				gl.glUniform1i(app.displayShader.uniforms.useAlpha.loc, 0)
 			end
 		end
 
@@ -1080,10 +1102,10 @@ function App:update(...)
 			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 			it.tex:bind()
-			gl.glDrawArrays(gl.GL_QUADS, 0, 4)
+			gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 		end
 
-		self.displayShader.vao:useNone()
+		self:disableDisplayAttrs()
 		GLTex2D:unbind()
 		self.displayShader:useNone()
 	end

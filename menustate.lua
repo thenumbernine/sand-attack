@@ -29,7 +29,7 @@ estheight = nil
 	ig.igSetNextWindowPos(viewport.WorkPos, 0, ig.ImVec2())
 	ig.igSetNextWindowSize(viewport.WorkSize, 0)
 	ig.igPushStyleVar_Float(ig.ImGuiStyleVar_WindowRounding, 0)
-	ig.igBegin('Main Menu', nil, bit.bor(
+	ig.igBegin(name, nil, bit.bor(
 		ig.ImGuiWindowFlags_NoMove,
 		ig.ImGuiWindowFlags_NoResize,
 		ig.ImGuiWindowFlags_NoCollapse,
@@ -126,7 +126,6 @@ function PlayingState:update()
 end
 function PlayingState:updateGUI()
 	local app = self.app
-	-- [[
 	ig.igSetNextWindowPos(ig.ImVec2(0, 0), 0, ig.ImVec2())
 	ig.igSetNextWindowSize(ig.ImVec2(-1, -1), 0)
 	ig.igBegin('X', nil, bit.bor(
@@ -135,10 +134,6 @@ function PlayingState:updateGUI()
 		ig.ImGuiWindowFlags_NoCollapse,
 		ig.ImGuiWindowFlags_NoDecoration
 	))
-	--]]
-	--[[
-	ig.igBegin('Config', nil, 0)
-	--]]
 	ig.igSetWindowFontScale(.5)
 
 	ig.igText('Level: '..tostring(app.level))
@@ -456,7 +451,7 @@ function SplashScreenState:update()
 
 	app.projMat:setOrtho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
 	app.displayShader:use()
-	app.displayShader.vao:use()
+	app:enableDisplayAttrs()
 
 	app.mvMat
 		:setTranslate(-.5 * aspectRatio, -.5)
@@ -464,13 +459,15 @@ function SplashScreenState:update()
 	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
 	gl.glUniformMatrix4fv(app.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
 
-	gl.glEnable(gl.GL_ALPHA_TEST)
-	app.splashTex:bind()
-	gl.glDrawArrays(gl.GL_QUADS, 0, 4)
-	gl.glDisable(gl.GL_ALPHA_TEST)
+	gl.glUniform1i(app.displayShader.uniforms.useAlpha.loc, 1)
 
-	app.displayShader.vao:useNone()
-	GLTex2D:unbind()
+	app.splashTex:bind()
+	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+
+	gl.glUniform1i(app.displayShader.uniforms.useAlpha.loc, 0)
+
+	app.splashTex:unbind()
+	app:disableDisplayAttrs()
 	app.displayShader:useNone()
 
 
