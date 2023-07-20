@@ -185,7 +185,7 @@ function ConfigState:updateGUI()
 	local app = self.app
 	self:beginFullView('Config', 6 * 32)
 
-	self:centerLuatableTooltipInputInt('Number of Next Pieces', app, 'numNextPieces')
+	self:centerLuatableTooltipInputInt('Number of Next Pieces', app.cfg, 'numNextPieces')
 	self:centerLuatableTooltipSliderFloat('Drop Speed', app.cfg, 'dropSpeed', .1, 100, nil, ig.ImGuiSliderFlags_Logarithmic)
 	self:centerLuatableCheckbox('Continuous Drop', app.cfg, 'continuousDrop')
 

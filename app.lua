@@ -201,10 +201,9 @@ function App:initGL(...)
 	--self.cfg.boardSize = self.cfg.boardSize or {x=160, y=288}
 	--self.cfg.boardSize = self.cfg.boardSize or {x=80, y=360}
 	--self.cfg.boardSize = self.cfg.boardSize or {x=512, y=512}
-
+	self.cfg.numNextPieces = self.cfg.numNextPieces or 3
 
 	self.numPlayers = 1
-	self.numNextPieces = 3
 
 	self.fps = 0
 	self.numSandVoxels = 0
@@ -496,7 +495,7 @@ function App:reset()
 
 	-- and I only really need to recreate these if the piece size changes ...
 	self.rotPieceTex = self:makeTexWithImage(self.pieceSize)
-	self.nextPieces = range(self.numNextPieces):mapi(function(i)
+	self.nextPieces = range(self.cfg.numNextPieces):mapi(function(i)
 		local tex = self:makeTexWithImage(self.pieceSize)
 		return {tex=tex}
 	end)
@@ -538,6 +537,7 @@ function App:upateFallSpeed()
 	-- https://harddrop.com/wiki/Tetris_Worlds
 	local maxSpeedLevel = 13 -- fastest level .. no faster is permitted
 	local effectiveLevel = math.min(self.level, maxSpeedLevel)
+	-- TODO make this curve customizable
 	local secondsPerRow = (.8 - ((effectiveLevel-1)*.007))^(effectiveLevel-1)
 	local secondsPerLine = secondsPerRow / self.voxelsPerBlock
 	-- how many ticks to wait before dropping a piece
