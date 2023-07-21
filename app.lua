@@ -1031,7 +1031,7 @@ function App:update(...)
 		local flashDt = self.gameTime - self.lastLineTime
 		if flashDt < self.lineFlashDuration then
 			self.wasFlashing = true
-			gl.glUniform1i(app.displayShader.uniforms.useAlpha.loc, 1)
+			gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 1)
 			local flashInt = bit.band(math.floor(flashDt * self.lineNumFlashes * 2), 1) == 0
 			if flashInt then
 				self.mvMat
@@ -1043,7 +1043,7 @@ function App:update(...)
 				self.flashTex:bind()
 				gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 			end
-			gl.glUniform1i(app.displayShader.uniforms.useAlpha.loc, 0)
+			gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 0)
 		elseif self.wasFlashing then
 			-- clear once we're done flashing
 			self.wasFlashing = false
@@ -1061,10 +1061,10 @@ function App:update(...)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 				gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
-				gl.glUniform1i(app.displayShader.uniforms.useAlpha.loc, 1)
+				gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 1)
 				self.youloseTex:bind()
 				gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
-				gl.glUniform1i(app.displayShader.uniforms.useAlpha.loc, 0)
+				gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 0)
 			end
 		end
 
