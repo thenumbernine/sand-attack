@@ -252,10 +252,13 @@ function App:initGL(...)
 	}
 
 	--local glslVersion = 460	-- too new?
-	local glslVersion = 430
+	--local glslVersion = 430
+	local glslVersion = '320 es'
 	self.displayShader = GLProgram{
 		vertexCode = [[
 #version ]]..glslVersion..[[
+
+precision highp float;
 
 in vec2 vertex;
 out vec2 texcoordv;
@@ -267,6 +270,8 @@ void main() {
 ]],
 		fragmentCode = [[
 #version ]]..glslVersion..[[
+
+precision highp float;
 
 in vec2 texcoordv;
 out vec4 fragColor;
