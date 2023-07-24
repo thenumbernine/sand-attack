@@ -236,6 +236,7 @@ function App:initGL(...)
 		classify = function(p) return p[3] end,	-- classify by alpha channel
 	}
 
+	-- TODO use self.view with .useBuiltinMatrixMath=true
 	self.projMat = matrix({4,4},'float'):zeros()
 	self.mvMat = matrix({4,4},'float'):zeros()
 	self.mvProjMat = matrix({4,4},'float'):zeros()
