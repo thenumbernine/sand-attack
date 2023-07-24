@@ -236,9 +236,9 @@ function App:initGL(...)
 		classify = function(p) return p[3] end,	-- classify by alpha channel
 	}
 
-	self.projMat = matrix{4,4}:zeros()
-	self.mvMat = matrix{4,4}:zeros()
-	self.mvProjMat = matrix{4,4}:zeros()
+	self.projMat = matrix({4,4},'float'):zeros()
+	self.mvMat = matrix({4,4},'float'):zeros()
+	self.mvProjMat = matrix({4,4},'float'):zeros()
 
 	local vtxbufCPU = ffi.new('float[8]', {
 		0,0,
