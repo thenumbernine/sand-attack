@@ -2,6 +2,7 @@ local ffi = require 'ffi'
 local sdl = require 'ffi.sdl'
 local template = require 'template'
 local class = require 'ext.class'
+local table = require 'ext.table'
 local vec2i = require 'vec-ffi.vec2i'
 local vec3f = require 'vec-ffi.vec3f'
 
