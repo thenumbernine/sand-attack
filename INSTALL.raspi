@@ -21,7 +21,10 @@ cd
 # Feel free to change this to whatever dir you want.
 # Replace `$HOME/Projects/` in the line below accordingly:
 mkdir Project
-echo 'export $LUA_PATH=";;$HOME/Projects/?.lua;$HOME/Projects/?/?.lua' >> .bashrc
+echo 'export LUA_PATH=";;$HOME/Projects/?.lua;$HOME/Projects/?/?.lua"' >> .bashrc
+# then you'll have to either restart your shell, or run the command:
+export LUA_PATH=";;$HOME/Projects/?.lua;$HOME/Projects/?/?.lua"
+
 
 # then cd into that location
 cd Project
