@@ -1,3 +1,20 @@
+# NOTICE THIS IS NOT A SHELL SCRIPT JUST YET.
+# It's a step-by-step instruction guide.
+# You're going to have to do some manual tuning in a few places.
+# Maybe if I put enough sed/patch commands in here I can make it a script,
+# but right now it isn't.
+#
+# I don't have any raspberry pi hardware so I followed the instructions here:
+# https://linuxconfig.org/how-to-run-the-raspberry-pi-os-in-a-virtual-machine-with-qemu-and-kvm
+# This means I'm using the Raspberry Pi OS image at:
+# wget https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2021-01-12/2021-01-11-raspios-buster-armhf-lite.zip
+# ... with one difference:
+# I downloaded the -full instead of the -lite image.
+# This may be why a few of the apt libraries that I needed were already installed, maybe not, I don't know.
+# Another note: The `virt-install` command on this page now needs one extra argument to run correctly: `--os-variant=debian9`.
+
+
+# First we pick somewhere to download all repos.  I picked home.
 cd
 
 # I'm putting all the repos etc into the `Projects` folder.
@@ -94,7 +111,7 @@ git submodule update --init --recursive
 
 # same with the next line #define SDL_HAS_MOUSE_FOCUS_CLICKTHROUGH, wrap it in #if define()'s
 
-# then just below that in the block of SDL_CreateSystemCursor calls, put `#if 0` and `#endif` on the lines around it. 
+# then just below that in the block of SDL_CreateSystemCursor calls, put `#if 0` and `#endif` on the lines around it.
 
 # then #if 0 out all of ImGui_ImplSDL2_UpdateMonitors() and its call
 
@@ -104,7 +121,7 @@ git submodule update --init --recursive
 # now change the Makefile in cimgui:
 # apply these changes to the Makefile in the cimgui base folder:
 	OBJS += ./imgui/backends/imgui_impl_sdl.o
-	# OBJS += ./imgui/backends/imgui_impl_opengl2.o  # I use opengl2 for desktop, but it doesn't handle GLES, so 
+	# OBJS += ./imgui/backends/imgui_impl_opengl2.o  # I use opengl2 for desktop, but it doesn't handle GLES, so
 	OBJS += ./imgui/backends/imgui_impl_opengl3.o  # ... so you have to use opengl3
 	CXXFLAGS += -Iwherever/you/put/the/SDL2/include
 	CXXFLAGS += -DIMGUI_IMPL_API=extern\ \"C\"
@@ -115,7 +132,7 @@ git submodule update --init --recursive
 # then build:
 make all
 
-# then copy to sandtetris, or wherever ffi.load can find it 
+# then copy to sandtetris, or wherever ffi.load can find it
 # (could also be wherever LD_LIBRARY_PATH points)
 cp libcimgui_sdl.so ../sandtetris/
 cd ..
@@ -153,7 +170,7 @@ luajit run.lua
 #   Unlike vanilla lua, luajit isn't so flexible in changing this functionality afaik.
 #   I'm not sure there's an easy way to query all folders luajit searches through to find .so files.
 #   If there is then maybe I can then cycle through those folders and then do some pattern-matching of all filenames to find whatever .so looks like it would work best ... ?
-# 
+#
 #   One fix is to follow the coding style at https://github.com/malkia/ufo and have, for every library, a possible Lua global variable to override to specify where to find the library.
 #   Then I could just set these in the sandtetris/run.lua file instead of changing them in every individual ffi/ file.
 #   However for multiple projects using the same header files, the changes should belong in the ffi/ header files and not the projects.
