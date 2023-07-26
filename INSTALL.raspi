@@ -1,0 +1,162 @@
+cd
+
+# I'm putting all the repos etc into the `Projects` folder.
+# Feel free to change this to whatever dir you want.
+# Replace `$HOME/Projects/` in the line below accordingly:
+mkdir Project
+echo 'export $LUA_PATH=";;$HOME/Projects/?.lua;$HOME/Projects/?/?.lua' >> .bashrc
+
+# then cd into that location
+cd Project
+
+# git all repos
+git clone https://github.com/thenumbernine/sand-tetris sandtetris
+git clone https://github.com/thenumbernine/lua-template template
+git clone https://github.com/thenumbernine/lua-ext ext
+git clone https://github.com/thenumbernine/lua-ffi-bindings	ffi
+git clone https://github.com/thenumbernine/vec-ffi-lua vec-ffi
+git clone https://github.com/thenumbernine/lua-matrix matrix
+git clone https://github.com/thenumbernine/lua-image image
+git clone https://github.com/thenumbernine/lua-gl gl
+git clone https://github.com/thenumbernine/lua-glapp glapp
+git clone https://github.com/thenumbernine/lua-imgui imgui
+git clone https://github.com/thenumbernine/lua-imguiapp imguiapp
+git clone https://github.com/thenumbernine/lua-audio audio
+
+# install apt packages
+# these were already installed for me in raspberry pi os:
+#sudo apt install luajit
+#sudo apt install libgles2-mesa
+#sudo apt install libsdl2-2.0-0
+#sudo apt install libvorbisfile3
+#sudo apt install libopenal1
+
+
+# Next, raspberry pi /usr/lib/arm-linux-gnueabihf/ doesn't like putting .so extension symlinks to the .so.<version> files.
+# So we have to accomodate luajit's dynamic linking to .so files by changing some lines in the ffi/ folder:
+# (Alternatively you can just add those symlinks yourself and then you won't have to change anything in the ffi/ folder.)
+
+vi ffi/OpenGLES3.lua
+# ... at the end of the file, change last line to: `return ffi.load'libGLESv2.so.2'`.
+
+vi ffi/sdl.lua
+# ... at the end of the file, replace the last 10 or so lines after the ]] line with the line: `return ffi.load'libSDL2-2.0.so.0'`.
+
+vi ffi/OpenAL.lua
+# ... at the end of the file, within the final `else' block, replace `return ffi.load'openal'` with `return ffi.load'libopenal.so.1'`.
+
+vi ffi/vorbis/vorbisfile.lua
+# ... near the end, the line `local lib = ffi.load'vorbisfile'`, change this with `local lib = ffi.load'libvorbisfile.so.3'`.
+
+
+# Now we have to work around whatever GLES glsl version limit is present.
+# On the image I'm using, GLES doesn't support 320 es, only 300 es.  So I had to edit ...
+vi glapp/tests/test_es.lua
+# ... and change the glsl #version from `320 es` to `300 es`, or whatever works on your machine.
+# If you don't make this change and run the test as-is, it will work if your GLES supports '320 es'.
+# If your machine doesn't support '320 es' then it should give you an error telling you what versions your drivers do support (mine did) --
+# -- just set it to whichever supported glsl version is latest.
+
+# At this point you should be able to `cd glapp/tests && luajit test_es.lua` and it should run.
+
+
+
+# now the hard part: cimgui
+
+# first, cimgui's prereq: SDL headers:
+
+# SDL2 runtime was already installed for me,
+# but building cimgui is going to need SDL2 headers, which were not installed:
+# so I tried `sudo apt install libsdl2-dev`
+# ... but this got me some 404 Not Found errors with the Raspberry Pi repos
+# ... so instead I copied the headers by hand ...
+# seems cimgui appreciates it if you use the same include as the installed libSDL2.so, which for me is 2.0.9
+wget https://sourceforge.net/projects/libsdl/files/SDL/2.0.9/SDL2-2.0.9.zip/download
+unzip somewhere
+cd somewhere
+./configure
+# ... to get SDL_config.h correct
+cd ..
+# even if configure errors and complains you're missing something, no worries, we just need the headers, not to build the binaries.
+
+
+# now for cimgui itself:
+
+git clone https://github.com/cimgui/cimgui
+cd cimgui
+git checkout tags/1.87dock
+git submodule update --init --recursive
+
+# now because of a poorly conditioned preprocessor in imgui, you'll have to change the file
+# imgui/backends/imgui_impl_sdl.cpp
+# find the block that defines SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE
+# add `#if !defined(SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE)` and `#endif` on the lines around it
+
+# same with the next line #define SDL_HAS_MOUSE_FOCUS_CLICKTHROUGH, wrap it in #if define()'s
+
+# then just below that in the block of SDL_CreateSystemCursor calls, put `#if 0` and `#endif` on the lines around it. 
+
+# then #if 0 out all of ImGui_ImplSDL2_UpdateMonitors() and its call
+
+# then line 277 or so, replace all `SDL_GetWindowForID(...)` with `bd->Window`
+
+
+# now change the Makefile in cimgui:
+# apply these changes to the Makefile in the cimgui base folder:
+	OBJS += ./imgui/backends/imgui_impl_sdl.o
+	# OBJS += ./imgui/backends/imgui_impl_opengl2.o  # I use opengl2 for desktop, but it doesn't handle GLES, so 
+	OBJS += ./imgui/backends/imgui_impl_opengl3.o  # ... so you have to use opengl3
+	CXXFLAGS += -Iwherever/you/put/the/SDL2/include
+	CXXFLAGS += -DIMGUI_IMPL_API=extern\ \"C\"
+	CXXFLAGS += -DSDL_HAS_CAPTURE_AND_GLOBAL_MOUSE=0
+	CXXFLAGS += -DSDL_HAS_MOUSE_FOCUS_CLICKTHROUGH=0
+	OUTPUTNAME = libcimgui_sdl.so
+
+# then build:
+make all
+
+# then copy to sandtetris, or wherever ffi.load can find it 
+# (could also be wherever LD_LIBRARY_PATH points)
+cp libcimgui_sdl.so ../sandtetris/
+cd ..
+
+
+# another cimgui prereq: we're going to have to change which backend cimgui uses from opengl2 to opengl3:
+vi ../imguiapp/imguiapp.lua
+# replace all ImplOpenGL2 with ImplOpenGL3, and ImplOpenGL3_Init() to ImplOpenGL3_Init(nil)
+# same with ffi/cimgui.lua
+
+
+# finally we can run it:
+cd sandtetris/
+# let luajit know where to look for libcimgui_sdl.so
+LD_LIBRARY_PATH=.
+
+luajit run.lua
+
+# you should see the same sort of error that glapp/tests/test_es.lua gives:
+# if your gles library supports the current repo glsl version (320 es) then it will work fine.
+# if not then it should tell you which versions are supported --
+# -- just go into the script and replace '320 es' with whatever version that is ('300 es' in my raspberry pi os emulator)
+
+
+# Ways I could make the code more accomodating and reduce the # of steps in this file:
+#
+# - In the Lua GL code I could query GLSL versions and stick whatever the latest is in the shader code.
+#   This would solve the need to replace/downgrade '320 es' to '300 es' or whatever version does work.
+#   The downside is if it picks a version too low then it'll give an even more cryptic error of whatever API changes are incompatible between the version chosen and the version of the code.
+#   Maybe a better best-practice would be to keep the code always using the #version of whatever the lowest-common-denominator is ... but meh.
+#
+#
+# - Maybe there's a better way to search for .so files if they aren't conveniently named.
+#   This would involve manually searching through wherever luajit searches for ffi.load files.
+#   Unlike vanilla lua, luajit isn't so flexible in changing this functionality afaik.
+#   I'm not sure there's an easy way to query all folders luajit searches through to find .so files.
+#   If there is then maybe I can then cycle through those folders and then do some pattern-matching of all filenames to find whatever .so looks like it would work best ... ?
+# 
+#   One fix is to follow the coding style at https://github.com/malkia/ufo and have, for every library, a possible Lua global variable to override to specify where to find the library.
+#   Then I could just set these in the sandtetris/run.lua file instead of changing them in every individual ffi/ file.
+#   However for multiple projects using the same header files, the changes should belong in the ffi/ header files and not the projects.
+#
+#
+# - cimgui is a pain to build against specific backends.  Maybe this has changed in the future?  I'll update my cimgui version and see if this changes things.
