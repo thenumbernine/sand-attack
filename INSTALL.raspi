@@ -53,29 +53,14 @@ git clone https://github.com/thenumbernine/lua-audio audio
 
 
 # Next, raspberry pi /usr/lib/arm-linux-gnueabihf/ doesn't like putting .so extension symlinks to the .so.<version> files.
-# So we have to accomodate luajit's dynamic linking to .so files by changing some lines in the ffi/ folder:
-# (Alternatively you can just add those symlinks yourself and then you won't have to change anything in the ffi/ folder.)
+# So we have to accomodate luajit's dynamic linking to .so files by specifying the exact names.
+# (Alternatively you can just add those symlinks yourself and then you won't have to change anything.)
+# Put the following lines at the top (line 2, immediately after the # line) of sandtetris/run.lua:
+	require 'ffi.load'.GLESv2 = 'libGLESv2.so.2'
+	require 'ffi.load'.SDL2 = 'libSDL2-2.0.so.0'
+	require 'ffi.load'.openal = 'libopenal.so.1'
+	require 'ffi.load'.vorbisfile = 'libvorbisfile.so.3'
 
-vi ffi/OpenGLES3.lua
-# ... at the end of the file, change last line to: `return ffi.load'libGLESv2.so.2'`.
-
-vi ffi/sdl.lua
-# ... at the end of the file, replace the last 10 or so lines after the ]] line with the line: `return ffi.load'libSDL2-2.0.so.0'`.
-
-vi ffi/OpenAL.lua
-# ... at the end of the file, within the final `else' block, replace `return ffi.load'openal'` with `return ffi.load'libopenal.so.1'`.
-
-vi ffi/vorbis/vorbisfile.lua
-# ... near the end, the line `local lib = ffi.load'vorbisfile'`, change this with `local lib = ffi.load'libvorbisfile.so.3'`.
-
-
-# Now we have to work around whatever GLES glsl version limit is present.
-# On the image I'm using, GLES doesn't support 320 es, only 300 es.  So I had to edit ...
-vi glapp/tests/test_es.lua
-# ... and change the glsl #version from `320 es` to `300 es`, or whatever works on your machine.
-# If you don't make this change and run the test as-is, it will work if your GLES supports '320 es'.
-# If your machine doesn't support '320 es' then it should give you an error telling you what versions your drivers do support (mine did) --
-# -- just set it to whichever supported glsl version is latest.
 
 # At this point you should be able to `cd glapp/tests && luajit test_es.lua` and it should run.
 
@@ -142,30 +127,3 @@ cd sandtetris/
 LD_LIBRARY_PATH=.
 
 luajit run.lua
-
-# you should see the same sort of error that glapp/tests/test_es.lua gives:
-# if your gles library supports the current repo glsl version (320 es) then it will work fine.
-# if not then it should tell you which versions are supported --
-# -- just go into the script and replace '320 es' with whatever version that is ('300 es' in my raspberry pi os emulator)
-
-
-# Ways I could make the code more accomodating and reduce the # of steps in this file:
-#
-# - In the Lua GL code I could query GLSL versions and stick whatever the latest is in the shader code.
-#   This would solve the need to replace/downgrade '320 es' to '300 es' or whatever version does work.
-#   The downside is if it picks a version too low then it'll give an even more cryptic error of whatever API changes are incompatible between the version chosen and the version of the code.
-#   Maybe a better best-practice would be to keep the code always using the #version of whatever the lowest-common-denominator is ... but meh.
-#
-#
-# - Maybe there's a better way to search for .so files if they aren't conveniently named.
-#   This would involve manually searching through wherever luajit searches for ffi.load files.
-#   Unlike vanilla lua, luajit isn't so flexible in changing this functionality afaik.
-#   I'm not sure there's an easy way to query all folders luajit searches through to find .so files.
-#   If there is then maybe I can then cycle through those folders and then do some pattern-matching of all filenames to find whatever .so looks like it would work best ... ?
-#
-#   One fix is to follow the coding style at https://github.com/malkia/ufo and have, for every library, a possible Lua global variable to override to specify where to find the library.
-#   Then I could just set these in the sandtetris/run.lua file instead of changing them in every individual ffi/ file.
-#   However for multiple projects using the same header files, the changes should belong in the ffi/ header files and not the projects.
-#
-#
-# - imgui is a pain to build against specific backends.

@@ -252,9 +252,10 @@ function App:initGL(...)
 		data = vtxbufCPU,
 	}
 
-	--local glslVersion = 460	-- too new?
+	--local glslVersion = 460	-- too new
 	--local glslVersion = 430
-	local glslVersion = '320 es'
+	--local glslVersion = '320 es'	-- too new
+	local glslVersion = '300 es'
 	self.displayShader = GLProgram{
 		vertexCode = [[
 #version ]]..glslVersion..[[
