@@ -51,19 +51,29 @@ git clone https://github.com/thenumbernine/lua-audio audio
 #sudo apt install libvorbisfile3
 #sudo apt install libopenal1
 
-
-# Next, raspberry pi /usr/lib/arm-linux-gnueabihf/ doesn't like putting .so extension symlinks to the .so.<version> files.
-# So we have to accomodate luajit's dynamic linking to .so files by specifying the exact names.
+# Raspberry pi /usr/lib/arm-linux-gnueabihf/ doesn't like putting .so extension symlinks to the .so.<version> files.
+# So from here on out we will have to hack in the specific library names for luajit to link to them.
 # (Alternatively you can just add those symlinks yourself and then you won't have to change anything.)
-# Put the following lines at the top (line 2, immediately after the # line) of sandtetris/run.lua:
+
+# You should be able to run the test_es.lua script in glapp/tests using the following lengthy command (which will override the .so names to point to the names in Raspberry Pi):
+luajit -e "require'ffi.load'.GLESv2='libGLESv2.so.2' require'ffi.load'.SDL2='libSDL2-2.0.so.0" test_es.lua
+# ... and you should see a spinning triangle.
+
+
+# Now we have to accomodate luajit's dynamic linking to .so files by specifying the exact names.
+# Put the following lines at the top of sandtetris/run.lua:
+#  (Put them immediately after line 1 which contains the # with luajit command used to launch sandtetris.)
 	require 'ffi.load'.GLESv2 = 'libGLESv2.so.2'
 	require 'ffi.load'.SDL2 = 'libSDL2-2.0.so.0'
 	require 'ffi.load'.openal = 'libopenal.so.1'
 	require 'ffi.load'.vorbisfile = 'libvorbisfile.so.3'
 
-
-# At this point you should be able to `cd glapp/tests && luajit test_es.lua` and it should run.
-
+# Alternatively if you want these library redirections to work for multiple projects, you can add the following keys to the table in the file ffi/load.lua:
+# (but this is not necessary with the modified sandtetris/run.lua)
+	GLESv2 = 'libGLESv2.so.2',
+	SDL2 = 'libSDL2-2.0.so.0',
+	openal = 'libopenal.so.1',
+	vorbisfile = 'libvorbisfile.so.3',
 
 
 # now the hard part: cimgui
@@ -92,24 +102,16 @@ cd cimgui
 git checkout tags/1.89.7dock
 git submodule update --init --recursive
 
-# now because of a poorly conditioned preprocessor in imgui, you'll have to change the file
-# imgui/backends/imgui_impl_sdl2.cpp
-# - Find the block of 5 lines that defines SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE.  The 5 lines will be `#if ...` `#define SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE 1` `#else` `#define SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE 0` `#endif`
-# - Add the line `#if !defined(SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE)` before these 5 lines, and the line `#endif` after these 5 lines. 
-
-# then just below that in the block of SDL_CreateSystemCursor calls, put `#if 0` and `#endif` on the lines around it.
-
-# then #if 0 out all of ImGui_ImplSDL2_UpdateMonitors() and its call
-
 
 # now change the Makefile in cimgui:
 # apply these changes to the Makefile in the cimgui base folder:
 	OBJS += ./imgui/backends/imgui_impl_sdl2.o
 	OBJS += ./imgui/backends/imgui_impl_opengl3.o
-	CXXFLAGS += -Iwherever/you/put/the/SDL2/include
 	CXXFLAGS += -DIMGUI_IMPL_API=extern\ \"C\"
-	CXXFLAGS += -DSDL_HAS_CAPTURE_AND_GLOBAL_MOUSE=0
-	CXXFLAGS += -DSDL_HAS_MOUSE_FOCUS_CLICKTHROUGH=0
+	CXXFLAGS += -Iwherever/you/put/the/SDL2/include
+	# make sure loading cimgui loads SDL2 as well.
+	# I could also put this as a ffi.load somewhere in the ffi/cimgui.lua file but meh.
+	CXXFLAGS += /usr/lib/arm-linux-gnueabihf/libSDL2-2.0.so.0
 	OUTPUTNAME = libcimgui_sdl.so
 
 # then build:
@@ -124,6 +126,6 @@ cd ..
 # finally we can run it:
 cd sandtetris/
 # let luajit know where to look for libcimgui_sdl.so
-LD_LIBRARY_PATH=.
+export LD_LIBRARY_PATH=.
 
 luajit run.lua
