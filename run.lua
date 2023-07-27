@@ -1,9 +1,18 @@
 #!/usr/bin/env luajit
 
--- specify GL version first:
-local gl = require 'gl.setup'()	-- for desktop GL
---local gl = require 'gl.setup' 'ffi.OpenGLES1'	-- for GLES1 ... but GLES1 has no shaders afaik?
---local gl = require 'gl.setup' 'ffi.OpenGLES2'	-- for GLES2
---local gl = require 'gl.setup' 'ffi.OpenGLES3'	-- for GLES3
+--[[ specify GL version first:
+require 'gl.setup'()	-- for desktop GL.  Windows needs this.
+--require 'gl.setup' 'ffi.OpenGLES1'	-- for GLES1 ... but GLES1 has no shaders afaik?
+--require 'gl.setup' 'ffi.OpenGLES2'	-- for GLES2
+--require 'gl.setup' 'ffi.OpenGLES3'	-- for GLES3.  Linux or Raspberry Pi can handle this.
+--]]
+-- [[ or detect
+local glfn = nil	-- default gl
+local ffi = require 'ffi'
+if ffi.os == 'Linux' then
+	glfn = 'ffi.OpenGLES3'	-- linux / raspi (also linux) can use GLES3
+end
+require 'gl.setup'(glfn)
+--]]
 
 return require 'sandtetris.app'():run()
