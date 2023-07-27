@@ -182,6 +182,7 @@ function App:initGL(...)
 	self.cfg.startLevel = self.cfg.startLevel or 1
 	self.cfg.dropSpeed = self.cfg.dropSpeed or 5
 	self.cfg.sandModel = self.cfg.sandModel or 1
+	self.cfg.speedupCoeff = self.cfg.speedupCoeff or .007
 	self.cfg.toppleChance = self.cfg.toppleChance or 1
 	self.cfg.playerKeys = self.cfg.playerKeys or {}
 	self.cfg.highscores = self.cfg.highscores or {}
@@ -547,10 +548,11 @@ function App:upateFallSpeed()
 	local maxSpeedLevel = 13 -- fastest level .. no faster is permitted
 	local effectiveLevel = math.min(self.level, maxSpeedLevel)
 	-- TODO make this curve customizable
-	local secondsPerRow = (.8 - ((effectiveLevel-1)*.007))^(effectiveLevel-1)
+	local secondsPerRow = (.8 - ((effectiveLevel-1.)*self.cfg.speedupCoeff))^(effectiveLevel-1.)
 	local secondsPerLine = secondsPerRow / self.voxelsPerBlock
 	-- how many ticks to wait before dropping a piece
 	self.ticksToFall = secondsPerLine / self.updateInterval
+print('effectiveLevel', effectiveLevel, 'secondsPerRow', secondsPerRow, 'scondsPerLin', secondsPerLine, 'ticksToFall', self.ticksToFall)
 end
 
 function App:populatePiece(args)
@@ -849,7 +851,7 @@ function App:updateGame()
 				end
 				for i=istart,iend,istep do
 				--]]
-					local k =  i + self.pieceSize.x * j
+					local k = i + self.pieceSize.x * j
 					local color = ffi.cast('uint32_t*', player.pieceTex.image.buffer)[k]
 					if color ~= 0 then
 						local x = player.piecePos.x + i

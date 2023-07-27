@@ -184,6 +184,8 @@ function ConfigState:updateGUI()
 	self:centerLuatableTooltipSliderFloat('Drop Speed', app.cfg, 'dropSpeed', .1, 100, nil, ig.ImGuiSliderFlags_Logarithmic)
 	self:centerLuatableCheckbox('Continuous Drop', app.cfg, 'continuousDrop')
 
+	self:centerLuatableTooltipSliderFloat('Per-Level Speedup Coeff', app.cfg, 'speedupCoeff', .07, .00007, '%.5f', ig.ImGuiSliderFlags_Logarithmic)
+
 	self:centerText'Board:'
 	self:centerLuatableTooltipInputInt('Board Width', app.cfg.boardSize, 'x')
 	self:centerLuatableTooltipInputInt('Board Height', app.cfg.boardSize, 'y')
@@ -507,6 +509,7 @@ HighScoreState.fields = table{
 	'boardWidth',
 	'boardHeight',
 	'sandModel',
+	'speedupCoeff',
 }
 function HighScoreState:makeNewRecord()
 	local app = self.app
@@ -517,6 +520,7 @@ function HighScoreState:makeNewRecord()
 		elseif field == 'toppleChance'
 		or field == 'numColors'
 		or field == 'sandModel'
+		or field == 'speedupCoeff'
 		then
 			record[field] = app.cfg[field]
 		elseif field == 'boardWidth' then
