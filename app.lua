@@ -552,7 +552,7 @@ function App:upateFallSpeed()
 	local secondsPerLine = secondsPerRow / self.voxelsPerBlock
 	-- how many ticks to wait before dropping a piece
 	self.ticksToFall = secondsPerLine / self.updateInterval
-print('effectiveLevel', effectiveLevel, 'secondsPerRow', secondsPerRow, 'scondsPerLin', secondsPerLine, 'ticksToFall', self.ticksToFall)
+--print('effectiveLevel', effectiveLevel, 'secondsPerRow', secondsPerRow, 'scondsPerLin', secondsPerLine, 'ticksToFall', self.ticksToFall)
 end
 
 function App:populatePiece(args)
