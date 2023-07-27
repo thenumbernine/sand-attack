@@ -104,28 +104,23 @@ cd ..
 
 git clone https://github.com/cimgui/cimgui
 cd cimgui
-git checkout tags/1.87dock
+git checkout tags/1.89.7dock
 git submodule update --init --recursive
 
 # now because of a poorly conditioned preprocessor in imgui, you'll have to change the file
-# imgui/backends/imgui_impl_sdl.cpp
-# find the block that defines SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE
-# add `#if !defined(SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE)` and `#endif` on the lines around it
-
-# same with the next line #define SDL_HAS_MOUSE_FOCUS_CLICKTHROUGH, wrap it in #if define()'s
+# imgui/backends/imgui_impl_sdl2.cpp
+# - Find the block of 5 lines that defines SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE.  The 5 lines will be `#if ...` `#define SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE 1` `#else` `#define SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE 0` `#endif`
+# - Add the line `#if !defined(SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE)` before these 5 lines, and the line `#endif` after these 5 lines. 
 
 # then just below that in the block of SDL_CreateSystemCursor calls, put `#if 0` and `#endif` on the lines around it.
 
 # then #if 0 out all of ImGui_ImplSDL2_UpdateMonitors() and its call
 
-# then line 277 or so, replace all `SDL_GetWindowForID(...)` with `bd->Window`
-
 
 # now change the Makefile in cimgui:
 # apply these changes to the Makefile in the cimgui base folder:
-	OBJS += ./imgui/backends/imgui_impl_sdl.o
-	# OBJS += ./imgui/backends/imgui_impl_opengl2.o  # I use opengl2 for desktop, but it doesn't handle GLES, so
-	OBJS += ./imgui/backends/imgui_impl_opengl3.o  # ... so you have to use opengl3
+	OBJS += ./imgui/backends/imgui_impl_sdl2.o
+	OBJS += ./imgui/backends/imgui_impl_opengl3.o
 	CXXFLAGS += -Iwherever/you/put/the/SDL2/include
 	CXXFLAGS += -DIMGUI_IMPL_API=extern\ \"C\"
 	CXXFLAGS += -DSDL_HAS_CAPTURE_AND_GLOBAL_MOUSE=0
@@ -139,12 +134,6 @@ make all
 # (could also be wherever LD_LIBRARY_PATH points)
 cp libcimgui_sdl.so ../sandtetris/
 cd ..
-
-
-# another cimgui prereq: we're going to have to change which backend cimgui uses from opengl2 to opengl3:
-vi ../imguiapp/imguiapp.lua
-# replace all ImplOpenGL2 with ImplOpenGL3, and ImplOpenGL3_Init() to ImplOpenGL3_Init(nil)
-# same with ffi/cimgui.lua
 
 
 # finally we can run it:
@@ -179,4 +168,4 @@ luajit run.lua
 #   However for multiple projects using the same header files, the changes should belong in the ffi/ header files and not the projects.
 #
 #
-# - cimgui is a pain to build against specific backends.  Maybe this has changed in the future?  I'll update my cimgui version and see if this changes things.
+# - imgui is a pain to build against specific backends.
