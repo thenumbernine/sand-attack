@@ -1166,7 +1166,8 @@ function App:drawTouchRegions()
 			if e[1] == sdl.SDL_MOUSEBUTTONDOWN 
 			or e[1] == sdl.SDL_FINGERDOWN
 			then
-				local x,y = e[2], e[3]
+				local x = e[2] * self.width
+				local y = e[3] * self.height
 				ig.ImDrawList_AddCircle(
 					drawlist,			-- drawlist
 					ig.ImVec2(x,y),	-- center
@@ -1194,7 +1195,8 @@ function App:drawTouchRegions()
 			if e[1] == sdl.SDL_MOUSEBUTTONDOWN 
 			or e[1] == sdl.SDL_FINGERDOWN
 			then
-				local x,y = e[2], e[3]
+				local x = e[2] * self.width
+				local y = e[3] * self.height
 				self.mvMat:setTranslate(
 					x-buttonRadius,
 					y-buttonRadius)
@@ -1241,8 +1243,8 @@ function App:getEventName(sdlEventID, a,b,c)
 		[sdl.SDL_CONTROLLERAXISMOTION] = 'gamepad<?=a?> axis<?=b?> <?=c?>',
 		[sdl.SDL_CONTROLLERBUTTONDOWN] = 'gamepad<?=a?> button<?=b?>',
 		[sdl.SDL_KEYDOWN] = 'key <?=key(a)?>',
-		[sdl.SDL_MOUSEBUTTONDOWN] = 'mouse <?=c?> x<?=a?> y<?=b?>',
-		[sdl.SDL_FINGERDOWN] = 'finger x<?=a?> y<?=b?>',
+		[sdl.SDL_MOUSEBUTTONDOWN] = 'mouse <?=c?> x<?=math.floor(a*100)?> y<?=math.floor(b*100)?>',
+		[sdl.SDL_FINGERDOWN] = 'finger x<?=math.floor(a*100)?> y<?=math.floor(b*100)?>',
 	})[sdlEventID], {
 		a=a, b=b, c=c,
 		dir=dir, key=key,
@@ -1275,8 +1277,8 @@ function App:processButtonEvent(press, ...)
 					then
 						match = etype == buttonDesc[1]
 						if match then
-							local dx = ex - buttonDesc[2] 
-							local dy = ey - buttonDesc[3] 
+							local dx = (ex - buttonDesc[2]) * self.width
+							local dy = (ey - buttonDesc[3]) * self.height
 							if dx*dx + dy*dy >= buttonRadius*buttonRadius then
 								match = false
 							end
@@ -1368,7 +1370,7 @@ function App:event(e, ...)
 		self:processButtonEvent(press, sdl.SDL_KEYDOWN, e.key.keysym.sym)
 	elseif e.type == sdl.SDL_MOUSEBUTTONDOWN or e.type == sdl.SDL_MOUSEBUTTONUP then
 		local press = e.type == sdl.SDL_MOUSEBUTTONDOWN
-		self:processButtonEvent(press, sdl.SDL_MOUSEBUTTONDOWN, e.button.x, e.button.y, e.button.button)
+		self:processButtonEvent(press, sdl.SDL_MOUSEBUTTONDOWN, tonumber(e.button.x)/self.width, tonumber(e.button.y)/self.height, e.button.button)
 	--elseif e.type == sdl.SDL_MOUSEWHEEL then
 	-- how does sdl do mouse wheel events ...
 	elseif e.type == sdl.SDL_FINGERDOWN or e.type == sdl.SDL_FINGERUP then

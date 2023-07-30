@@ -123,7 +123,7 @@ function PlayingState:init(app)
 	app.paused = false
 end
 function PlayingState:update()
-	self:drawTouchRegions()
+	self.app:drawTouchRegions()
 end
 function PlayingState:updateGUI()
 	local app = self.app
