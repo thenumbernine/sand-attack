@@ -8,6 +8,7 @@ local string = require 'ext.string'
 local range = require 'ext.range'
 local fromlua = require 'ext.fromlua'
 local tolua = require 'ext.tolua'
+local template = require 'template'
 local matrix = require 'matrix.ffi'
 local Image = require 'image'
 local gl = require 'gl'
@@ -1129,13 +1130,43 @@ function App:flipBoard()
 	self.sandTex:bind():subimage()
 end
 
+-- static, used by gamestate and app
+function App:getEventName(sdlEventID, a,b,c)
+	if not a then return '?' end
+	local function dir(d)
+		local s = table()
+		local ds = 'udlr'
+		for i=1,4 do
+			if 0 ~= bit.band(d,bit.lshift(1,i-1)) then
+				s:insert(ds:sub(i,i))
+			end
+		end
+		return s:concat()
+	end
+	local function key(k)
+		return ffi.string(sdl.SDL_GetKeyName(k))
+	end
+	return template(({
+		[sdl.SDL_JOYHATMOTION] = 'joy<?=a?> hat<?=b?> <?=dir(c)?>',
+		[sdl.SDL_JOYAXISMOTION] = 'joy<?=a?> axis<?=b?> <?=c?>',
+		[sdl.SDL_JOYBUTTONDOWN] = 'joy<?=a?> button<?=b?>',
+		[sdl.SDL_CONTROLLERAXISMOTION] = 'gamepad<?=a?> axis<?=b?> <?=c?>',
+		[sdl.SDL_CONTROLLERBUTTONDOWN] = 'gamepad<?=a?> button<?=b?>',
+		[sdl.SDL_MOUSEBUTTONDOWN] = 'mouse <?=a?> x<?=b?> y<?=c?>',
+		[sdl.SDL_KEYDOWN] = 'key <?=key(a)?>',
+	})[sdlEventID], {
+		a=a, b=b, c=c,
+		dir=dir, key=key,
+	})
+end
+
 function App:processButtonEvent(press, ...)
 	-- TODO put the callback somewhere, not a global
 	-- it's used by the New Game menu
 	if waitingForEvent then
 		if press then
 			local ev = {...}
-			ev.name = Player:getEventName(...)
+			ev.name = self:getEventName(...)
 			waitingForEvent.callback(ev)
 			waitingForEvent = nil
 		end
@@ -1207,11 +1238,29 @@ function App:event(e, ...)
 		-- e.jbutton.menustate is 0/1 for up/down, right?
 		local press = e.type == sdl.SDL_JOYBUTTONDOWN
 		self:processButtonEvent(press, sdl.SDL_JOYBUTTONDOWN, e.jbutton.which, e.jbutton.button)
+	elseif e.type == sdl.SDL_CONTROLLERAXISMOTION then
+		-- -1,0,1 depend on the axis press
+		local lr = math.floor(3 * (tonumber(e.caxis.value) + 32768) / 65536) - 1
+		local press = lr ~= 0
+		if not press then
+			-- clear both left and right movement
+			self:processButtonEvent(press, sdl.SDL_CONTROLLERAXISMOTION, e.caxis.which, e.jaxis.axis, -1)
+			self:processButtonEvent(press, sdl.SDL_CONTROLLERAXISMOTION, e.caxis.which, e.jaxis.axis, 1)
+		else
+			-- set movement for the lr direction
+			self:processButtonEvent(press, sdl.SDL_CONTROLLERAXISMOTION, e.caxis.which, e.jaxis.axis, lr)
+		end
+	elseif e.type == sdl.SDL_CONTROLLERBUTTONDOWN or e.type == sdl.SDL_CONTROLLERBUTTONUP then
+		local press = e.type == sdl.SDL_CONTROLLERBUTTONDOWN
+		self:processButtonEvent(press, sdl.SDL_CONTROLLERBUTTONDOWN, e.cbutton.which, e.cbutton.button)
 	elseif e.type == sdl.SDL_KEYDOWN or e.type == sdl.SDL_KEYUP then
 		local press = e.type == sdl.SDL_KEYDOWN
 		self:processButtonEvent(press, sdl.SDL_KEYDOWN, e.key.keysym.sym)
-	-- else mouse buttons?
-	-- else mouse motion / position?
+	elseif e.type == sdl.SDL_MOUSEBUTTONDOWN or e.type == sdl.SDL_MOUSEBUTTONUP then
+		local press = e.type == sdl.SDL_MOUSEBUTTONDOWN
+		self:processButtonEvent(press, sdl.SDL_MOUSEBUTTONDOWN, e.button.button, e.button.x, e.button.y)
+	--elseif e.type == sdl.SDL_MOUSEWHEEL then
+	-- how does sdl do mouse wheel events ...
 	end
 
 	-- TODO how to incorporate this into the gameplay ...

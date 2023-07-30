@@ -216,6 +216,10 @@ function ConfigState:updateGUI()
 	self:endFullView()
 end
 
+
+-- default key mappings for first few players
+local defaultKeys
+
 local StartNewGameState = class(MenuState)
 function StartNewGameState:init(app, multiplayer)
 	StartNewGameState.super.init(self, app)
@@ -224,6 +228,29 @@ function StartNewGameState:init(app, multiplayer)
 		app.numPlayers = math.max(app.numPlayers, 2)
 	else
 		app.numPlayers = 1
+	end
+
+	local App = require 'sandtetris.app'
+	defaultKeys = {
+		{
+			up = {sdl.SDL_KEYDOWN, sdl.SDLK_UP},
+			down = {sdl.SDL_KEYDOWN, sdl.SDLK_DOWN},
+			left = {sdl.SDL_KEYDOWN, sdl.SDLK_LEFT},
+			right = {sdl.SDL_KEYDOWN, sdl.SDLK_RIGHT},
+			pause = {sdl.SDL_KEYDOWN, sdl.SDLK_ESCAPE},
+		},
+		{
+			up = {sdl.SDL_KEYDOWN, ('w'):byte()},
+			down = {sdl.SDL_KEYDOWN, ('s'):byte()},
+			left = {sdl.SDL_KEYDOWN, ('a'):byte()},
+			right = {sdl.SDL_KEYDOWN, ('d'):byte()},
+			pause = {},	-- sorry keypad player 2
+		},
+	}
+	for _,keyEvents in ipairs(defaultKeys) do
+		for keyName,event in pairs(keyEvents) do
+			event.name = App:getEventName(table.unpack(event))
+		end
 	end
 end
 local tmpcolor = ig.ImVec4()	-- for imgui button
@@ -255,7 +282,7 @@ function StartNewGameState:updateGUI()
 	for i=1,app.numPlayers do
 		if not app.cfg.playerKeys[i] then
 			app.cfg.playerKeys[i] = {}
-			local defaultsrc = Player.defaultKeys[i]
+			local defaultsrc = defaultKeys[i]
 			for _,keyname in ipairs(Player.keyNames) do
 				app.cfg.playerKeys[i][keyname] = defaultsrc and defaultsrc[keyname] or {}
 			end
