@@ -71,6 +71,10 @@ end
 local App = class(ImGuiApp)
 
 App.title = 'Sand Attack'
+App.sdlInitFlags = bit.bor(
+	sdl.SDL_INIT_VIDEO,
+	sdl.SDL_INIT_JOYSTICK
+)
 
 App.useAudio = true	-- set to false to disable audio altogether
 App.showFPS = false	-- show fps in gui
@@ -210,6 +214,16 @@ function App:initGL(...)
 	self.numSandVoxels = 0
 
 	self.loseScreenDuration = 3
+
+	self.buttonTex = GLTex2D{
+		image = Image'tex/button.png':flip(),
+		wrap = {
+			s = gl.GL_CLAMP_TO_EDGE,
+			t = gl.GL_CLAMP_TO_EDGE,
+		},
+		minFilter = gl.GL_NEAREST,
+		magFilter = gl.GL_LINEAR,
+	}
 
 	self.youloseTex = GLTex2D{
 		image = Image'tex/youlose.png':flip(),
@@ -1111,7 +1125,6 @@ function App:update(...)
 	App.super.update(self, ...)
 	glreport'here'
 
-
 	if self.showFPS then
 		self.fpsSampleCount = self.fpsSampleCount + 1
 		if self.thisTime - self.lastFrameTime >= 1 then
@@ -1124,6 +1137,81 @@ function App:update(...)
 end
 App.lastFrameTime = 0
 App.fpsSampleCount = 0
+
+function App:drawTouchRegions()
+	-- TODO how to customize button radius ...
+	local buttonRadius = self.width*.05
+	local buttonThickness = buttonRadius * .1
+	
+	--[=[ draw with imgui (in updateGUI)
+	-- show touch circles at all times
+	-- TODO just do it in gl
+	local viewport = ig.igGetMainViewport()
+	ig.igSetNextWindowPos(viewport.WorkPos, 0, ig.ImVec2())
+	ig.igSetNextWindowSize(viewport.WorkSize, 0)
+	ig.igBegin(' ', nil, bit.bor(
+		ig.ImGuiWindowFlags_NoMove,
+		ig.ImGuiWindowFlags_NoResize,
+		ig.ImGuiWindowFlags_NoCollapse,
+		ig.ImGuiWindowFlags_NoDecoration,
+		ig.ImGuiWindowFlags_NoBackground,
+		ig.ImGuiWindowFlags_NoBringToFrontOnFocus
+	))
+	-- if we're editing a certain player's inputs ...
+	-- TODO maybe just show always? or only editing - but show for all players?
+	for i=1,self.numPlayers do
+		local drawlist = ig.igGetWindowDrawList()
+		for _,keyname in ipairs(Player.keyNames) do
+			local e = self.cfg.playerKeys[i][keyname]
+			if e[1] == sdl.SDL_MOUSEBUTTONDOWN 
+			or e[1] == sdl.SDL_FINGERDOWN
+			then
+				local x,y = e[2], e[3]
+				ig.ImDrawList_AddCircle(
+					drawlist,			-- drawlist
+					ig.ImVec2(x,y),	-- center
+					buttonRadius,	-- radius
+					0xffffffff, -- ImU32
+					10,	-- num_segments
+					buttonThickness)	-- thicknes
+			end
+		end
+	end
+	ig.igEnd()
+	--]=]
+	-- [=[ draw with gl
+	gl.glEnable(gl.GL_BLEND)
+	gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
+	self.displayShader
+		:use()
+		:enableAttrs()
+	gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 0)
+	self.buttonTex:bind()
+	self.projMat:setOrtho(0,self.width,self.height,0,-1,1)
+	for i=1,self.numPlayers do
+		for _,keyname in ipairs(Player.keyNames) do
+			local e = self.cfg.playerKeys[i][keyname]
+			if e[1] == sdl.SDL_MOUSEBUTTONDOWN 
+			or e[1] == sdl.SDL_FINGERDOWN
+			then
+				local x,y = e[2], e[3]
+				self.mvMat:setTranslate(
+					x-buttonRadius,
+					y-buttonRadius)
+					:applyScale(2*buttonRadius, 2*buttonRadius)
+				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
+				gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+				gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+			end
+		end
+	end
+	self.buttonTex:unbind()
+	self.displayShader
+		:disableAttrs()
+		:useNone()
+	gl.glDisable(gl.GL_BLEND)
+	--]=]
+end
 
 function App:flipBoard()
 	self.sandmodel:flipBoard()
@@ -1152,8 +1240,9 @@ function App:getEventName(sdlEventID, a,b,c)
 		[sdl.SDL_JOYBUTTONDOWN] = 'joy<?=a?> button<?=b?>',
 		[sdl.SDL_CONTROLLERAXISMOTION] = 'gamepad<?=a?> axis<?=b?> <?=c?>',
 		[sdl.SDL_CONTROLLERBUTTONDOWN] = 'gamepad<?=a?> button<?=b?>',
-		[sdl.SDL_MOUSEBUTTONDOWN] = 'mouse <?=a?> x<?=b?> y<?=c?>',
 		[sdl.SDL_KEYDOWN] = 'key <?=key(a)?>',
+		[sdl.SDL_MOUSEBUTTONDOWN] = 'mouse <?=c?> x<?=a?> y<?=b?>',
+		[sdl.SDL_FINGERDOWN] = 'finger x<?=a?> y<?=b?>',
 	})[sdlEventID], {
 		a=a, b=b, c=c,
 		dir=dir, key=key,
@@ -1161,32 +1250,53 @@ function App:getEventName(sdlEventID, a,b,c)
 end
 
 function App:processButtonEvent(press, ...)
+	local buttonRadius = self.width*.05
 	-- TODO put the callback somewhere, not a global
 	-- it's used by the New Game menu
-	if waitingForEvent then
+	if self.waitingForEvent then
 		if press then
 			local ev = {...}
 			ev.name = self:getEventName(...)
-			waitingForEvent.callback(ev)
-			waitingForEvent = nil
+			self.waitingForEvent.callback(ev)
+			self.waitingForEvent = nil
 		end
 	else
+		local etype, ex, ey = ...
 		local descLen = select('#', ...)
 		for playerIndex, playerConfig in ipairs(self.cfg.playerKeys) do
 			for buttonName, buttonDesc in pairs(playerConfig) do
-				if descLen == #buttonDesc then
-					local match = true
-					for i=1,descLen do
-						if select(i, ...) ~= buttonDesc[i] then
-							match = false
-							break
+				-- special case for mouse/touch, test within a distanc
+				local match = descLen == #buttonDesc
+				if match then
+					local istart = 1
+					-- special case for mouse/touch, click within radius ...
+					if etype == sdl.SDL_MOUSEBUTTONDOWN
+					or etype == sdl.SDL_FINGERDOWN
+					then
+						match = etype == buttonDesc[1]
+						if match then
+							local dx = ex - buttonDesc[2] 
+							local dy = ey - buttonDesc[3] 
+							if dx*dx + dy*dy >= buttonRadius*buttonRadius then
+								match = false
+							end
+							-- skip the first 2 for values 
+							istart = 4
 						end
 					end
 					if match then
-						local player = self.players[playerIndex]
-						if player then
-							player.keyPress[buttonName] = press
+						for i=istart,descLen do
+							if select(i, ...) ~= buttonDesc[i] then
+								match = false
+								break
+							end
 						end
+					end
+				end
+				if match then
+					local player = self.players[playerIndex]
+					if player then
+						player.keyPress[buttonName] = press
 					end
 				end
 			end
@@ -1258,9 +1368,12 @@ function App:event(e, ...)
 		self:processButtonEvent(press, sdl.SDL_KEYDOWN, e.key.keysym.sym)
 	elseif e.type == sdl.SDL_MOUSEBUTTONDOWN or e.type == sdl.SDL_MOUSEBUTTONUP then
 		local press = e.type == sdl.SDL_MOUSEBUTTONDOWN
-		self:processButtonEvent(press, sdl.SDL_MOUSEBUTTONDOWN, e.button.button, e.button.x, e.button.y)
+		self:processButtonEvent(press, sdl.SDL_MOUSEBUTTONDOWN, e.button.x, e.button.y, e.button.button)
 	--elseif e.type == sdl.SDL_MOUSEWHEEL then
 	-- how does sdl do mouse wheel events ...
+	elseif e.type == sdl.SDL_FINGERDOWN or e.type == sdl.SDL_FINGERUP then
+		local press = e.type == sdl.SDL_FINGERDOWN
+		self:processButtonEvent(press, sdl.SDL_FINGERDOWN, e.tfinger.x, e.tfinger.y)
 	end
 
 	-- TODO how to incorporate this into the gameplay ...

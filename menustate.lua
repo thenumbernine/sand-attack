@@ -123,6 +123,7 @@ function PlayingState:init(app)
 	app.paused = false
 end
 function PlayingState:update()
+	self:drawTouchRegions()
 end
 function PlayingState:updateGUI()
 	local app = self.app
@@ -132,7 +133,8 @@ function PlayingState:updateGUI()
 		ig.ImGuiWindowFlags_NoMove,
 		ig.ImGuiWindowFlags_NoResize,
 		ig.ImGuiWindowFlags_NoCollapse,
-		ig.ImGuiWindowFlags_NoDecoration
+		ig.ImGuiWindowFlags_NoDecoration,
+		ig.ImGuiWindowFlags_NoBackground
 	))
 	ig.igSetWindowFontScale(.5)
 
@@ -253,6 +255,14 @@ function StartNewGameState:init(app, multiplayer)
 		end
 	end
 end
+
+-- if we're editing keys then show keys
+function StartNewGameState:update()
+	if self.currentPlayerIndex then
+		self.app:drawTouchRegions()
+	end
+end
+
 local tmpcolor = ig.ImVec4()	-- for imgui button
 local tmpcolorv = vec3f()		-- for imgui color picker
 function StartNewGameState:updateGUI()
@@ -294,28 +304,33 @@ function StartNewGameState:updateGUI()
 	end
 	if self.currentPlayerIndex then
 		assert(self.currentPlayerIndex >= 1 and self.currentPlayerIndex <= app.numPlayers)
-		if ig.igBeginPopupModal'Edit Keys' then
+		-- this is modal but it makes the drawn onscreen gui hard to see
+		--if ig.igBeginPopupModal'Edit Keys' then
+		-- this isn't modal so you can select off this window
+		if ig.igBeginPopup('Edit Keys', 0) then
 			for _,keyname in ipairs(Player.keyNames) do
 				ig.igPushID_Str(keyname)
 				ig.igText(keyname)
 				ig.igSameLine()
 				local ev = app.cfg.playerKeys[self.currentPlayerIndex][keyname]
 				if ig.igButton(
-					waitingForEvent
-					and waitingForEvent.key == keyname
-					and waitingForEvent.playerIndex == self.currentPlayerIndex
+					app.waitingForEvent
+					and app.waitingForEvent.key == keyname
+					and app.waitingForEvent.playerIndex == self.currentPlayerIndex
 					and 'Press Button...' or (ev and ev.name) or '?')
 				then
-					waitingForEvent = {
+					app.waitingForEvent = {
 						key = keyname,
 						playerIndex = self.currentPlayerIndex,
 						callback = function(ev)
-							-- always reserve escape?  or allow player to configure it as the pause key?
-							--if ev[1] == sdl.SDL_KEYDOWN and ev[2] == sdl.SDLK_ESCAPE then
-							--	app.cfg.playerKeys[self.currentPlayerIndex][keyname] = {}
-							--else
-								app.cfg.playerKeys[self.currentPlayerIndex][keyname] = ev
-							--end
+							--[[ always reserve escape?  or allow player to configure it as the pause key?
+							if ev[1] == sdl.SDL_KEYDOWN and ev[2] == sdl.SDLK_ESCAPE then
+								app.cfg.playerKeys[self.currentPlayerIndex][keyname] = {}
+								return
+							end
+							--]]
+							-- mouse/touch requires two clicks to determine size? meh... no, confusing.
+							app.cfg.playerKeys[self.currentPlayerIndex][keyname] = ev
 						end,
 					}
 				end
@@ -396,7 +411,6 @@ function StartNewGameState:updateGUI()
 		end
 	end
 	--]]
-
 	self:endFullView()
 end
 
@@ -508,9 +522,14 @@ function SplashScreenState:update()
 end
 function SplashScreenState:event(e)
 	local app = self.app
-	if e.type == sdl.SDL_KEYDOWN
-	or e.type == sdl.SDL_MOUSEBUTTONDOWN
+	if e.type == sdl.SDL_JOYHATMOTION
+	or e.type == sdl.SDL_JOYAXISMOTION
 	or e.type == sdl.SDL_JOYBUTTONDOWN
+	or e.type == sdl.SDL_CONTROLLERAXISMOTION
+	or e.type == sdl.SDL_CONTROLLERBUTTONDOWN
+	or e.type == sdl.SDL_KEYDOWN
+	or e.type == sdl.SDL_MOUSEBUTTONDOWN
+	or e.type == sdl.SDL_FINGERDOWN
 	then
 		app.menustate = MainMenuState(app)
 	end
