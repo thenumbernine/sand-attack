@@ -210,6 +210,7 @@ function ConfigState:updateGUI()
 		end
 	end
 
+	self:centerLuatableTooltipSliderFloat('On-Screen Button Radius', app.cfg, 'screenButtonRadius', .001, 1)
 
 	if self:centerButton'Done' then
 		app:saveConfig()
@@ -305,9 +306,9 @@ function StartNewGameState:updateGUI()
 	if self.currentPlayerIndex then
 		assert(self.currentPlayerIndex >= 1 and self.currentPlayerIndex <= app.numPlayers)
 		-- this is modal but it makes the drawn onscreen gui hard to see
-		--if ig.igBeginPopupModal'Edit Keys' then
+		if ig.igBeginPopupModal'Edit Keys' then
 		-- this isn't modal so you can select off this window
-		if ig.igBeginPopup('Edit Keys', 0) then
+		--if ig.igBeginPopup('Edit Keys', 0) then
 			for _,keyname in ipairs(Player.keyNames) do
 				ig.igPushID_Str(keyname)
 				ig.igText(keyname)

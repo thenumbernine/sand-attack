@@ -192,6 +192,7 @@ function App:initGL(...)
 	self.cfg.playerKeys = self.cfg.playerKeys or {}
 	self.cfg.highscores = self.cfg.highscores or {}
 	self.cfg.numColors = self.cfg.numColors or 4
+	self.cfg.screenButtonRadius = self.cfg.screenButtonRadius or .05
 	if self.cfg.continuousDrop == nil then
 		self.cfg.continuousDrop = true
 	end
@@ -966,10 +967,6 @@ function App:update(...)
 	self.thisTime = getTime()
 	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 
-	if self.menustate.update then
-		self.menustate:update()
-	end
-
 	local w, h = self.sandSize:unpack()
 
 	if not self.paused then
@@ -1125,6 +1122,13 @@ function App:update(...)
 	App.super.update(self, ...)
 	glreport'here'
 
+
+	-- draw menustate over gui?
+	-- right now it's just the splash screen and the touch buttons
+	if self.menustate.update then
+		self.menustate:update()
+	end
+
 	if self.showFPS then
 		self.fpsSampleCount = self.fpsSampleCount + 1
 		if self.thisTime - self.lastFrameTime >= 1 then
@@ -1139,48 +1143,8 @@ App.lastFrameTime = 0
 App.fpsSampleCount = 0
 
 function App:drawTouchRegions()
-	-- TODO how to customize button radius ...
-	local buttonRadius = self.width*.05
-	local buttonThickness = buttonRadius * .1
-	
-	--[=[ draw with imgui (in updateGUI)
-	-- show touch circles at all times
-	-- TODO just do it in gl
-	local viewport = ig.igGetMainViewport()
-	ig.igSetNextWindowPos(viewport.WorkPos, 0, ig.ImVec2())
-	ig.igSetNextWindowSize(viewport.WorkSize, 0)
-	ig.igBegin(' ', nil, bit.bor(
-		ig.ImGuiWindowFlags_NoMove,
-		ig.ImGuiWindowFlags_NoResize,
-		ig.ImGuiWindowFlags_NoCollapse,
-		ig.ImGuiWindowFlags_NoDecoration,
-		ig.ImGuiWindowFlags_NoBackground,
-		ig.ImGuiWindowFlags_NoBringToFrontOnFocus
-	))
-	-- if we're editing a certain player's inputs ...
-	-- TODO maybe just show always? or only editing - but show for all players?
-	for i=1,self.numPlayers do
-		local drawlist = ig.igGetWindowDrawList()
-		for _,keyname in ipairs(Player.keyNames) do
-			local e = self.cfg.playerKeys[i][keyname]
-			if e[1] == sdl.SDL_MOUSEBUTTONDOWN 
-			or e[1] == sdl.SDL_FINGERDOWN
-			then
-				local x = e[2] * self.width
-				local y = e[3] * self.height
-				ig.ImDrawList_AddCircle(
-					drawlist,			-- drawlist
-					ig.ImVec2(x,y),	-- center
-					buttonRadius,	-- radius
-					0xffffffff, -- ImU32
-					10,	-- num_segments
-					buttonThickness)	-- thicknes
-			end
-		end
-	end
-	ig.igEnd()
-	--]=]
-	-- [=[ draw with gl
+	local buttonRadius = self.width * self.cfg.screenButtonRadius
+
 	gl.glEnable(gl.GL_BLEND)
 	gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
 	self.displayShader
@@ -1212,7 +1176,6 @@ function App:drawTouchRegions()
 		:disableAttrs()
 		:useNone()
 	gl.glDisable(gl.GL_BLEND)
-	--]=]
 end
 
 function App:flipBoard()
@@ -1252,7 +1215,8 @@ function App:getEventName(sdlEventID, a,b,c)
 end
 
 function App:processButtonEvent(press, ...)
-	local buttonRadius = self.width*.05
+	local buttonRadius = self.width * self.cfg.screenButtonRadius
+	
 	-- TODO put the callback somewhere, not a global
 	-- it's used by the New Game menu
 	if self.waitingForEvent then
