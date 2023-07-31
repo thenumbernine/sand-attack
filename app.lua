@@ -1,5 +1,5 @@
 local ffi = require 'ffi'
-local sdl = require 'ffi.sdl'
+local sdl = require 'ffi.req' 'sdl'
 local table = require 'ext.table'
 local path = require 'ext.path'
 local class = require 'ext.class'
@@ -39,7 +39,7 @@ local SandModel = require 'sandtetris.sandmodel'
 local RNG = class()
 -- TODO max and the + and % constants are bad, fix them
 RNG.max = 2147483647ull
-require 'ffi.c.time'
+require 'ffi.req' 'c.time'
 function RNG:init(seed)
 	self.seed = ffi.cast('uint64_t', tonumber(seed) or ffi.C.time(nil))
 end
@@ -169,7 +169,7 @@ function App:initGL(...)
 			t = gl.GL_CLAMP_TO_EDGE,
 		},
 	}
-	require 'ffi.c.stdlib'	-- free()
+	require 'ffi.req' 'c.stdlib'	-- free()
 	ffi.C.free(outPixels[0])	-- just betting here I have to free this myself ...
 	ig.ImFontAtlas_SetTexID(self.fontAtlas, ffi.cast('ImTextureID', self.fontTex.id))
 --]]
