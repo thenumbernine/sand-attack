@@ -30,7 +30,7 @@ export LUA_PATH=";;$HOME/Projects/?.lua;$HOME/Projects/?/?.lua"
 cd Project
 
 # git all repos
-git clone https://github.com/thenumbernine/sand-tetris sandtetris
+git clone https://github.com/thenumbernine/sand-attack sand-attack
 git clone https://github.com/thenumbernine/lua-template template
 git clone https://github.com/thenumbernine/lua-ext ext
 git clone https://github.com/thenumbernine/lua-ffi-bindings	ffi
@@ -61,15 +61,15 @@ luajit -e "require'ffi.load'.GLESv2='libGLESv2.so.2' require'ffi.load'.SDL2='lib
 
 
 # Now we have to accomodate luajit's dynamic linking to .so files by specifying the exact names.
-# Put the following lines at the top of sandtetris/run.lua:
-#  (Put them immediately after line 1 which contains the # with luajit command used to launch sandtetris.)
+# Put the following lines at the top of sand-attack/run.lua:
+#  (Put them immediately after line 1 which contains the # with luajit command used to launch sand-attack.)
 	require 'ffi.load'.GLESv2 = 'libGLESv2.so.2'
 	require 'ffi.load'.SDL2 = 'libSDL2-2.0.so.0'
 	require 'ffi.load'.openal = 'libopenal.so.1'
 	require 'ffi.load'.vorbisfile = 'libvorbisfile.so.3'
 
 # Alternatively if you want these library redirections to work for multiple projects, you can add the following keys to the table in the file ffi/load.lua:
-# (but this is not necessary with the modified sandtetris/run.lua)
+# (but this is not necessary with the modified sand-attack/run.lua)
 	GLESv2 = 'libGLESv2.so.2',
 	SDL2 = 'libSDL2-2.0.so.0',
 	openal = 'libopenal.so.1',
@@ -117,14 +117,14 @@ git submodule update --init --recursive
 # then build:
 make all
 
-# then copy to sandtetris, or wherever ffi.load can find it
+# then copy to sand-attack, or wherever ffi.load can find it
 # (could also be wherever LD_LIBRARY_PATH points)
-cp libcimgui_sdl.so ../sandtetris/
+cp libcimgui_sdl.so ../sand-attack/
 cd ..
 
 
 # finally we can run it:
-cd sandtetris/
+cd sand-attack/
 # let luajit know where to look for libcimgui_sdl.so
 export LD_LIBRARY_PATH=.
 

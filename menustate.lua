@@ -11,13 +11,13 @@ local gl = require 'gl'
 local GLTex2D = require 'gl.tex2d'
 local ig = require 'imgui'
 local getTime = require 'ext.timer'.getTime
-local SandModel = require 'sandtetris.sandmodel'
+local SandModel = require 'sand-attack.sandmodel'
 
 local showDebug = false	-- show debug info in gui
 
 local MenuState = class()
 function MenuState:init(app)
-	local App = require 'sandtetris.app'
+	local App = require 'sand-attack.app'
 	assert(App:isa(app))
 	self.app = assert(app)
 end
@@ -233,7 +233,7 @@ function StartNewGameState:init(app, multiplayer)
 		app.numPlayers = 1
 	end
 
-	local App = require 'sandtetris.app'
+	local App = require 'sand-attack.app'
 	defaultKeys = {
 		{
 			up = {sdl.SDL_KEYDOWN, sdl.SDLK_UP},
@@ -267,7 +267,7 @@ end
 local tmpcolor = ig.ImVec4()	-- for imgui button
 local tmpcolorv = vec3f()		-- for imgui color picker
 function StartNewGameState:updateGUI()
-	local Player = require 'sandtetris.player'
+	local Player = require 'sand-attack.player'
 	local app = self.app
 
 	self:beginFullView(self.multiplayer and 'New Game Multiplayer' or 'New Game', 3 * 32)
@@ -452,7 +452,7 @@ function MainMenuState:updateGUI()
 	if self:centerButton'High Scores' then
 		app.menustate = MenuState.HighScoreState(app)
 	end
-	local url = 'https://github.com/thenumbernine/sand-tetris'
+	local url = 'https://github.com/thenumbernine/sand-attack'
 	if self:centerButton'About' then
 		if ffi.os == 'Windows' then
 			os.execute('explorer "'..url..'"')

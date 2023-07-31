@@ -1,4 +1,4 @@
-name = 'SandTetris'
+name = 'SandAttack'
 luaDistVer = 'luajit'	-- luajit-openresty-2.1.0
 luaArgs = {'run.lua'}
 
@@ -14,15 +14,15 @@ files = {
 	['..'] = table{
 		-- hmm better way to do this?
 		-- scripts (other than run.lua) are relative to parent dir
-		-- resources and run.lua are relative to sandtetris/
+		-- resources and run.lua are relative to sand-attack/
 		-- option #1: put all individual script files here:
-		'sandtetris/app.lua',
-		'sandtetris/menustate.lua',
-		'sandtetris/sandmodel.lua',
-		'sandtetris/player.lua',
-		-- option #2: copy this dir and reference all resources from 'sandtetris/'
+		'sand-attack/app.lua',
+		'sand-attack/menustate.lua',
+		'sand-attack/sandmodel.lua',
+		'sand-attack/player.lua',
+		-- option #2: copy this dir and reference all resources from 'sand-attack/'
 		-- (this'll require a 'cd ..' every time you playtest it from within its cwd ...)
-		--'sandtetris',
+		--'sand-attack',
 
 		'template',
 		'ext',

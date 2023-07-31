@@ -1,11 +1,11 @@
-## Sand Tetris
+## Sand Attack!
 
 [![Donate via Stripe](https://img.shields.io/badge/Donate-Stripe-green.svg)](https://buy.stripe.com/00gbJZ0OdcNs9zi288)<br>
 [![Donate via Bitcoin](https://img.shields.io/badge/Donate-Bitcoin-green.svg)](bitcoin:37fsp7qQKU8XoHZGRQvVzQVP8FrEJ73cSJ)<br>
 
-Tetris with abelian sandpile models.  Jk it's with sand.
+Connect Lines From Falling Blocks of Sand
 
-[![sand tetris](http://img.youtube.com/vi/L2Irjl3f8EY/0.jpg)](https://youtu.be/L2Irjl3f8EY)
+[![sand attack](http://img.youtube.com/vi/L2Irjl3f8EY/0.jpg)](https://youtu.be/L2Irjl3f8EY)
 
 ## Dependencies:
 
@@ -36,11 +36,11 @@ external libraries required:
 
 - multiplayer-versus where you can drop sand on your opponent
 	and a color that they have to clear-touching to reveal to other random colors
-	like that other etris game ...
+	like that other tris game ...
 - varying board width for # of players
 - gameplay option of increasing # colors
 - I've got SPH stuff but it's behavior is still meh. with it: exploding pieces, tilting board, obstacles in the board, etc
-- choose music, like o.g. tetris?
+- choose music? 
 - faster blob detection
 - submit high scores? meh.  in a game, record seed, record all players' keystates per frame, and allow replaying and submitting of gamestates.  cheat-proof and pro-TAS.
 - better notification of score-modifier for chaining lines

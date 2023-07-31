@@ -25,9 +25,9 @@ local ImGuiApp = require 'imguiapp'
 local Audio = require 'audio'
 local AudioSource = require 'audio.source'
 local AudioBuffer = require 'audio.buffer'
-local Player = require 'sandtetris.player'
-local MenuState = require 'sandtetris.menustate'
-local SandModel = require 'sandtetris.sandmodel'
+local Player = require 'sand-attack.player'
+local MenuState = require 'sand-attack.menustate'
+local SandModel = require 'sand-attack.sandmodel'
 
 -- I'm trying to make reproducible random #s
 -- it is reproducible up to the generation of the next pieces

@@ -15,4 +15,4 @@ end
 require 'gl.setup'(glfn)
 --]]
 
-return require 'sandtetris.app'():run()
+return require 'sand-attack.app'():run()
