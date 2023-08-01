@@ -556,7 +556,8 @@ function App:reset()
 	self:upateFallSpeed()
 	self.paused = true
 
-self.sandmodel:test()
+-- debugging:
+--self.sandmodel:test()
 end
 
 function App:upateFallSpeed()

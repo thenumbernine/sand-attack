@@ -825,19 +825,28 @@ in vec2 texcoordv;
 
 out vec4 fragColor;
 
-uniform vec2 texsize;
-uniform vec2 ofs;
+uniform ivec2 texsize;
+uniform ivec2 ofs;
 uniform sampler2D tex;
 
 void main() {
 	//current integer texcoord
-	ivec2 itc = ivec2(texcoordv * texsize);
+	ivec2 itc = ivec2(texcoordv * vec2(texsize));
 
 	//get the [0,1]^2 offset within our 2x2 block
-	ivec2 lc = itc & ivec2(1,1);
+	ivec2 lc = itc & 1;
+	lc.y ^= ofs.y;
 
 	//get the upper-left integer texcoord of the block
-	ivec2 ulitc = itc & ~ivec2(1,1);
+	//ivec2 ulitc = itc & (~ivec2(1,1));
+	ivec2 ulitc = itc - lc;
+
+	//if we're on a 2x2 box that extends beneath the bottom ...
+	if (ulitc.y < 0 || ulitc.y >= texsize.y-1) {
+		// then just keep whatever's here
+		fragColor = texelFetch(tex, itc, 0);
+		return;
+	}
 
 	//get the blocks
 	//vec4 c[2][2];
@@ -848,36 +857,69 @@ void main() {
 	c[1 + (0 << 1)] = texelFetch(tex, ulitc + ivec2(1, 0), 0);
 	c[0 + (1 << 1)] = texelFetch(tex, ulitc + ivec2(0, 1), 0);
 	c[1 + (1 << 1)] = texelFetch(tex, ulitc + ivec2(1, 1), 0);
+	
+	//fall down + right...
+	if (ofs.x == 0) {
 
-#if 0
-	// upper-left is empty
-	if (c[0 + (0 << 1)] == vec4(0.)) {
-		//then do nothing -- draw the output as input 
-		fragColor = c[lc.x + lc.y << 1];
-	// upper-left isn't empty, but lower-left is ... 
-	} else if (c[0 + (1 << 1)] == vec4(0.)) {
-		// swap y for xofs=0, keep y for xofs=1
-		fragColor = c[lc.x + (lc.x ^ (~lc.x&1)) << 1];
-	// upper-left isn't empty, lower-left isn't empty, lower-right is empty ...
-	} else if (c[1 + (1 << 1)] == vec4(0.)) {
-		if (lc.x == lc.y) {
-			fragColor = c[(~lc.x&1) + (~lc.y&1) << 1];
+		// upper-left is empty
+		if (c[0 + (1 << 1)] == vec4(0.)) {
+			//then do nothing -- draw the output as input 
+			fragColor = c[lc.x + (lc.y << 1)];
+		// upper-left isn't empty, but lower-left is ... 
+		} else if (c[0 + (0 << 1)] == vec4(0.)) {
+			// swap y for lc.x == ofs.x, keep y for xofs=1
+			if (lc.x == 0) {
+				fragColor = c[lc.x + (((~lc.y)&1) << 1)];
+			} else {
+				fragColor = c[lc.x + (lc.y << 1)];
+			}
+			//fragColor = c[lc.x + ((lc.x ^ ((~lc.x)&1)) << 1)];
+		// upper-left isn't empty, lower-left isn't empty, lower-right is empty ...
+		} else if (c[1 + (0 << 1)] == vec4(0.)) {
+			if (lc.x != lc.y) {
+				fragColor = c[((~lc.x)&1) + (((~lc.y)&1) << 1)];
+			} else {
+				fragColor = c[lc.x + (lc.y << 1)];
+			}
+		// all are full -- keep 
 		} else {
-			fragColor = c[lc.x + lc.y << 1];
+			fragColor = c[lc.x + (lc.y << 1)];
 		}
-	// all are full -- keep 
-	} else 
-#endif
-	{
-		fragColor = c[lc.x + (lc.y << 1)];
-		//fragColor = c[0];	//works
-		//fragColor = texelFetch(tex, itc, 0);	//works
-		//fragColor = texture(tex, texcoordv);	//works
+	
+	//fall down + left ...
+	} else {
+	
+		// upper-right is empty
+		if (c[1 + (1 << 1)] == vec4(0.)) {
+			//then do nothing -- draw the output as input 
+			fragColor = c[lc.x + (lc.y << 1)];
+		// upper-right isn't empty, but lower-right is ... 
+		} else if (c[1 + (0 << 1)] == vec4(0.)) {
+			// swap y for lc.x == ofs.x, keep y for xofs=1
+			if (lc.x == 1) {
+				fragColor = c[lc.x + (((~lc.y)&1) << 1)];
+			} else {
+				fragColor = c[lc.x + (lc.y << 1)];
+			}
+			//fragColor = c[lc.x + ((lc.x ^ ((~lc.x)&1)) << 1)];
+		// upper-right isn't empty, lower-right isn't empty, lower-left is empty ...
+		} else if (c[0 + (0 << 1)] == vec4(0.)) {
+			if (lc.x == lc.y) {
+				fragColor = c[((~lc.x)&1) + (((~lc.y)&1) << 1)];
+			} else {
+				fragColor = c[lc.x + (lc.y << 1)];
+			}
+		// all are full -- keep 
+		} else {
+			fragColor = c[lc.x + (lc.y << 1)];
+		}
 	}
 }
 ]],
 		uniforms = {
+			tex = 0,
 			texsize = {w, h},
+			ofs = {0,0},
 		},
 		
 		attrs = {
@@ -886,19 +928,23 @@ void main() {
 	}
 end
 
-local function printBuf(buf, w, h)
+local function printBuf(buf, w, h, yofs)
 	local p = ffi.cast('uint32_t*', buf)
 	local s = ''
 	for j=0,h-1 do
+		local l = ''
 		for i=0,w-1 do
-			local l = ('| %8x '):format(p[0])
-			io.stdout:write(l)
-			s = s .. l
+			local c = ('| %8x '):format(p[0])
+			l = l .. c
 			p=p+1
 		end
-		s = s .. '\n'
-		print()
+		l = l .. '\n'
+		if j % 2 == yofs then 
+			l = l .. '\n'
+		end
+		s = l .. s
 	end
+	print(s)
 	return s
 end
 
@@ -917,7 +963,7 @@ function AutomataSandGPU:test()
 	end
 
 	print'before'
-	local beforeStr = printBuf(app.sandTex.image.buffer, w, h)
+	local beforeStr = printBuf(app.sandTex.image.buffer, w, h, 0)
 	
 	-- copy sandtex to pingpong
 	self.pp:prev()
@@ -927,100 +973,91 @@ function AutomataSandGPU:test()
 
 	app.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
 
-	-- update
-	self.pp:draw{
-		viewport = {0, 0, w, h},
-		callback = function()
-			self.updateShader
-				:use()
-				:enableAttrs()
-			if self.updateShader.uniforms.mvProjMat then
-				gl.glUniformMatrix4fv(
-					self.updateShader.uniforms.mvProjMat.loc,
-					1,
-					gl.GL_FALSE,
-					app.mvProjMat.ptr)
-			end
-			local tex = self.pp:prev()
-			tex:bind()
-			gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
-			tex:unbind()
-			self.updateShader
-				:disableAttrs()
-				:useNone()
-		end,
-	}
-	self.pp:swap()
+	self.updateShader
+		:use()
+		:enableAttrs()
+	gl.glUniform2i(self.updateShader.uniforms.ofs.loc, xofs, yofs)
+	gl.glUniformMatrix4fv(
+		self.updateShader.uniforms.mvProjMat.loc,
+		1,
+		gl.GL_FALSE,
+		app.mvProjMat.ptr)
 
-	-- get pingpong
-	local ptr = self.pp:prev():toCPU(app.sandTex.image.buffer)
-
-	print'after'
-	local afterStr = printBuf(app.sandTex.image.buffer, w, h)
+	for yofs=0,1 do
+		for xofs=0,1 do
+			-- update
+			self.pp:draw{
+				viewport = {0, 0, w, h},
+				callback = function()
+					local tex = self.pp:prev()
+					tex:bind()
+					gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+					tex:unbind()
+				end,
+			}
+			self.pp:swap()
 	
-	print(beforeStr == afterStr and 'MATCH' or 'DOES NOT MATCH')
+			-- get pingpong
+			self.pp:prev():toCPU(app.sandTex.image.buffer)
+
+			print('after ofs', xofs, yofs)
+			local afterStr = printBuf(app.sandTex.image.buffer, w, h, yofs)
+		end
+	end
+
+	self.updateShader
+		:disableAttrs()
+		:useNone()
 
 	os.exit()
-
 end
 
 function AutomataSandGPU:update()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 
+	-- copy sandtex to pingpong
+	self.pp:prev()
+		:bind()
+		:subimage{data=app.sandTex.image.buffer}
+		:unbind()
 
+	app.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
+
+	self.updateShader
+		:use()
+		:enableAttrs()
+	gl.glUniformMatrix4fv(
+		self.updateShader.uniforms.mvProjMat.loc,
+		1,
+		gl.GL_FALSE,
+		app.mvProjMat.ptr)
+	
 	for xofs=0,1 do
 		for yofs=0,1 do
-		
+			-- update
+			self.pp:draw{
+				viewport = {0, 0, w, h},
+				callback = function()
+					gl.glUniform2i(self.updateShader.uniforms.ofs.loc, xofs, yofs)
+					local tex = self.pp:prev()
+					tex:bind()
+					gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+					tex:unbind()
+				end,
+			}
+			self.pp:swap()
 		end
 	end
+					
+	self.updateShader
+		:disableAttrs()
+		:useNone()
+	
+	-- get pingpong
+	self.pp:prev():toCPU(app.sandTex.image.buffer)
 
-	local needsCheckLine = false
-	-- update
-	local prow = ffi.cast('int32_t*', app.sandTex.image.buffer) + w
-	for j=1,h-1 do
-		-- 50/50 cycling left-to-right vs right-to-left
-		local istart, iend, istep
-		if app.rng(2) == 2 then
-			istart,iend,istep = 0, w-1, 1
-		else
-			istart,iend,istep = w-1, 0, -1
-		end
-		local p = prow + istart
-		for i=istart,iend,istep do
-			-- if the cell is blank and there's a sand cell above us ... pull it down
-			if p[0] ~= 0 then
-				if p[-w] == 0 then
-					p[0], p[-w] = p[-w], p[0]
-					needsCheckLine = true
-				-- hmm symmetry? check left vs right first?
-				elseif app.rng() < app.cfg.toppleChance then
-					-- 50/50 check left then right, vs check right then left
-					if app.rng(2) == 2 then
-						if i > 0 and p[-w-1] == 0 then
-							p[0], p[-w-1] = p[-w-1], p[0]
-							needsCheckLine = true
-						elseif i < w-1 and p[-w+1] == 0 then
-							p[0], p[-w+1] = p[-w+1], p[0]
-							needsCheckLine = true
-						end
-					else
-						if i < w-1 and p[-w+1] == 0 then
-							p[0], p[-w+1] = p[-w+1], p[0]
-							needsCheckLine = true
-						elseif i > 0 and p[-w-1] == 0 then
-							p[0], p[-w-1] = p[-w-1], p[0]
-							needsCheckLine = true
-						end
-					end
-				end
-			end
-			p = p + istep
-		end
-		prow = prow + w
-	end
-
-	return needsCheckLine
+	return true
 end
 
 function AutomataSandGPU:clearBlob(blob)
