@@ -519,18 +519,12 @@ function App:reset()
 	self.sandSize = vec2i(self.cfg.boardSize)
 	local w, h = self.sandSize:unpack()
 
-	-- FBO the size of the sand texture
-	self.sandFBO = require 'gl.fbo'{width=w, height=h}
-		:unbind()
-
 	self.loseTime = nil
 
 	local sandModelClass = assert(SandModel.subclasses[self.cfg.sandModel])
 	self.sandmodel = sandModelClass(self)
 
 	-- I only really need to recreate the sand & flash texs if the board size changes ...
-	-- sandTex is going to be handled by the sandmodel, but used by renderer also, so that's why it's here
-	self.sandTex = self:makeTexWithImage(self.sandSize)
 	self.flashTex = self:makeTexWithImage(self.sandSize)
 
 	-- [[ this is only for sph sand but meh
@@ -862,7 +856,7 @@ function App:updateGame()
 	if needsCheckLine then
 		ffi.fill(self.currentClearImage.buffer, 4 * w * h)
 		local clearedCount = 0
-		local blobs = self.sandTex.image:getBlobs(self.getBlobCtx)
+		local blobs = self.sandmodel:getSandTex().image:getBlobs(self.getBlobCtx)
 --print('#blobs', #blobs)
 		for _,blob in pairs(blobs) do
 			if blob.cl ~= 0 then
@@ -917,13 +911,13 @@ function App:updateGame()
 		-- only count voxles if we're showing debug info
 		if self.showDebug then
 			self.numSandVoxels = 0
-			local p = ffi.cast('uint32_t*', self.sandTex.image.buffer)
+			local p = ffi.cast('uint32_t*', self.sandmodel:getSandTex().image.buffer)
 			for i=0,w*h-1 do
 				if p[0] ~= 0 then self.numSandVoxels = self.numSandVoxels + 1 end
 				p = p + 1
 			end
 		end
-		self.sandTex:bind():subimage()
+		self.sandmodel:getSandTex():bind():subimage()
 	end
 
 	for _,player in ipairs(self.players) do
@@ -971,7 +965,7 @@ function App:update(...)
 		gl.glEnable(gl.GL_ALPHA_TEST)
 		--]]
 
-		self.sandTex:bind()
+		self.sandmodel:getSandTex():bind()
 		gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 
 		--[[ transparent for the background for sand area?

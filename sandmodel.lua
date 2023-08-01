@@ -11,15 +11,26 @@ local SandModel = class()
 
 function SandModel:init(app)
 	self.app = assert(app)
+	
+	self.sandTex = app:makeTexWithImage(app.sandSize)
+		:unbind()
+	
+	-- FBO the size of the sand texture
+	self.fbo = require 'gl.fbo'{width=w, height=h}
+		:unbind()
+end
+
+function SandModel:getSandTex()
+	return self.sandTex
 end
 
 -- functions all cpu-based sand models use:
 function SandModel:reset()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	ffi.fill(app.sandTex.image.buffer, 4 * w * h)
-	assert(app.sandTex.data == app.sandTex.image.buffer)
-	app.sandTex:bind():subimage():unbind()
+	ffi.fill(self.sandTex.image.buffer, 4 * w * h)
+	assert(self.sandTex.data == self.sandTex.image.buffer)
+	self.sandTex:bind():subimage():unbind()
 end
 
 function SandModel:testPieceMerge(player)
@@ -37,7 +48,7 @@ function SandModel:testPieceMerge(player)
 				-- otherwise test vs pixels
 				if x >= 0 and x < w
 				and y < h
-				and ffi.cast('uint32_t*',app.sandTex.image.buffer)[x + w * y] ~= 0
+				and ffi.cast('uint32_t*',self.sandTex.image.buffer)[x + w * y] ~= 0
 				then
 					return true
 				end
@@ -76,9 +87,9 @@ function SandModel:mergePiece(player)
 				local y = player.piecePos.y + j
 				if x >= 0 and x < w
 				and y >= 0 and y < h
-				and ffi.cast('uint32_t*', app.sandTex.image.buffer)[x + w * y] == 0
+				and ffi.cast('uint32_t*', self.sandTex.image.buffer)[x + w * y] == 0
 				then
-					ffi.cast('uint32_t*', app.sandTex.image.buffer)[x + w * y] = color
+					ffi.cast('uint32_t*', self.sandTex.image.buffer)[x + w * y] = color
 					-- [[ this is only for sph sand
 					if app.sandmodel.mergepixel then
 						app.sandmodel:mergepixel(x,y,color)
@@ -101,7 +112,7 @@ function AutomataSand:update()
 
 	local needsCheckLine = false
 	-- update
-	local prow = ffi.cast('int32_t*', app.sandTex.image.buffer) + w
+	local prow = ffi.cast('int32_t*', self.sandTex.image.buffer) + w
 	for j=1,h-1 do
 		-- 50/50 cycling left-to-right vs right-to-left
 		local istart, iend, istep
@@ -154,7 +165,7 @@ function AutomataSand:clearBlob(blob)
 	for _,int in ipairs(blob) do
 		local iw = int.x2 - int.x1 + 1
 		clearedCount = clearedCount + iw
-		ffi.fill(app.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
+		ffi.fill(self.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
 		for k=0,4*iw-1 do
 			app.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 		end
@@ -165,7 +176,7 @@ end
 function AutomataSand:flipBoard()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	local p1 = ffi.cast('int32_t*', app.sandTex.image.buffer)
+	local p1 = ffi.cast('int32_t*', self.sandTex.image.buffer)
 	local p2 = p1 + w * h - 1
 	for j=0,bit.rshift(h,1)-1 do
 		for i=0,w-1 do
@@ -174,7 +185,7 @@ function AutomataSand:flipBoard()
 			p2 = p2 - 1
 		end
 	end
-	app.sandTex:bind():subimage()
+	self.sandTex:bind():subimage()
 end
 
 
@@ -238,7 +249,7 @@ function SPHSand:update()
 		if y == 0 then
 			onground = true
 		else
-			local p = ffi.cast('uint32_t*', app.sandTex.image.buffer) + (x + w * y)
+			local p = ffi.cast('uint32_t*', self.sandTex.image.buffer) + (x + w * y)
 
 			-- if the cell is blank and there's a sand cell above us ... pull it down
 			--if p[0] ~= 0 then -- should be true from blitting last frame?
@@ -333,14 +344,14 @@ function SPHSand:update()
 	--]]
 
 	-- now clear and blit all grains onto the board
-	ffi.fill(app.sandTex.image.buffer, w * h * 4)
+	ffi.fill(self.sandTex.image.buffer, w * h * 4)
 	local pushForceTimesDT = 1
 	local numOverlaps = 0
 	for gi=0,self.grains.size-1 do
 		local g = self.grains.v[gi]
 		local x = math.floor(g.pos.x)
 		local y = math.floor(g.pos.y)
-		local p = ffi.cast('uint32_t*', app.sandTex.image.buffer) + (x + w * y)
+		local p = ffi.cast('uint32_t*', self.sandTex.image.buffer) + (x + w * y)
 		-- if there's already a color here / sand here
 		if p[0] ~= 0 then
 			numOverlaps = numOverlaps + 1
@@ -372,7 +383,7 @@ function SPHSand:clearBlob(blob)
 	for _,int in ipairs(blob) do
 		local iw = int.x2 - int.x1 + 1
 		clearedCount = clearedCount + iw
-		--ffi.fill(app.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
+		--ffi.fill(self.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
 		for k=0,4*iw-1 do
 			app.currentClearImage.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 			app.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
@@ -389,7 +400,7 @@ function SPHSand:doneClearingBlobs()
 		local y = math.floor(g.pos.y)
 		local ofs = x + w * y
 		if ffi.cast('uint32_t*', app.currentClearImage.buffer)[ofs] ~= 0 then
-			ffi.cast('uint32_t*', app.sandTex.image.buffer)[ofs] = 0
+			ffi.cast('uint32_t*', self.sandTex.image.buffer)[ofs] = 0
 			self.grains:erase(g, g+1)
 		end
 	end
@@ -400,7 +411,7 @@ function SPHSand:flipBoard()
 		local g = self.grains.v+i
 		g[0].pos.y = h-g[0].pos.y-FLT_EPSILON
 	end
-	app.sandTex:bind():subimage()
+	self.sandTex:bind():subimage()
 end
 function SPHSand:updateDebugGUI()
 	ig.igText('Num Grains: '..self.grains.size)
@@ -436,7 +447,7 @@ function CFDSand:update()
 
 	local needsCheckLine = false
 	-- update
-	local sandip = ffi.cast('int32_t*', app.sandTex.image.buffer)
+	local sandip = ffi.cast('int32_t*', self.sandTex.image.buffer)
 	local prow = sandip + w
 	local urow = ffi.cast('float*', self.u) + w
 	local vrow = ffi.cast('float*', self.v) + w
@@ -529,7 +540,7 @@ function CFDSand:densityStep(diff, dt)
 	--self:addSource()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	local rgbaImage = ffi.cast('uint32_t*', app.sandTex.image.buffer)
+	local rgbaImage = ffi.cast('uint32_t*', self.sandTex.image.buffer)
 	local rgbaPrevImage = ffi.cast('uint32_t*', self.sandTexPrev.image.buffer)
 	-- diffuse
 	--self:diffuse(0, rgbaPrevImage, rgbaImage, diff, dt)
@@ -700,7 +711,7 @@ function CFDSand:clearBlob(blob)
 	for _,int in ipairs(blob) do
 		local iw = int.x2 - int.x1 + 1
 		clearedCount = clearedCount + iw
-		ffi.fill(app.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
+		ffi.fill(self.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
 		for k=0,4*iw-1 do
 			app.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 			self.u[k + 4 * (int.x1 + w * int.y)] = 0
@@ -712,7 +723,7 @@ end
 function CFDSand:flipBoard()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	local p1 = ffi.cast('int32_t*', app.sandTex.image.buffer)
+	local p1 = ffi.cast('int32_t*', self.sandTex.image.buffer)
 	local p2 = p1 + w * h - 1
 	local u1 = ffi.cast('float*', self.u)
 	local u2 = u1 + w * h - 1
@@ -731,7 +742,7 @@ function CFDSand:flipBoard()
 			v2 = v2 - 1
 		end
 	end
-	app.sandTex:bind():subimage()
+	self.sandTex:bind():subimage()
 end
 
 
@@ -770,7 +781,6 @@ function AutomataSandGPU:init(app)
 		-- for desktop gl i'd attach a tex per attachment
 		-- but for gles2 / webgl1 this isn't ideal
 		-- (but for gles3 / webgl2 it's fine)
-		fbo = app.sandFBO,
 		dontAttach = true,
 	}
 	-- init here?  or elsewhere?  or every time we bind?
@@ -972,7 +982,7 @@ function AutomataSandGPU:test()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 
-	local p = ffi.cast('uint32_t*', app.sandTex.image.buffer)
+	local p = ffi.cast('uint32_t*', self.sandTex.image.buffer)
 	for j=0,h-1 do
 		for i=0,w-1 do
 			if math.random() < .5 then
@@ -983,12 +993,12 @@ function AutomataSandGPU:test()
 	end
 
 	print'before'
-	local beforeStr = printBuf(app.sandTex.image.buffer, w, h, 0)
+	local beforeStr = printBuf(self.sandTex.image.buffer, w, h, 0)
 
 	-- copy sandtex to pingpong
 	self.pp:prev()
 		:bind()
-		:subimage{data=app.sandTex.image.buffer}
+		:subimage{data=self.sandTex.image.buffer}
 		:unbind()
 
 	app.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
@@ -1022,10 +1032,10 @@ function AutomataSandGPU:test()
 					self.pp:swap()
 
 					-- get pingpong
-					self.pp:prev():toCPU(app.sandTex.image.buffer)
+					self.pp:prev():toCPU(self.sandTex.image.buffer)
 
 					print('after ofs', xofs, yofs, toppleRight)
-					local afterStr = printBuf(app.sandTex.image.buffer, w, h, yofs)
+					local afterStr = printBuf(self.sandTex.image.buffer, w, h, yofs)
 				end
 			end
 		end
@@ -1047,7 +1057,7 @@ function AutomataSandGPU:update()
 	-- copy sandtex to pingpong
 	self.pp:prev()
 		:bind()
-		:subimage{data=app.sandTex.image.buffer}
+		:subimage{data=self.sandTex.image.buffer}
 		:unbind()
 
 	app.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
@@ -1115,7 +1125,7 @@ function AutomataSandGPU:update()
 		h,							--GLsizei height,
 		gl.GL_RGBA,					--GLenum format,
 		gl.GL_UNSIGNED_BYTE,		--GLenum type,
-		app.sandTex.image.buffer)	--void *pixels
+		self.sandTex.image.buffer)	--void *pixels
 	
 	self.pp.fbo:unbind()
 	gl.glViewport(0, 0, app.width, app.height)
@@ -1134,7 +1144,7 @@ function AutomataSandGPU:clearBlob(blob)
 	for _,int in ipairs(blob) do
 		local iw = int.x2 - int.x1 + 1
 		clearedCount = clearedCount + iw
-		ffi.fill(app.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
+		ffi.fill(self.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
 		for k=0,4*iw-1 do
 			app.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 		end
@@ -1149,7 +1159,7 @@ function AutomataSandGPU:flipBoard()
 	-- should the sand model be responsible for the sandTex ?
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	local p1 = ffi.cast('int32_t*', app.sandTex.image.buffer)
+	local p1 = ffi.cast('int32_t*', self.sandTex.image.buffer)
 	local p2 = p1 + w * h - 1
 	for j=0,bit.rshift(h,1)-1 do
 		for i=0,w-1 do
@@ -1158,7 +1168,7 @@ function AutomataSandGPU:flipBoard()
 			p2 = p2 - 1
 		end
 	end
-	app.sandTex:bind():subimage()
+	self.sandTex:bind():subimage()
 end
 
 
