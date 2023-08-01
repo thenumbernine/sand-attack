@@ -6,7 +6,7 @@ require 'gl.setup'()	-- for desktop GL.  Windows needs this.
 --require 'gl.setup' 'OpenGLES2'	-- for GLES2
 --require 'gl.setup' 'OpenGLES3'	-- for GLES3.  Linux or Raspberry Pi can handle this.
 --]]
--- [[ or detect
+--[[ or detect
 local glfn = nil	-- default gl
 local ffi = require 'ffi'
 if ffi.os == 'Linux' then

@@ -737,13 +737,243 @@ end
 -- I'm not moving all operations (in app.lua) to the gpu just yet
 -- esp since cfd and sph sand use cpu operations
 
+local gl = require 'gl'
+local GLPingPong = require 'gl.pingpong'
+local GLProgram = require 'gl.program'
+
 local AutomataSandGPU = SandModel:subclass()
 
 AutomataSandGPU.name = 'Automata GPU'
 
+function AutomataSandGPU:init(app)
+	AutomataSandGPU.super.init(self, app)
+	local w, h = app.sandSize:unpack()
+	
+	self.pp = GLPingPong{
+		-- args copied from App:makeTexWithImage
+		internalFormat = gl.GL_RGBA,
+		width = tonumber(app.sandSize.x),
+		height = tonumber(app.sandSize.y),
+		format = gl.GL_RGBA,
+		type = gl.GL_UNSIGNED_BYTE,
+		wrap = {
+			s = gl.GL_CLAMP_TO_EDGE,
+			t = gl.GL_CLAMP_TO_EDGE,
+		},
+		minFilter = gl.GL_NEAREST,
+		magFilter = gl.GL_NEAREST,
+	}
+
+	--[[
+	handle 2x2 blocks offset at 00 10 01 11
+
+yofs = alternating rows
+xofs = 0 <-> fall right, xofs = 1 <-> fall left
+
+for xofs=0 (fall right)
+
++---+---+    +---+---+
+|   | ? |    |   | ? |
++---+---+ => +---+---+ 
+| ? | ? |    | ? | ? |
++---+---+    +---+---+
+
++---+---+    +---+---+
+| A | ? |    |   | ? |
++---+---+ => +---+---+ 
+|   | ? |    | A | ? |
++---+---+    +---+---+
+
++---+---+    +---+---+
+| A | ? |    |   | ? |
++---+---+ => +---+---+ 
+| B |   |    | B | A |
++---+---+    +---+---+
+
++---+---+    +---+---+
+| A | ? |    | A | ? |
++---+---+ => +---+---+ 
+| B | C |    | B | C |
++---+---+    +---+---+
+
+for xofs=1 (fall left), same but mirrored
+
+	--]]
+	self.updateShader = GLProgram{
+		vertexCode = [[
+#version ]]..app.glslVersion..[[
+
+precision highp float;
+
+in vec2 vertex;
+
+out vec2 texcoordv;
+
+uniform mat4 mvProjMat;
+
+void main() {
+	texcoordv = vertex;
+	gl_Position = mvProjMat * vec4(vertex, 0., 1.);
+}
+]],
+		fragmentCode = [[
+#version ]]..app.glslVersion..[[
+
+precision highp float;
+
+in vec2 texcoordv;
+
+out vec4 fragColor;
+
+uniform vec2 texsize;
+uniform vec2 ofs;
+uniform sampler2D tex;
+
+void main() {
+	//current integer texcoord
+	ivec2 itc = ivec2(texcoordv * texsize);
+
+	//get the [0,1]^2 offset within our 2x2 block
+	ivec2 lc = itc & ivec2(1,1);
+
+	//get the upper-left integer texcoord of the block
+	ivec2 ulitc = itc & ~ivec2(1,1);
+
+	//get the blocks
+	//vec4 c[2][2];
+	// glsl 310 es needed for arrays of arrays
+	// so instead ...
+	vec4 c[4];
+	c[0 + (0 << 1)] = texelFetch(tex, ulitc + ivec2(0, 0), 0);
+	c[1 + (0 << 1)] = texelFetch(tex, ulitc + ivec2(1, 0), 0);
+	c[0 + (1 << 1)] = texelFetch(tex, ulitc + ivec2(0, 1), 0);
+	c[1 + (1 << 1)] = texelFetch(tex, ulitc + ivec2(1, 1), 0);
+
+#if 0
+	// upper-left is empty
+	if (c[0 + (0 << 1)] == vec4(0.)) {
+		//then do nothing -- draw the output as input 
+		fragColor = c[lc.x + lc.y << 1];
+	// upper-left isn't empty, but lower-left is ... 
+	} else if (c[0 + (1 << 1)] == vec4(0.)) {
+		// swap y for xofs=0, keep y for xofs=1
+		fragColor = c[lc.x + (lc.x ^ (~lc.x&1)) << 1];
+	// upper-left isn't empty, lower-left isn't empty, lower-right is empty ...
+	} else if (c[1 + (1 << 1)] == vec4(0.)) {
+		if (lc.x == lc.y) {
+			fragColor = c[(~lc.x&1) + (~lc.y&1) << 1];
+		} else {
+			fragColor = c[lc.x + lc.y << 1];
+		}
+	// all are full -- keep 
+	} else 
+#endif
+	{
+		fragColor = c[lc.x + (lc.y << 1)];
+		//fragColor = c[0];	//works
+		//fragColor = texelFetch(tex, itc, 0);	//works
+		//fragColor = texture(tex, texcoordv);	//works
+	}
+}
+]],
+		uniforms = {
+			texsize = {w, h},
+		},
+		
+		attrs = {
+			vertex = app.quadVertexBuf,
+		},
+	}
+end
+
+local function printBuf(buf, w, h)
+	local p = ffi.cast('uint32_t*', buf)
+	local s = ''
+	for j=0,h-1 do
+		for i=0,w-1 do
+			local l = ('| %8x '):format(p[0])
+			io.stdout:write(l)
+			s = s .. l
+			p=p+1
+		end
+		s = s .. '\n'
+		print()
+	end
+	return s
+end
+
+function AutomataSandGPU:test()
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+
+	local p = ffi.cast('uint32_t*', app.sandTex.image.buffer)
+	for j=0,h-1 do
+		for i=0,w-1 do
+			if math.random() < .5 then
+				p[0] = math.random(0, 0xffffffff)
+			end
+			p=p+1
+		end
+	end
+
+	print'before'
+	local beforeStr = printBuf(app.sandTex.image.buffer, w, h)
+	
+	-- copy sandtex to pingpong
+	self.pp:prev()
+		:bind()
+		:subimage{data=app.sandTex.image.buffer}
+		:unbind()
+
+	app.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
+
+	-- update
+	self.pp:draw{
+		viewport = {0, 0, w, h},
+		callback = function()
+			self.updateShader
+				:use()
+				:enableAttrs()
+			if self.updateShader.uniforms.mvProjMat then
+				gl.glUniformMatrix4fv(
+					self.updateShader.uniforms.mvProjMat.loc,
+					1,
+					gl.GL_FALSE,
+					app.mvProjMat.ptr)
+			end
+			local tex = self.pp:prev()
+			tex:bind()
+			gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+			tex:unbind()
+			self.updateShader
+				:disableAttrs()
+				:useNone()
+		end,
+	}
+	self.pp:swap()
+
+	-- get pingpong
+	local ptr = self.pp:prev():toCPU(app.sandTex.image.buffer)
+
+	print'after'
+	local afterStr = printBuf(app.sandTex.image.buffer, w, h)
+	
+	print(beforeStr == afterStr and 'MATCH' or 'DOES NOT MATCH')
+
+	os.exit()
+
+end
+
 function AutomataSandGPU:update()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
+
+
+	for xofs=0,1 do
+		for yofs=0,1 do
+		
+		end
+	end
 
 	local needsCheckLine = false
 	-- update
@@ -821,8 +1051,6 @@ function AutomataSandGPU:flipBoard()
 		end
 	end
 end
-
-
 
 
 

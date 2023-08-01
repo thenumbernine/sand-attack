@@ -264,31 +264,31 @@ function App:initGL(...)
 		0,1,
 		1,1,
 	})
-	local vertexBuf = GLArrayBuffer{
+	self.quadVertexBuf = GLArrayBuffer{
 		size = ffi.sizeof(vtxbufCPU),
 		data = vtxbufCPU,
 	}
 
-	--local glslVersion = 460	-- too new
-	--local glslVersion = 430
-	--local glslVersion = '320 es'	-- too new
-	local glslVersion = '300 es'
+	--self.glslVersion = 460	-- too new
+	--self.glslVersion = 430
+	--self.glslVersion = '320 es'	-- too new
+	self.glslVersion = '300 es'
 	self.displayShader = GLProgram{
 		vertexCode = [[
-#version ]]..glslVersion..[[
+#version ]]..self.glslVersion..[[
 
 precision highp float;
 
 in vec2 vertex;
 out vec2 texcoordv;
-uniform mat4 modelViewProjMat;
+uniform mat4 mvProjMat;
 void main() {
 	texcoordv = vertex;
-	gl_Position = modelViewProjMat * vec4(vertex, 0., 1.);
+	gl_Position = mvProjMat * vec4(vertex, 0., 1.);
 }
 ]],
 		fragmentCode = [[
-#version ]]..glslVersion..[[
+#version ]]..self.glslVersion..[[
 
 precision highp float;
 
@@ -307,7 +307,7 @@ void main() {
 		},
 
 		attrs = {
-			vertex = vertexBuf,
+			vertex = self.quadVertexBuf,
 		},
 	}:useNone()
 
@@ -555,6 +555,8 @@ function App:reset()
 	self.scoreChain = 0
 	self:upateFallSpeed()
 	self.paused = true
+
+self.sandmodel:test()
 end
 
 function App:upateFallSpeed()
@@ -932,7 +934,7 @@ function App:update(...)
 		self.mvMat:setTranslate(-.5 * s, -.5)
 			:applyScale(s, 1)
 		self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-		gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+		gl.glUniformMatrix4fv(self.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 		--[[ transparent for the background for sand area?
 		gl.glEnable(gl.GL_ALPHA_TEST)
@@ -957,7 +959,7 @@ function App:update(...)
 						(self.pieceSize.x + 2 * self.pieceOutlineRadius) / w * s,
 						(self.pieceSize.y + 2 * self.pieceOutlineRadius) / h)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-				gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+				gl.glUniformMatrix4fv(self.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 				gl.glEnable(gl.GL_BLEND)
 				gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
@@ -976,7 +978,7 @@ function App:update(...)
 				)
 				:applyScale(self.pieceSize.x / w * s, self.pieceSize.y / h)
 			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+			gl.glUniformMatrix4fv(self.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 			gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 1)
 			player.pieceTex:bind()
@@ -996,7 +998,7 @@ function App:update(...)
 					:setTranslate(-.5 * s, -.5)
 					:applyScale(s, 1)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-				gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+				gl.glUniformMatrix4fv(self.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 				self.flashTex:bind()
 				gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
@@ -1017,7 +1019,7 @@ function App:update(...)
 					:setTranslate(-.5 * s, -.5)
 					:applyScale(s, 1)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-				gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+				gl.glUniformMatrix4fv(self.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 				gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 1)
 				self.youloseTex:bind()
@@ -1036,7 +1038,7 @@ function App:update(...)
 				:setTranslate(aspectRatio * .5 - nextPieceSize, .5 - (i-1) * dy)
 				:applyScale(nextPieceSize, -nextPieceSize)
 			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-			gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+			gl.glUniformMatrix4fv(self.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 			it.tex:bind()
 			gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
@@ -1103,7 +1105,7 @@ function App:drawTouchRegions()
 					y-buttonRadius)
 					:applyScale(2*buttonRadius, 2*buttonRadius)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-				gl.glUniformMatrix4fv(self.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+				gl.glUniformMatrix4fv(self.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 				gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 			end
 		end

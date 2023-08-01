@@ -502,7 +502,7 @@ function SplashScreenState:update()
 		:setTranslate(-.5 * aspectRatio, -.5)
 		:applyScale(aspectRatio, 1)
 	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
-	gl.glUniformMatrix4fv(app.displayShader.uniforms.modelViewProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
+	gl.glUniformMatrix4fv(app.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
 
 	gl.glUniform1i(app.displayShader.uniforms.useAlpha.loc, 1)
 
