@@ -826,7 +826,7 @@ in vec2 texcoordv;
 out vec4 fragColor;
 
 uniform ivec2 texsize;
-uniform ivec2 ofs;
+uniform ivec3 ofs;		//x=xofs (0,1), y=yofs (0,1), z = topple-right
 uniform sampler2D tex;
 
 void main() {
@@ -834,15 +834,20 @@ void main() {
 	ivec2 itc = ivec2(texcoordv * vec2(texsize));
 
 	//get the [0,1]^2 offset within our 2x2 block
-	ivec2 lc = itc & 1;
-	lc.y ^= ofs.y;
+	ivec2 lc = (itc & 1) ^ ofs.xy;
 
 	//get the upper-left integer texcoord of the block
 	//ivec2 ulitc = itc & (~ivec2(1,1));
 	ivec2 ulitc = itc - lc;
 
 	//if we're on a 2x2 box that extends beneath the bottom ...
-	if (ulitc.y < 0 || ulitc.y >= texsize.y-1) {
+	if (
+		ulitc.y < 0 || 
+		ulitc.y >= texsize.y-1 ||
+
+		ulitc.x < 0 || 
+		ulitc.x >= texsize.x-1
+	) {
 		// then just keep whatever's here
 		fragColor = texelFetch(tex, itc, 0);
 		return;
@@ -859,7 +864,7 @@ void main() {
 	c[1 + (1 << 1)] = texelFetch(tex, ulitc + ivec2(1, 1), 0);
 	
 	//fall down + right...
-	if (ofs.x == 0) {
+	if (ofs.z == 0) {
 
 		// upper-left is empty
 		if (c[0 + (1 << 1)] == vec4(0.)) {
@@ -919,7 +924,6 @@ void main() {
 		uniforms = {
 			tex = 0,
 			texsize = {w, h},
-			ofs = {0,0},
 		},
 		
 		attrs = {
@@ -976,32 +980,34 @@ function AutomataSandGPU:test()
 	self.updateShader
 		:use()
 		:enableAttrs()
-	gl.glUniform2i(self.updateShader.uniforms.ofs.loc, xofs, yofs)
 	gl.glUniformMatrix4fv(
 		self.updateShader.uniforms.mvProjMat.loc,
 		1,
 		gl.GL_FALSE,
 		app.mvProjMat.ptr)
 
-	for yofs=0,1 do
-		for xofs=0,1 do
-			-- update
-			self.pp:draw{
-				viewport = {0, 0, w, h},
-				callback = function()
-					local tex = self.pp:prev()
-					tex:bind()
-					gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
-					tex:unbind()
-				end,
-			}
-			self.pp:swap()
-	
-			-- get pingpong
-			self.pp:prev():toCPU(app.sandTex.image.buffer)
+	for toppleRight=1,1 do
+		for yofs=0,0 do
+			for xofs=0,0 do
+				-- update
+				self.pp:draw{
+					viewport = {0, 0, w, h},
+					callback = function()
+						gl.glUniform3i(self.updateShader.uniforms.ofs.loc, xofs, yofs, toppleRight)
+						local tex = self.pp:prev()
+						tex:bind()
+						gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+						tex:unbind()
+					end,
+				}
+				self.pp:swap()
+		
+				-- get pingpong
+				self.pp:prev():toCPU(app.sandTex.image.buffer)
 
-			print('after ofs', xofs, yofs)
-			local afterStr = printBuf(app.sandTex.image.buffer, w, h, yofs)
+				print('after ofs', xofs, yofs, toppleRight)
+				local afterStr = printBuf(app.sandTex.image.buffer, w, h, yofs)
+			end
 		end
 	end
 
@@ -1033,23 +1039,25 @@ function AutomataSandGPU:update()
 		gl.GL_FALSE,
 		app.mvProjMat.ptr)
 	
-	for xofs=0,1 do
-		for yofs=0,1 do
-			-- update
-			self.pp:draw{
-				viewport = {0, 0, w, h},
-				callback = function()
-					gl.glUniform2i(self.updateShader.uniforms.ofs.loc, xofs, yofs)
-					local tex = self.pp:prev()
-					tex:bind()
-					gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
-					tex:unbind()
-				end,
-			}
-			self.pp:swap()
+	for toppleRight=0,1 do
+		for xofs=0,1 do
+			for yofs=0,1 do
+				-- update
+				self.pp:draw{
+					viewport = {0, 0, w, h},
+					callback = function()
+						gl.glUniform3i(self.updateShader.uniforms.ofs.loc, xofs, yofs, toppleRight)
+						local tex = self.pp:prev()
+						tex:bind()
+						gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+						tex:unbind()
+					end,
+				}
+				self.pp:swap()
+			end
 		end
 	end
-					
+	
 	self.updateShader
 		:disableAttrs()
 		:useNone()
