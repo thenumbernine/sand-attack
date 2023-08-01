@@ -188,8 +188,8 @@ function ConfigState:updateGUI()
 	self:centerLuatableTooltipSliderFloat('Per-Level Speedup Coeff', app.cfg, 'speedupCoeff', .07, .00007, '%.5f', ig.ImGuiSliderFlags_Logarithmic)
 
 	self:centerText'Board:'
-	self:centerLuatableTooltipInputInt('Board Width', app.cfg.boardSize, 'x')
-	self:centerLuatableTooltipInputInt('Board Height', app.cfg.boardSize, 'y')
+	self:centerLuatableTooltipInputInt('Board Width', app.cfg.boardSizeInBlocks, 'x')
+	self:centerLuatableTooltipInputInt('Board Height', app.cfg.boardSizeInBlocks, 'y')
 	self:centerLuatableTooltipSliderFloat('Topple Chance', app.cfg, 'toppleChance', 0, 1)
 	self:centerLuatableTooltipInputInt('Pixels Per Block', app.cfg, 'voxelsPerBlock')
 	app.cfg.voxelsPerBlock = math.max(1, app.cfg.voxelsPerBlock)
@@ -576,9 +576,9 @@ function HighScoreState:makeNewRecord()
 		elseif field == 'sandModel' then
 			record[field] = SandModel.subclassNames[app.cfg[field]]
 		elseif field == 'boardWidth' then
-			record[field] = tonumber(app.cfg.boardSize.x)
+			record[field] = tonumber(app.cfg.boardSizeInBlocks.x)
 		elseif field == 'boardHeight' then
-			record[field] = tonumber(app.cfg.boardSize.y)
+			record[field] = tonumber(app.cfg.boardSizeInBlocks.y)
 		else
 			record[field] = app[field]
 		end
