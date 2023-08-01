@@ -196,8 +196,8 @@ function App:initGL(...)
 	self.cfg.effectVolume = self.cfg.effectVolume or 1
 	self.cfg.backgroundVolume = self.cfg.backgroundVolume or .3
 	self.cfg.startLevel = self.cfg.startLevel or 1
-	self.cfg.movedx = self.cfg.movedx or self.gameScale				-- TODO configurable
-	self.cfg.dropSpeed = self.cfg.dropSpeed or (5*self.gameScale)
+	self.cfg.movedx = self.cfg.movedx or 1				-- TODO configurable
+	self.cfg.dropSpeed = self.cfg.dropSpeed or 5
 	self.cfg.sandModel = self.cfg.sandModel or 1
 	self.cfg.speedupCoeff = self.cfg.speedupCoeff or .007
 	self.cfg.toppleChance = self.cfg.toppleChance or 1
@@ -941,10 +941,10 @@ function App:updateGame()
 		-- TODO key updates at higher interval than drop rate ...
 		-- but test collision for both
 		if player.keyPress.left then
-			player.piecePos.x = player.piecePos.x - self.cfg.movedx
+			player.piecePos.x = player.piecePos.x - self.cfg.movedx * self.gameScale
 		end
 		if player.keyPress.right then
-			player.piecePos.x = player.piecePos.x + self.cfg.movedx
+			player.piecePos.x = player.piecePos.x + self.cfg.movedx * self.gameScale
 		end
 		self:constrainPiecePos(player)
 
@@ -958,7 +958,7 @@ function App:updateGame()
 			player.droppingPiece = false
 		end
 		if player.droppingPiece then
-			player.piecePos.y = player.piecePos.y - self.cfg.dropSpeed
+			player.piecePos.y = player.piecePos.y - self.cfg.dropSpeed * self.gameScale
 		end
 		if player.keyPress.up and not player.keyPressLast.up then
 			self:rotatePiece(player)
