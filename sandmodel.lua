@@ -772,6 +772,11 @@ function AutomataSandGPU:init(app)
 		-- (but for gles3 / webgl2 it's fine)
 		dontAttach = true,
 	}
+	self.pp.fbo:bind()
+	self.pp.fbo:setColorAttachmentTex2D(self.pp:cur().id, 0)
+	local res,err = self.pp.fbo.check()
+	if not res then print(err) end
+	self.pp.fbo:unbind()
 
 	--[[
 	handle 2x2 blocks offset at 00 10 01 11
@@ -1055,8 +1060,13 @@ function AutomataSandGPU:update()
 	local rightxor = math.random(0,1)
 	local xofsxor = math.random(0,1)
 	local yofsxor = math.random(0,1)
-
+	
+	self.pp.fbo:bind()
+	-- check per-bind or per-set-attachment?
+	local res,err = self.pp.fbo.check()
+	if not res then print(err) end
 	gl.glViewport(0, 0, w, h)
+	
 	for toppleRight=0,1 do
 		for xofs=0,1 do
 			for yofs=0,1 do
@@ -1067,10 +1077,7 @@ function AutomataSandGPU:update()
 				--]]
 				-- [[
 				--gl.glFramebufferTexture2D(gl.GL_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0 + self.pp.index-1, gl.GL_TEXTURE_2D, self.pp:cur().id, 0)
-				self.pp.fbo:bind()
 				self.pp.fbo:setColorAttachmentTex2D(self.pp:cur().id, 0)
-				local res,err = self.pp.fbo.check()
-				if not res then print(err) end
 				--gl.glDrawBuffer(gl.GL_COLOR_ATTACHMENT0)
 				--]]
 						gl.glUniform3i(self.updateShader.uniforms.ofs.loc,
@@ -1086,21 +1093,29 @@ function AutomataSandGPU:update()
 				}
 				--]]
 				-- [[
-				self.pp.fbo:unbind()
 				--]]
 
 				self.pp:swap()
 			end
 		end
 	end
+
+	-- while we're here, readpixels into the image
+	gl.glReadPixels(
+		0,							--GLint x,
+		0,							--GLint y,
+		w,							--GLsizei width,
+		h,							--GLsizei height,
+		gl.GL_RGBA,					--GLenum format,
+		gl.GL_UNSIGNED_BYTE,		--GLenum type,
+		app.sandTex.image.buffer)	--void *pixels
+	
+	self.pp.fbo:unbind()
 	gl.glViewport(0, 0, app.width, app.height)
 
 	self.updateShader
 		:disableAttrs()
 		:useNone()
-
-	-- get pingpong
-	self.pp:prev():toCPU(app.sandTex.image.buffer)
 
 	return true
 end
