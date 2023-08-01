@@ -1,13 +1,15 @@
-## Sand Attack!
+# Sand Attack!
 
 [![Donate via Stripe](https://img.shields.io/badge/Donate-Stripe-green.svg)](https://buy.stripe.com/00gbJZ0OdcNs9zi288)<br>
 [![Donate via Bitcoin](https://img.shields.io/badge/Donate-Bitcoin-green.svg)](bitcoin:37fsp7qQKU8XoHZGRQvVzQVP8FrEJ73cSJ)<br>
+
+# [Download](https://github.com/thenumbernine/sand-attack/releases/tag/1.0)
 
 Connect Lines From Falling Blocks of Sand
 
 [![sand attack](http://img.youtube.com/vi/L2Irjl3f8EY/0.jpg)](https://youtu.be/L2Irjl3f8EY)
 
-## Dependencies:
+# Dependencies:
 
 other repos of mine:
 - https://github.com/thenumbernine/lua-template
@@ -32,7 +34,7 @@ external libraries required:
 - OpenAL-Soft
 
 
-## TODO:
+# TODO:
 
 - multiplayer-versus where you can drop sand on your opponent
 	and a color that they have to clear-touching to reveal to other random colors
@@ -50,7 +52,7 @@ external libraries required:
 - - centering stuff horizontally is painful at best.  then try adding more than one item on the same line ...
 - - InputFloat can't be edited with gamepad navigation
 
-## Music Credit:
+# Music Credit:
 
 ```
 Desert City Kevin MacLeod (incompetech.com)
@@ -87,7 +89,7 @@ https://creativecommons.org/licenses/by/3.0/
 Music promoted by https://www.chosic.com/free-music/all/
 ```
 
-## Font Credit:
+# Font Credit:
 
 ```
 https://www.1001freefonts.com/billow-twril.font
