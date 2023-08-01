@@ -527,9 +527,7 @@ function App:reset()
 	end)
 
 
-	ffi.fill(self.sandTex.image.buffer, 4 * w * h)
-	assert(self.sandTex.data == self.sandTex.image.buffer)
-	self.sandTex:bind():subimage():unbind()
+	self.sandmodel:reset()
 
 	self.gameColors = table.sub(self.cfg.colors, 1, self.cfg.numColors):mapi(function(c) return vec3f(c) end)		-- colors used now
 	assert(#self.gameColors == self.cfg.numColors)	-- menu system should handle this
@@ -629,7 +627,7 @@ function App:newPiece(player)
 	self:updatePieceTex(player)
 	player.piecePos = vec2i(bit.rshift(w-self.pieceSize.x,1), h-1)
 	player.pieceLastPos = vec2i(player.piecePos)
-	if self:testPieceMerge(player) then
+	if self.sandmodel:testPieceMerge(player) then
 		-- but this means you can pause mid-losing ... meh
 		self.loseTime = self.thisTime
 	end
@@ -733,29 +731,6 @@ local vtxs = {
 	{0,1},
 }
 
-function App:testPieceMerge(player)
-	local w, h = self.sandSize:unpack()
-	for j=0,self.pieceSize.y-1 do
-		for i=0,self.pieceSize.x-1 do
-			local k = i + self.pieceSize.x * j
-			local color = ffi.cast('uint32_t*', player.pieceTex.image.buffer)[k]
-			if color ~= 0 then
-				local x = player.piecePos.x + i
-				local y = player.piecePos.y + j
-				-- if the piece hit the bottom, consider it a merge for the sake of converting to sand
-				if y < 0 then return true end
-				-- otherwise test vs pixels
-				if x >= 0 and x < w
-				and y < h
-				and ffi.cast('uint32_t*',self.sandTex.image.buffer)[x + w * y] ~= 0
-				then
-					return true
-				end
-			end
-		end
-	end
-end
-
 function App:updateGame()
 	local w, h = self.sandSize:unpack()
 	local dt = self.thisTime - self.lastUpdateTime
@@ -827,15 +802,15 @@ function App:updateGame()
 			player.piecePos.x = player.pieceLastPos.x
 			for y=-self.pieceSize.y,player.pieceLastPos.y do
 				player.piecePos.y = y
-				if not self:testPieceMerge(player) then break end
+				if not self.sandmodel:testPieceMerge(player) then break end
 			end
 			merge = true
 		else
-			if self:testPieceMerge(player) then
+			if self.sandmodel:testPieceMerge(player) then
 				player.piecePos.x = player.pieceLastPos.x
 				for y=player.piecePos.y+1,player.pieceLastPos.y do
 					player.piecePos.y = y
-					if not self:testPieceMerge(player) then break end
+					if not self.sandmodel:testPieceMerge(player) then break end
 				end
 				merge = true
 			end
@@ -847,45 +822,7 @@ function App:updateGame()
 				player.droppingPiece = false	-- stop dropping piece
 			end
 			needsCheckLine = true
-			for j=0,self.pieceSize.y-1 do
-				-- I could abstract out the merge code to each sandmodel
-				-- but meh, sph wants random col order, automata doesn't care,
-				-- so i'll just have it random ehre
-				--[[
-				for i=0,self.pieceSize.x-1 do
-				--]]
-				-- [[
-				local istart,iend,istep
-				if math.random(2) == 2 then
-					istart = 0
-					iend = self.pieceSize.x-1
-					istep = 1
-				else
-					istart = self.pieceSize.x-1
-					iend = 0
-					istep = -1
-				end
-				for i=istart,iend,istep do
-				--]]
-					local k = i + self.pieceSize.x * j
-					local color = ffi.cast('uint32_t*', player.pieceTex.image.buffer)[k]
-					if color ~= 0 then
-						local x = player.piecePos.x + i
-						local y = player.piecePos.y + j
-						if x >= 0 and x < w
-						and y >= 0 and y < h
-						and ffi.cast('uint32_t*', self.sandTex.image.buffer)[x + w * y] == 0
-						then
-							ffi.cast('uint32_t*', self.sandTex.image.buffer)[x + w * y] = color
-							-- [[ this is only for sph sand
-							if self.sandmodel.mergepixel then
-								self.sandmodel:mergepixel(x,y,color)
-							end
-							--]]
-						end
-					end
-				end
-			end
+			self.sandmodel:mergePiece(player)
 			self:newPiece(player)
 		end
 	end

@@ -6,13 +6,95 @@ local vec4ub = require 'vec-ffi.vec4ub'
 local vec2f = require 'vec-ffi.vec2f'
 local Image = require 'image'
 
+
 local SandModel = class()
+
 function SandModel:init(app)
 	self.app = assert(app)
 end
 
-local AutomataSand = class(SandModel)
+-- functions all cpu-based sand models use:
+function SandModel:reset()
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+	ffi.fill(app.sandTex.image.buffer, 4 * w * h)
+	assert(app.sandTex.data == app.sandTex.image.buffer)
+	app.sandTex:bind():subimage():unbind()
+end
+
+function SandModel:testPieceMerge(player)
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+	for j=0,app.pieceSize.y-1 do
+		for i=0,app.pieceSize.x-1 do
+			local k = i + app.pieceSize.x * j
+			local color = ffi.cast('uint32_t*', player.pieceTex.image.buffer)[k]
+			if color ~= 0 then
+				local x = player.piecePos.x + i
+				local y = player.piecePos.y + j
+				-- if the piece hit the bottom, consider it a merge for the sake of converting to sand
+				if y < 0 then return true end
+				-- otherwise test vs pixels
+				if x >= 0 and x < w
+				and y < h
+				and ffi.cast('uint32_t*',app.sandTex.image.buffer)[x + w * y] ~= 0
+				then
+					return true
+				end
+			end
+		end
+	end
+end
+
+function SandModel:mergePiece(player)
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+	for j=0,app.pieceSize.y-1 do
+		-- I could abstract out the merge code to each sandmodel
+		-- but meh, sph wants random col order, automata doesn't care,
+		-- so i'll just have it random ehre
+		--[[
+		for i=0,app.pieceSize.x-1 do
+		--]]
+		-- [[
+		local istart,iend,istep
+		if math.random(2) == 2 then
+			istart = 0
+			iend = app.pieceSize.x-1
+			istep = 1
+		else
+			istart = app.pieceSize.x-1
+			iend = 0
+			istep = -1
+		end
+		for i=istart,iend,istep do
+		--]]
+			local k = i + app.pieceSize.x * j
+			local color = ffi.cast('uint32_t*', player.pieceTex.image.buffer)[k]
+			if color ~= 0 then
+				local x = player.piecePos.x + i
+				local y = player.piecePos.y + j
+				if x >= 0 and x < w
+				and y >= 0 and y < h
+				and ffi.cast('uint32_t*', app.sandTex.image.buffer)[x + w * y] == 0
+				then
+					ffi.cast('uint32_t*', app.sandTex.image.buffer)[x + w * y] = color
+					-- [[ this is only for sph sand
+					if app.sandmodel.mergepixel then
+						app.sandmodel:mergepixel(x,y,color)
+					end
+					--]]
+				end
+			end
+		end
+	end
+end
+
+
+local AutomataSand = SandModel:subclass()
+
 AutomataSand.name = 'Automata'
+
 function AutomataSand:update()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
@@ -64,6 +146,7 @@ function AutomataSand:update()
 
 	return needsCheckLine
 end
+
 function AutomataSand:clearBlob(blob)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
@@ -78,6 +161,7 @@ function AutomataSand:clearBlob(blob)
 	end
 	return clearedCount
 end
+
 function AutomataSand:flipBoard()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
@@ -91,6 +175,7 @@ function AutomataSand:flipBoard()
 		end
 	end
 end
+
 
 local vector = require 'ffi.cpp.vector'
 
@@ -106,7 +191,7 @@ typedef struct {
 } grain_t;
 ]]
 
-local SPHSand = class(SandModel)
+local SPHSand = SandModel:subclass()
 SPHSand.name = 'SPH'
 function SPHSand:init(app)
 	SPHSand.super.init(self, app)
@@ -320,7 +405,7 @@ function SPHSand:updateDebugGUI()
 end
 
 
-local CFDSand = class(SandModel)
+local CFDSand = SandModel:subclass()
 CFDSand.name = 'CFD (experimental)'
 function CFDSand:init(app)
 	CFDSand.super.init(self, app)
@@ -646,10 +731,108 @@ function CFDSand:flipBoard()
 	end
 end
 
+
+
+-- proof-of-concept for gpu updates
+-- I'm not moving all operations (in app.lua) to the gpu just yet
+-- esp since cfd and sph sand use cpu operations
+
+local AutomataSandGPU = SandModel:subclass()
+
+AutomataSandGPU.name = 'Automata GPU'
+
+function AutomataSandGPU:update()
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+
+	local needsCheckLine = false
+	-- update
+	local prow = ffi.cast('int32_t*', app.sandTex.image.buffer) + w
+	for j=1,h-1 do
+		-- 50/50 cycling left-to-right vs right-to-left
+		local istart, iend, istep
+		if app.rng(2) == 2 then
+			istart,iend,istep = 0, w-1, 1
+		else
+			istart,iend,istep = w-1, 0, -1
+		end
+		local p = prow + istart
+		for i=istart,iend,istep do
+			-- if the cell is blank and there's a sand cell above us ... pull it down
+			if p[0] ~= 0 then
+				if p[-w] == 0 then
+					p[0], p[-w] = p[-w], p[0]
+					needsCheckLine = true
+				-- hmm symmetry? check left vs right first?
+				elseif app.rng() < app.cfg.toppleChance then
+					-- 50/50 check left then right, vs check right then left
+					if app.rng(2) == 2 then
+						if i > 0 and p[-w-1] == 0 then
+							p[0], p[-w-1] = p[-w-1], p[0]
+							needsCheckLine = true
+						elseif i < w-1 and p[-w+1] == 0 then
+							p[0], p[-w+1] = p[-w+1], p[0]
+							needsCheckLine = true
+						end
+					else
+						if i < w-1 and p[-w+1] == 0 then
+							p[0], p[-w+1] = p[-w+1], p[0]
+							needsCheckLine = true
+						elseif i > 0 and p[-w-1] == 0 then
+							p[0], p[-w-1] = p[-w-1], p[0]
+							needsCheckLine = true
+						end
+					end
+				end
+			end
+			p = p + istep
+		end
+		prow = prow + w
+	end
+
+	return needsCheckLine
+end
+
+function AutomataSandGPU:clearBlob(blob)
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+	local clearedCount = 0
+	for _,int in ipairs(blob) do
+		local iw = int.x2 - int.x1 + 1
+		clearedCount = clearedCount + iw
+		ffi.fill(app.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
+		for k=0,4*iw-1 do
+			app.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
+		end
+	end
+	return clearedCount
+end
+
+function AutomataSandGPU:flipBoard()
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+	local p1 = ffi.cast('int32_t*', app.sandTex.image.buffer)
+	local p2 = p1 + w * h - 1
+	for j=0,bit.rshift(h,1)-1 do
+		for i=0,w-1 do
+			p1[0], p2[0] = p2[0], p1[0]
+			p1 = p1 + 1
+			p2 = p2 - 1
+		end
+	end
+end
+
+
+
+
+
+
+
 SandModel.subclasses = table{
 	AutomataSand,
 	SPHSand,
 	CFDSand,
+	AutomataSandGPU,
 }
 SandModel.subclassNames = SandModel.subclasses:mapi(function(cl) return cl.name end)
 
