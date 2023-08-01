@@ -989,13 +989,13 @@ function AutomataSandGPU:test()
 		gl.GL_FALSE,
 		app.mvProjMat.ptr)
 
+	gl.glViewport(0, 0, w, h)
 	for i=1,updatesPerFrame do
 		for toppleRight=1,1 do
 			for yofs=0,0 do
 				for xofs=0,0 do
 					-- update
 					self.pp:draw{
-						viewport = {0, 0, w, h},
 						callback = function()
 							gl.glUniform3i(self.updateShader.uniforms.ofs.loc, xofs, yofs, toppleRight)
 							local tex = self.pp:prev()
@@ -1015,6 +1015,7 @@ function AutomataSandGPU:test()
 			end
 		end
 	end
+	gl.glViewport(0, 0, app.width, app.height)
 
 	self.updateShader
 		:disableAttrs()
@@ -1048,12 +1049,12 @@ function AutomataSandGPU:update()
 	local xofsxor = math.random(0,1)
 	local yofsxor = math.random(0,1)
 
+	gl.glViewport(0, 0, w, h)
 	for toppleRight=0,1 do
 		for xofs=0,1 do
 			for yofs=0,1 do
 				-- update
 				self.pp:draw{
-					viewport = {0, 0, w, h},
 					callback = function()
 						gl.glUniform3i(self.updateShader.uniforms.ofs.loc,
 							bit.bxor(xofs, xofsxor),
@@ -1069,6 +1070,7 @@ function AutomataSandGPU:update()
 			end
 		end
 	end
+	gl.glViewport(0, 0, app.width, app.height)
 
 	self.updateShader
 		:disableAttrs()
