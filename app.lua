@@ -416,14 +416,11 @@ void main() {
 	glreport'here'
 end
 
--- static method
-function App:makeTexWithImage(size)
-	local img = Image(size.x, size.y, 4, 'unsigned char')
-	ffi.fill(img.buffer, 4 * size.x * size.y)
+function App:makeTexFromImage(img)
 	local tex = GLTex2D{
 		internalFormat = gl.GL_RGBA,
-		width = tonumber(size.x),
-		height = tonumber(size.y),
+		width = tonumber(img.width),
+		height = tonumber(img.height),
 		format = gl.GL_RGBA,
 		type = gl.GL_UNSIGNED_BYTE,
 		wrap = {
@@ -435,8 +432,14 @@ function App:makeTexWithImage(size)
 		data = img.buffer,	-- stored
 	}
 	tex.image = img
-	-- TODO store tex.image as img?
 	return tex
+end
+
+-- static method
+function App:makeTexWithBlankImage(size)
+	local img = Image(size.x, size.y, 4, 'unsigned char')
+	ffi.fill(img.buffer, 4 * size.x * size.y)
+	return self:makeTexFromImage(img)
 end
 
 function App:makePieceImage(s)
@@ -455,22 +458,7 @@ function App:makePieceImage(s)
 			end
 		end
 	end
-	local tex = GLTex2D{
-		internalFormat = gl.GL_RGBA,
-		width = tonumber(self.pieceSize.x),
-		height = tonumber(self.pieceSize.y),
-		format = gl.GL_RGBA,
-		type = gl.GL_UNSIGNED_BYTE,
-		wrap = {
-			s = gl.GL_CLAMP_TO_EDGE,
-			t = gl.GL_CLAMP_TO_EDGE,
-		},
-		minFilter = gl.GL_NEAREST,
-		magFilter = gl.GL_NEAREST,
-		data = img.buffer,
-	}
-	tex.image = img
-	return tex
+	return self:makeTexFromImage(img)
 end
 
 function App:loadSound(filename)
@@ -554,22 +542,7 @@ function App:reset()
 				)
 			end
 		end
-		local tex = GLTex2D{
-			internalFormat = gl.GL_RGBA,
-			width = tonumber(size.x),
-			height = tonumber(size.y),
-			format = gl.GL_RGBA,
-			type = gl.GL_UNSIGNED_BYTE,
-			wrap = {
-				s = gl.GL_CLAMP_TO_EDGE,
-				t = gl.GL_CLAMP_TO_EDGE,
-			},
-			minFilter = gl.GL_NEAREST,
-			magFilter = gl.GL_NEAREST,
-			data = img.buffer,	-- stored
-		}
-		tex.image = img
-		self.pieceRandomColorTex = tex
+		self.pieceRandomColorTex = self:makeTexFromImage(img)
 	end
 
 
@@ -625,7 +598,7 @@ function App:reset()
 	self.sandmodel = sandModelClass(self)
 
 	-- I only really need to recreate the sand & flash texs if the board size changes ...
-	self.flashTex = self:makeTexWithImage(self.sandSize)
+	self.flashTex = self:makeTexWithBlankImage(self.sandSize)
 
 	-- [[ this is only for sph sand but meh
 	-- keep track of what is being cleared this frame
@@ -634,9 +607,9 @@ function App:reset()
 	--]]
 
 	-- and I only really need to recreate these if the piece size changes ...
-	self.rotPieceTex = self:makeTexWithImage(self.pieceSize)
+	self.rotPieceTex = self:makeTexWithBlankImage(self.pieceSize)
 	self.nextPieces = range(self.cfg.numNextPieces):mapi(function(i)
-		local tex = self:makeTexWithImage(self.pieceSize)
+		local tex = self:makeTexWithBlankImage(self.pieceSize)
 		return {tex=tex}
 	end)
 

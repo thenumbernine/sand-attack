@@ -20,9 +20,9 @@ function Player:init(args)
 	self.keyPress = {}
 	self.keyPressLast = {}
 
-	self.pieceTex = app:makeTexWithImage(app.pieceSize)
+	self.pieceTex = app:makeTexWithBlankImage(app.pieceSize)
 	-- give pieces an outline so you can tell players apart
-	self.pieceOutlineTex = app:makeTexWithImage(vec2i(
+	self.pieceOutlineTex = app:makeTexWithBlankImage(vec2i(
 		app.pieceSize.x + 2 * app.pieceOutlineRadius,
 		app.pieceSize.y + 2 * app.pieceOutlineRadius
 	))

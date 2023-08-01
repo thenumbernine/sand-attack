@@ -12,7 +12,7 @@ local SandModel = class()
 function SandModel:init(app)
 	self.app = assert(app)
 	
-	self.sandTex = app:makeTexWithImage(app.sandSize)
+	self.sandTex = app:makeTexWithBlankImage(app.sandSize)
 		:unbind()
 	
 	-- FBO the size of the sand texture
@@ -102,11 +102,11 @@ function SandModel:mergePiece(player)
 end
 
 
-local AutomataSand = SandModel:subclass()
+local AutomataSandCPU = SandModel:subclass()
 
-AutomataSand.name = 'Automata'
+AutomataSandCPU.name = 'Automata CPU'
 
-function AutomataSand:update()
+function AutomataSandCPU:update()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 
@@ -158,7 +158,7 @@ function AutomataSand:update()
 	return needsCheckLine
 end
 
-function AutomataSand:clearBlob(blob)
+function AutomataSandCPU:clearBlob(blob)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 	local clearedCount = 0
@@ -173,7 +173,7 @@ function AutomataSand:clearBlob(blob)
 	return clearedCount
 end
 
-function AutomataSand:flipBoard()
+function AutomataSandCPU:flipBoard()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 	local p1 = ffi.cast('int32_t*', self.sandTex.image.buffer)
@@ -432,7 +432,7 @@ function CFDSand:init(app)
 	self.v = make()
 	self.uprev = make()
 	self.vprev = make()
-	self.sandTexPrev = app:makeTexWithImage(app.sandSize)
+	self.sandTexPrev = app:makeTexWithBlankImage(app.sandSize)
 	self.div = make()
 	self.p = make()
 
@@ -764,7 +764,7 @@ function AutomataSandGPU:init(app)
 	local w, h = app.sandSize:unpack()
 
 	self.pp = GLPingPong{
-		-- args copied from App:makeTexWithImage
+		-- args copied from App:makeTexWithBlankImage
 		internalFormat = gl.GL_RGBA,
 		width = tonumber(app.sandSize.x),
 		height = tonumber(app.sandSize.y),
@@ -1172,7 +1172,7 @@ end
 
 
 SandModel.subclasses = table{
-	AutomataSand,
+	AutomataSandCPU,
 	SPHSand,
 	CFDSand,
 	AutomataSandGPU,
