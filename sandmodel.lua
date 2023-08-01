@@ -28,14 +28,16 @@ end
 function SandModel:reset()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	ffi.fill(self.sandTex.image.buffer, 4 * w * h)
-	assert(self.sandTex.data == self.sandTex.image.buffer)
-	self.sandTex:bind():subimage():unbind()
+	ffi.fill(self:getSandTex().image.buffer, 4 * w * h)
+	assert(self:getSandTex().data == self:getSandTex().image.buffer)
+	self:getSandTex():bind():subimage():unbind()
 end
 
 function SandModel:testPieceMerge(player)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
+	local sandTex = self:getSandTex()
+	local ptr = ffi.cast('uint32_t*',sandTex.image.buffer)
 	for j=0,app.pieceSize.y-1 do
 		for i=0,app.pieceSize.x-1 do
 			local k = i + app.pieceSize.x * j
@@ -48,7 +50,7 @@ function SandModel:testPieceMerge(player)
 				-- otherwise test vs pixels
 				if x >= 0 and x < w
 				and y < h
-				and ffi.cast('uint32_t*',self.sandTex.image.buffer)[x + w * y] ~= 0
+				and ptr[x + w * y] ~= 0
 				then
 					return true
 				end
@@ -60,6 +62,8 @@ end
 function SandModel:mergePiece(player)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
+	local sandTex = self:getSandTex()
+	local ptr = ffi.cast('uint32_t*', sandTex.image.buffer)
 	for j=0,app.pieceSize.y-1 do
 		-- I could abstract out the merge code to each sandmodel
 		-- but meh, sph wants random col order, automata doesn't care,
@@ -87,9 +91,9 @@ function SandModel:mergePiece(player)
 				local y = player.piecePos.y + j
 				if x >= 0 and x < w
 				and y >= 0 and y < h
-				and ffi.cast('uint32_t*', self.sandTex.image.buffer)[x + w * y] == 0
+				and ptr[x + w * y] == 0
 				then
-					ffi.cast('uint32_t*', self.sandTex.image.buffer)[x + w * y] = color
+					ptr[x + w * y] = color
 					-- [[ this is only for sph sand
 					if app.sandmodel.mergepixel then
 						app.sandmodel:mergepixel(x,y,color)
@@ -763,6 +767,7 @@ function AutomataSandGPU:init(app)
 	AutomataSandGPU.super.init(self, app)
 	local w, h = app.sandSize:unpack()
 
+	self.sandTex = nil	-- not needed for GPU .. instad use the pingpong
 	self.pp = GLPingPong{
 		-- args copied from App:makeTexWithBlankImage
 		internalFormat = gl.GL_RGBA,
@@ -777,12 +782,23 @@ function AutomataSandGPU:init(app)
 		minFilter = gl.GL_NEAREST,
 		magFilter = gl.GL_NEAREST,
 
+		fbo = self.fbo,
 		-- pingpong arg
 		-- for desktop gl i'd attach a tex per attachment
 		-- but for gles2 / webgl1 this isn't ideal
 		-- (but for gles3 / webgl2 it's fine)
 		dontAttach = true,
 	}
+	
+	-- give each pingpong buffer an image
+	for _,t in ipairs(self.pp.hist) do
+		local size = app.sandSize
+		local img = Image(size.x, size.y, 4, 'unsigned char')
+		ffi.fill(img.buffer, 4 * size.x * size.y)
+		t.image = img
+		t.data = img.buffer
+	end
+
 	-- init here?  or elsewhere?  or every time we bind?
 	self.pp.fbo:bind()
 	self.pp.fbo:setColorAttachmentTex2D(self.pp:cur().id, 0)
@@ -1054,19 +1070,15 @@ function AutomataSandGPU:update()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 
-	-- copy sandtex to pingpong
-	self.pp:prev()
-		:bind()
-		:subimage{data=self.sandTex.image.buffer}
-		:unbind()
+	local fbo = self.pp.fbo
+	local shader = self.updateShader
 
-	self.updateShader
-		:use()
+	shader:use()
 		:enableAttrs()
 
 	app.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
 	gl.glUniformMatrix4fv(
-		self.updateShader.uniforms.mvProjMat.loc,
+		shader.uniforms.mvProjMat.loc,
 		1,
 		gl.GL_FALSE,
 		app.mvProjMat.ptr)
@@ -1075,7 +1087,7 @@ function AutomataSandGPU:update()
 	local xofsxor = math.random(0,1)
 	local yofsxor = math.random(0,1)
 
-	self.pp.fbo:bind()
+	fbo:bind()
 	gl.glViewport(0, 0, w, h)
 
 	local updatesPerFrame = math.ceil(app.cfg.gameScale)
@@ -1089,12 +1101,12 @@ function AutomataSandGPU:update()
 						callback = function()
 					--]]
 					-- [[
-					self.pp.fbo:setColorAttachmentTex2D(self.pp:cur().id)
+					fbo:setColorAttachmentTex2D(self.pp:cur().id)
 					-- check per-bind or per-set-attachment?
-					local res,err = self.pp.fbo.check()
+					local res,err = fbo.check()
 					if not res then print(err) end
 					--]]
-							gl.glUniform3i(self.updateShader.uniforms.ofs.loc,
+							gl.glUniform3i(shader.uniforms.ofs.loc,
 								bit.bxor(xofs, xofsxor),
 								bit.bxor(yofs, yofsxor),
 								bit.bxor(toppleRight, rightxor))
@@ -1123,13 +1135,12 @@ function AutomataSandGPU:update()
 		h,							--GLsizei height,
 		gl.GL_RGBA,					--GLenum format,
 		gl.GL_UNSIGNED_BYTE,		--GLenum type,
-		self.sandTex.image.buffer)	--void *pixels
+		self.pp:prev().image.buffer)	--void *pixels
 
-	self.pp.fbo:unbind()
+	fbo:unbind()
 	gl.glViewport(0, 0, app.width, app.height)
 
-	self.updateShader
-		:disableAttrs()
+	shader:disableAttrs()
 		:useNone()
 
 	return true
@@ -1142,7 +1153,7 @@ function AutomataSandGPU:clearBlob(blob)
 	for _,int in ipairs(blob) do
 		local iw = int.x2 - int.x1 + 1
 		clearedCount = clearedCount + iw
-		ffi.fill(self.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
+		ffi.fill(self:getSandTex().image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
 		for k=0,4*iw-1 do
 			app.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 		end
@@ -1157,7 +1168,7 @@ function AutomataSandGPU:flipBoard()
 	-- should the sand model be responsible for the sandTex ?
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	local p1 = ffi.cast('int32_t*', self.sandTex.image.buffer)
+	local p1 = ffi.cast('int32_t*', self:getSandTex().image.buffer)
 	local p2 = p1 + w * h - 1
 	for j=0,bit.rshift(h,1)-1 do
 		for i=0,w-1 do
@@ -1166,9 +1177,12 @@ function AutomataSandGPU:flipBoard()
 			p2 = p2 - 1
 		end
 	end
-	self.sandTex:bind():subimage()
+	self:getSandTex():bind():subimage()
 end
 
+function AutomataSandGPU:getSandTex()
+	return self.pp:prev()
+end
 
 
 SandModel.subclasses = table{

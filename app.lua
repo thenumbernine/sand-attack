@@ -114,8 +114,6 @@ App.highScoresFilename = 'highscores.lua'
 function App:initGL(...)
 	App.super.initGL(self, ...)
 
-	gl.glClearColor(.5, .5, .5, 1)
-
 	-- allow keys to navigate menu
 	-- TODO how to make it so player keys choose menus, not just space bar/
 	-- or meh?
@@ -682,14 +680,15 @@ function App:populatePiece(args)
 	local color = self.gameColors[colorIndex]
 	local alpha = colorIndex/#self.gameColors
 
+	local fbo = self.pieceFBO
 	local dsttex = args.tex
 	local shader = self.populatePieceShader
 
 	gl.glViewport(0, 0, self.pieceSize.x, self.pieceSize.y)
 
-	self.pieceFBO:bind()
-	self.pieceFBO:setColorAttachmentTex2D(dsttex.id)
-	local res,err = self.pieceFBO.check()
+	fbo:bind()
+		:setColorAttachmentTex2D(dsttex.id)
+	local res, err = fbo.check()
 	if not res then print(err) end
 
 	shader
@@ -729,7 +728,7 @@ function App:populatePiece(args)
 		gl.GL_UNSIGNED_BYTE,	--GLenum type,
 		dsttex.image.buffer)	--void *pixels
 
-	self.pieceFBO:unbind()
+	fbo:unbind()
 
 	gl.glViewport(0, 0, self.width, self.height)
 end
@@ -835,14 +834,15 @@ end
 function App:rotatePiece(player)
 	if not player.pieceTex then return end
 
+	local fbo = self.pieceFBO
 	local srctex = player.pieceTex
 	local dsttex = self.rotPieceTex
 	local shader = self.displayShader
 	gl.glViewport(0, 0, self.pieceSize.x, self.pieceSize.y)
 
-	self.pieceFBO:bind()
-	self.pieceFBO:setColorAttachmentTex2D(dsttex.id)
-	local res,err = self.pieceFBO.check()
+	fbo:bind()
+		:setColorAttachmentTex2D(dsttex.id)
+	local res, err = fbo.check()
 	if not res then print(err) end
 
 	shader
@@ -882,7 +882,7 @@ function App:rotatePiece(player)
 		gl.GL_UNSIGNED_BYTE,	--GLenum type,
 		dsttex.image.buffer)	--void *pixels
 
-	self.pieceFBO:unbind()
+	fbo:unbind()
 
 	gl.glViewport(0, 0, self.width, self.height)
 
@@ -1050,6 +1050,9 @@ function App:updateGame()
 			end
 
 			self:playSound'sfx/line.wav'
+			
+			-- flashTex was filled in by sandmodel:clearBlob
+			-- ... which is still on CPU
 			self.flashTex:bind():subimage()
 			self.lastLineTime = self.gameTime
 
@@ -1083,6 +1086,8 @@ end
 
 function App:update(...)
 	self.thisTime = getTime()
+
+	gl.glClearColor(.5, .5, .5, 1)
 	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 
 	local w, h = self.sandSize:unpack()
@@ -1186,9 +1191,30 @@ function App:update(...)
 		elseif self.wasFlashing then
 			-- clear once we're done flashing
 			self.wasFlashing = false
-			ffi.fill(self.flashTex.image.buffer, 4 * w * h)
-			assert(self.flashTex.data == self.flashTex.image.buffer)
-			self.flashTex:bind():subimage()
+
+			local dsttex = self.flashTex
+			local fbo = self.sandmodel.fbo
+
+			gl.glViewport(0, 0, w, h)
+			fbo:bind()
+				:setColorAttachmentTex2D(dsttex.id)
+			local res, err = fbo.check()
+			if not res then print(err) end
+
+			gl.glClearColor(0, 0, 0, 0)
+			gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+
+			gl.glReadPixels(
+				0,						--GLint x,
+				0,						--GLint y,
+				w,						--GLsizei width,
+				h,						--GLsizei height,
+				gl.GL_RGBA,				--GLenum format,
+				gl.GL_UNSIGNED_BYTE,	--GLenum type,
+				dsttex.image.buffer)	--void *pixels
+
+			fbo:unbind()
+			gl.glViewport(0, 0, self.width, self.height)
 		end
 
 		if self.loseTime then
