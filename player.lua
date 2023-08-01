@@ -22,10 +22,7 @@ function Player:init(args)
 
 	self.pieceTex = app:makeTexWithBlankImage(app.pieceSize)
 	-- give pieces an outline so you can tell players apart
-	self.pieceOutlineTex = app:makeTexWithBlankImage(vec2i(
-		app.pieceSize.x + 2 * app.pieceOutlineRadius,
-		app.pieceSize.y + 2 * app.pieceOutlineRadius
-	))
+	self.pieceOutlineTex = app:makeTexWithBlankImage(app.pieceOutlineSize)
 end
 
 return Player

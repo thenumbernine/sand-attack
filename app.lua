@@ -15,6 +15,7 @@ local gl = require 'gl'
 local GLTex2D = require 'gl.tex2d'
 local GLProgram = require 'gl.program'
 local GLArrayBuffer = require 'gl.arraybuffer'
+local GLFBO = require 'gl.fbo'
 local glreport = require 'gl.report'
 local vec2i = require 'vec-ffi.vec2i'
 local vec2f = require 'vec-ffi.vec2f'
@@ -369,6 +370,77 @@ void main() {
 		},
 	}:useNone()
 
+	self.updatePieceOutlineShader = GLProgram{
+		vertexCode = [[
+#version ]]..self.glslVersion..[[
+
+precision highp float;
+
+in vec2 vertex;
+out vec2 texcoordv;
+uniform mat4 mvProjMat;
+void main() {
+	texcoordv = vertex;
+	gl_Position = mvProjMat * vec4(vertex, 0., 1.);
+}
+]],
+		fragmentCode = [[
+#version ]]..self.glslVersion..[[
+
+precision highp float;
+
+in vec2 texcoordv;
+out vec4 fragColor;
+
+uniform sampler2D pieceTex;
+uniform ivec2 pieceSize;
+uniform ivec3 pieceOutlineSize;	//.z = pieceOutlineRadius;
+uniform vec3 color;
+
+float lenSq(vec2 v) {
+	return dot(v,v);
+}
+
+void main() {
+	float maxDistSq = float(pieceOutlineSize.x + pieceOutlineSize.y);
+	float bestDistSq = maxDistSq;
+	
+	int pieceOutlineRadius = pieceOutlineSize.z;
+	ivec2 ij = ivec2(texcoordv * vec2(pieceOutlineSize));
+	ivec2 ofs;
+	for (ofs.y = -pieceOutlineRadius; ofs.y <= pieceOutlineRadius; ++ofs.y) {
+		for (ofs.x = -pieceOutlineRadius; ofs.x <= pieceOutlineRadius; ++ofs.x) {
+			ivec2 xy = ij - pieceOutlineRadius + ofs;
+			if (xy.x >= 0 && xy.x < pieceSize.x &&
+				xy.y >= 0 && xy.y < pieceSize.y
+			) {
+				vec4 c = texelFetch(pieceTex, xy, 0);
+				if (c != vec4(0.)) {
+					float distSq = max(1., lenSq(vec2(ofs)));
+					bestDistSq = min(bestDistSq, distSq);
+				}
+			}
+		}
+	}
+
+	if (bestDistSq < maxDistSq) {
+		float frac = 1. / bestDistSq;
+		fragColor = vec4(color * frac, 1.);
+	} else {
+		fragColor = vec4(0.);
+	}
+}
+]],
+		uniforms = {
+			pieceTex = 0,
+		},
+
+		attrs = {
+			vertex = self.quadVertexBuf,
+		},
+
+	}
+
 	self.sounds = {}
 
 	if self.useAudio then
@@ -536,8 +608,11 @@ function App:reset()
 
 	self.pieceSize = self.pieceSizeInBlocks * self.cfg.voxelsPerBlock
 
-	self.pieceFBO = require 'gl.fbo'{width=self.pieceSize.x, height=self.pieceSize.y}
+	self.pieceFBO = GLFBO{width=self.pieceSize.x, height=self.pieceSize.y}
 		:unbind()
+
+	self.pieceOutlineSize = self.pieceSize + 2 * self.pieceOutlineRadius
+	self.pieceOutlineFBO = GLFBO{width=self.pieceOutlineSize.x, height=self.pieceOutlineSize.y}
 
 	do
 		local size = self.pieceSize
@@ -796,39 +871,48 @@ function App:updatePieceTex(player)
 			end
 		end
 	end
-
+ 
 	-- [[ update the piece outline
-	assert(player.pieceOutlineTex.width == self.pieceSize.x + 2 * self.pieceOutlineRadius)
-	assert(player.pieceOutlineTex.height == self.pieceSize.y + 2 * self.pieceOutlineRadius)
-	ffi.fill(player.pieceOutlineTex.image.buffer, 4 * player.pieceOutlineTex.width * player.pieceOutlineTex.height)
-	local outlineBuf = ffi.cast('uint32_t*', player.pieceOutlineTex.image.buffer)
-	for j=0,player.pieceOutlineTex.height-1 do
-		for i=0,player.pieceOutlineTex.width-1 do
-			local bestDistSq = math.huge
-			for ofy=-self.pieceOutlineRadius,self.pieceOutlineRadius do
-				for ofx=-self.pieceOutlineRadius,self.pieceOutlineRadius do
-					local x = i - self.pieceOutlineRadius + ofx
-					local y = j - self.pieceOutlineRadius + ofy
-					if x >= 0
-					and x < self.pieceSize.x
-					and y >= 0
-					and y < self.pieceSize.y
-					then
-						if pieceBuf[x + self.pieceSize.x * y] ~= 0 then
-							local distSq = math.max(1, ofx*ofx + ofy*ofy)
-							bestDistSq = math.min(bestDistSq, distSq)
-						end
-					end
-				end
-			end
-			if bestDistSq < math.huge then
-				--bestDistSq = math.sqrt(bestDistSq)
-				local frac = 1 / bestDistSq
-				outlineBuf[i + player.pieceOutlineTex.width * j] = vec3fto4ub(player.color * frac)
-			end
-		end
-	end
-	player.pieceOutlineTex:bind():subimage()
+	local fbo = self.pieceOutlineFBO
+	local dsttex = player.pieceOutlineTex
+	local shader = self.updatePieceOutlineShader
+	local srctex = player.pieceTex
+	
+	gl.glViewport(0, 0, fbo.width, fbo.height)
+
+	fbo:bind()
+		:setColorAttachmentTex2D(dsttex.id)
+	local res, err = fbo.check()
+	if not res then print(err) end
+
+	shader:use()
+		:enableAttrs()
+
+	self.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
+	gl.glUniformMatrix4fv(
+		shader.uniforms.mvProjMat.loc,
+		1,
+		gl.GL_FALSE,
+		self.mvProjMat.ptr)
+	gl.glUniform2i(shader.uniforms.pieceSize.loc,
+		self.pieceSize.x,
+		self.pieceSize.y)
+	gl.glUniform3i(shader.uniforms.pieceOutlineSize.loc,
+		self.pieceOutlineSize.x,
+		self.pieceOutlineSize.y,
+		self.pieceOutlineRadius)
+	gl.glUniform3f(shader.uniforms.color.loc, player.color:unpack())
+
+	srctex:bind()
+	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+	srctex:unbind()
+
+	shader:disableAttrs()
+		:useNone()
+
+	fbo:unbind()
+	
+	gl.glViewport(0, 0, self.width, self.height)
 	--]]
 end
 
