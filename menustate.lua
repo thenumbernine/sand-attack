@@ -13,8 +13,6 @@ local ig = require 'imgui'
 local getTime = require 'ext.timer'.getTime
 local SandModel = require 'sand-attack.sandmodel'
 
-local showDebug = true	-- show debug info in gui
-
 local MenuState = class()
 function MenuState:init(app)
 	local App = require 'sand-attack.app'
@@ -142,7 +140,7 @@ function PlayingState:updateGUI()
 	ig.igText('Score: '..tostring(app.score))
 	ig.igText('Lines: '..tostring(app.lines))
 
-	if showDebug then
+	if app.showDebug then
 		if app.showFPS then ig.igText('FPS: '..app.fps) end
 		ig.igText('Num Voxels: '..app.numSandVoxels)
 		ig.igText('Ticks to Fall: '..tostring(app.ticksToFall))
@@ -184,6 +182,7 @@ function ConfigState:updateGUI()
 
 	self:centerLuatableTooltipInputInt('Number of Next Pieces', app.cfg, 'numNextPieces')
 	self:centerLuatableTooltipSliderFloat('Drop Speed', app.cfg, 'dropSpeed', .1, 100, nil, ig.ImGuiSliderFlags_Logarithmic)
+	self:centerLuatableTooltipSliderInt('Move Speed', app.cfg, 'movedx')
 	self:centerLuatableCheckbox('Continuous Drop', app.cfg, 'continuousDrop')
 
 	self:centerLuatableTooltipSliderFloat('Per-Level Speedup Coeff', app.cfg, 'speedupCoeff', .07, .00007, '%.5f', ig.ImGuiSliderFlags_Logarithmic)
@@ -192,6 +191,8 @@ function ConfigState:updateGUI()
 	self:centerLuatableTooltipInputInt('Board Width', app.cfg.boardSize, 'x')
 	self:centerLuatableTooltipInputInt('Board Height', app.cfg.boardSize, 'y')
 	self:centerLuatableTooltipSliderFloat('Topple Chance', app.cfg, 'toppleChance', 0, 1)
+	self:centerLuatableTooltipInputInt('Pixels Per Block', app.cfg, 'voxelsPerBlock')
+	app.cfg.voxelsPerBlock = math.max(1, app.cfg.voxelsPerBlock)
 
 	ig.luatableCombo('Sand Model', app.cfg, 'sandModel', SandModel.subclassNames)
 
@@ -553,9 +554,10 @@ HighScoreState.fields = table{
 	'score',
 	'numColors',
 	'numPlayers',
-	'toppleChance',
 	'boardWidth',
 	'boardHeight',
+	'toppleChance',
+	'voxelsPerBlock',
 	'sandModel',
 	'speedupCoeff',
 }
@@ -566,6 +568,7 @@ function HighScoreState:makeNewRecord()
 		if field == 'name' then
 			record[field] = self[field]
 		elseif field == 'toppleChance'
+		or field == 'voxelsPerBlock'
 		or field == 'numColors'
 		or field == 'sandModel'
 		or field == 'speedupCoeff'

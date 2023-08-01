@@ -174,6 +174,7 @@ function AutomataSand:flipBoard()
 			p2 = p2 - 1
 		end
 	end
+	app.sandTex:bind():subimage()
 end
 
 
@@ -399,6 +400,7 @@ function SPHSand:flipBoard()
 		local g = self.grains.v+i
 		g[0].pos.y = h-g[0].pos.y-FLT_EPSILON
 	end
+	app.sandTex:bind():subimage()
 end
 function SPHSand:updateDebugGUI()
 	ig.igText('Num Grains: '..self.grains.size)
@@ -729,6 +731,7 @@ function CFDSand:flipBoard()
 			v2 = v2 - 1
 		end
 	end
+	app.sandTex:bind():subimage()
 end
 
 
@@ -744,9 +747,6 @@ local GLProgram = require 'gl.program'
 local AutomataSandGPU = SandModel:subclass()
 
 AutomataSandGPU.name = 'Automata GPU'
-
-AutomataSandGPU.updatesPerFrame = 1	-- original resolution
-AutomataSandGPU.updatesPerFrame = 2	-- double resolution
 
 function AutomataSandGPU:init(app)
 	AutomataSandGPU.super.init(self, app)
@@ -770,8 +770,10 @@ function AutomataSandGPU:init(app)
 		-- for desktop gl i'd attach a tex per attachment
 		-- but for gles2 / webgl1 this isn't ideal
 		-- (but for gles3 / webgl2 it's fine)
+		fbo = app.sandFBO,
 		dontAttach = true,
 	}
+	-- init here?  or elsewhere?  or every time we bind?
 	self.pp.fbo:bind()
 	self.pp.fbo:setColorAttachmentTex2D(self.pp:cur().id, 0)
 	local res,err = self.pp.fbo.check()
@@ -1001,6 +1003,8 @@ function AutomataSandGPU:test()
 		app.mvProjMat.ptr)
 
 	gl.glViewport(0, 0, w, h)
+
+	local updatesPerFrame = math.ceil(app.cfg.gameScale)
 	for i=1,updatesPerFrame do
 		for toppleRight=1,1 do
 			for yofs=0,0 do
@@ -1067,35 +1071,38 @@ function AutomataSandGPU:update()
 	if not res then print(err) end
 	gl.glViewport(0, 0, w, h)
 	
-	for toppleRight=0,1 do
-		for xofs=0,1 do
-			for yofs=0,1 do
-				-- update
-				--[[
-				self.pp:draw{
-					callback = function()
-				--]]
-				-- [[
-				--gl.glFramebufferTexture2D(gl.GL_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0 + self.pp.index-1, gl.GL_TEXTURE_2D, self.pp:cur().id, 0)
-				self.pp.fbo:setColorAttachmentTex2D(self.pp:cur().id, 0)
-				--gl.glDrawBuffer(gl.GL_COLOR_ATTACHMENT0)
-				--]]
-						gl.glUniform3i(self.updateShader.uniforms.ofs.loc,
-							bit.bxor(xofs, xofsxor),
-							bit.bxor(yofs, yofsxor),
-							bit.bxor(toppleRight, rightxor))
-						local tex = self.pp:prev()
-						tex:bind()
-						gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
-						tex:unbind()
-				--[[
-					end,
-				}
-				--]]
-				-- [[
-				--]]
+	local updatesPerFrame = math.ceil(app.cfg.gameScale)
+	for i=1,updatesPerFrame do
+		for toppleRight=0,1 do
+			for xofs=0,1 do
+				for yofs=0,1 do
+					-- update
+					--[[
+					self.pp:draw{
+						callback = function()
+					--]]
+					-- [[
+					--gl.glFramebufferTexture2D(gl.GL_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0 + self.pp.index-1, gl.GL_TEXTURE_2D, self.pp:cur().id, 0)
+					self.pp.fbo:setColorAttachmentTex2D(self.pp:cur().id, 0)
+					--gl.glDrawBuffer(gl.GL_COLOR_ATTACHMENT0)
+					--]]
+							gl.glUniform3i(self.updateShader.uniforms.ofs.loc,
+								bit.bxor(xofs, xofsxor),
+								bit.bxor(yofs, yofsxor),
+								bit.bxor(toppleRight, rightxor))
+							local tex = self.pp:prev()
+							tex:bind()
+							gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+							tex:unbind()
+					--[[
+						end,
+					}
+					--]]
+					-- [[
+					--]]
 
-				self.pp:swap()
+					self.pp:swap()
+				end
 			end
 		end
 	end
@@ -1135,7 +1142,11 @@ function AutomataSandGPU:clearBlob(blob)
 	return clearedCount
 end
 
+-- TODO
 function AutomataSandGPU:flipBoard()
+	-- hmm, needs the pingpong here
+	-- so I need to assert the pingpong state too ...
+	-- should the sand model be responsible for the sandTex ?
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 	local p1 = ffi.cast('int32_t*', app.sandTex.image.buffer)
@@ -1147,9 +1158,8 @@ function AutomataSandGPU:flipBoard()
 			p2 = p2 - 1
 		end
 	end
+	app.sandTex:bind():subimage()
 end
-
-
 
 
 

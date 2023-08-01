@@ -77,7 +77,8 @@ App.sdlInitFlags = bit.bor(
 )
 
 App.useAudio = true	-- set to false to disable audio altogether
-App.showFPS = true -- show fps in gui
+App.showFPS = true -- show fps in gui / console
+App.showDebug = false	-- show some more debug stuff
 local dontCheckForLinesEver = false	-- means don't ever ever check for lines.  used for fps testing the sand topple simulation.
 
 App.updateInterval = 1/60
@@ -99,22 +100,7 @@ while #App.defaultColors < 255 do
 		return math.random()
 	end):normalize():unpack()}
 end
-
 -- ... but not all 8 bit alpha channels are really 8 bits ...
-
--- board size is 80 x 144 visible
--- piece is 4 blocks arranged
--- blocks are 8 x 8
--- TODO should this be configurable?
---App.voxelsPerBlock = 8	-- original
-App.voxelsPerBlock = 16	-- double
---App.voxelsPerBlock = 32		-- quadruple
-App.pieceSizeInBlocks = vec2i(4,4)
-App.pieceSize = App.pieceSizeInBlocks * App.voxelsPerBlock
-
---App.movedx = 1	-- feels good at original resolution
-App.movedx = 2		-- double
---App.movedx = 4	-- quadruple
 
 App.maxAudioDist = 10
 
@@ -187,13 +173,23 @@ function App:initGL(...)
 		print("failed to read config file: "..tostring(err))
 	end)
 	self.cfg = self.cfg or {}
+	
+	-- board size is 80 x 144 visible
+	-- piece is 4 blocks arranged
+	-- blocks are 8 x 8 by default
+	self.pieceSizeInBlocks = vec2i(4,4)	-- fixed
 
+	--self.cfg.voxelsPerBlock = self.cfg.voxelsPerBlock or 8	-- original
+	self.cfg.voxelsPerBlock = self.cfg.voxelsPerBlock or 16	-- double
+	--self.cfg.voxelsPerBlock = self.cfg.voxelsPerBlock or 32		-- quadruple
+
+	self.cfg.gameScale = self.cfg.gameScale or (self.cfg.voxelsPerBlock/8)	-- TODO configurable
+	
 	self.cfg.effectVolume = self.cfg.effectVolume or 1
 	self.cfg.backgroundVolume = self.cfg.backgroundVolume or .3
 	self.cfg.startLevel = self.cfg.startLevel or 1
-	--self.cfg.dropSpeed = self.cfg.dropSpeed or 5	-- 5 is good at original resolution
-	self.cfg.dropSpeed = self.cfg.dropSpeed or 10	-- double
-	--self.cfg.dropSpeed = self.cfg.dropSpeed or 20	-- quadruple
+	self.cfg.movedx = self.cfg.movedx or self.cfg.gameScale				-- TODO configurable
+	self.cfg.dropSpeed = self.cfg.dropSpeed or (5*self.cfg.gameScale)
 	self.cfg.sandModel = self.cfg.sandModel or 1
 	self.cfg.speedupCoeff = self.cfg.speedupCoeff or .007
 	self.cfg.toppleChance = self.cfg.toppleChance or 1
@@ -210,13 +206,15 @@ function App:initGL(...)
 			self.cfg.colors[i] = {table.unpack(color)}
 		end
 	end
-	--self.cfg.boardSize = self.cfg.boardSize or {x=80, y=144}	-- original
+	self.cfg.boardSize = self.cfg.boardSize or {x=80*self.cfg.gameScale , y=144*self.cfg.gameScale }	-- original
 	--self.cfg.boardSize = self.cfg.boardSize or {x=160, y=200}
 	--self.cfg.boardSize = self.cfg.boardSize or {x=160, y=288}	-- double
 	--self.cfg.boardSize = self.cfg.boardSize or {x=80, y=360}
-	self.cfg.boardSize = self.cfg.boardSize or {x=320, y=576}	-- quadruple
+	--self.cfg.boardSize = self.cfg.boardSize or {x=320, y=576}	-- quadruple
 	--self.cfg.boardSize = self.cfg.boardSize or {x=512, y=512}
 	self.cfg.numNextPieces = self.cfg.numNextPieces or 3
+	
+	self.pieceSize = self.pieceSizeInBlocks * self.cfg.voxelsPerBlock
 
 	self.numPlayers = 1
 
@@ -391,16 +389,17 @@ function App:makeTexWithImage(size)
 	return tex
 end
 
-local function makePieceImage(s)
+function App:makePieceImage(s)
 	s = string.split(s, '\n')
-	local img = Image(App.pieceSize.x, App.pieceSize.y, 4, 'unsigned char')
-	ffi.fill(img.buffer, 4 * img.width * img.height)
-	for j=0,App.pieceSizeInBlocks.y-1 do
-		for i=0,App.pieceSizeInBlocks.x-1 do
+	local img = Image(self.pieceSize.x, self.pieceSize.y, 4, 'unsigned char')
+	local ptr = ffi.cast('uint32_t*', img.buffer)
+	ffi.fill(ptr, 4 * img.width * img.height)
+	for j=0,self.pieceSizeInBlocks.y-1 do
+		for i=0,self.pieceSizeInBlocks.x-1 do
 			if s[j+1]:sub(i+1,i+1) == '#' then
-				for u=0,App.voxelsPerBlock-1 do
-					for v=0,App.voxelsPerBlock-1 do
-						ffi.cast('uint32_t*', img.buffer)[(u + App.voxelsPerBlock * i) + img.width * (v + App.voxelsPerBlock * j)] = 0xffffffff
+				for u=0,self.cfg.voxelsPerBlock-1 do
+					for v=0,self.cfg.voxelsPerBlock-1 do
+						ptr[(u + self.cfg.voxelsPerBlock * i) + img.width * (v + self.cfg.voxelsPerBlock * j)] = 0xffffffff
 					end
 				end
 			end
@@ -408,45 +407,6 @@ local function makePieceImage(s)
 	end
 	return img
 end
-
-local pieceImages = table{
-	makePieceImage[[
- #
- #
- #
- #
-]],
-	makePieceImage[[
- #
- #
- ##
-]],
-	makePieceImage[[
-   #
-   #
-  ##
-]],
-	makePieceImage[[
-
- ##
- ##
-]],
-	makePieceImage[[
-
- #
-###
-]],
-	makePieceImage[[
- #
- ##
-  #
-]],
-	makePieceImage[[
-  #
- ##
- #
-]],
-}
 
 function App:loadSound(filename)
 	if not filename then error("warning: couldn't find sound file "..searchfilename) end
@@ -509,8 +469,59 @@ function App:reset()
 	self.rng = RNG()
 	--]]
 
+
+	-- init pieces
+
+
+	self.pieceImages = table{
+		self:makePieceImage[[
+ #
+ #
+ #
+ #
+]],
+		self:makePieceImage[[
+ #
+ #
+ ##
+]],
+		self:makePieceImage[[
+   #
+   #
+  ##
+]],
+		self:makePieceImage[[
+
+ ##
+ ##
+]],
+		self:makePieceImage[[
+
+ #
+###
+]],
+		self:makePieceImage[[
+ #
+ ##
+  #
+]],
+		self:makePieceImage[[
+  #
+ ##
+ #
+]],
+	}
+
+
+	-- init board
+
+
 	self.sandSize = vec2i(self.cfg.boardSize)
 	local w, h = self.sandSize:unpack()
+
+	-- FBO the size of the sand texture
+	self.sandFBO = require 'gl.fbo'{width=w, height=h}
+		:unbind()
 
 	self.loseTime = nil
 
@@ -575,14 +586,16 @@ function App:upateFallSpeed()
 	local effectiveLevel = math.min(self.level, maxSpeedLevel)
 	-- TODO make this curve customizable
 	local secondsPerRow = (.8 - ((effectiveLevel-1.)*self.cfg.speedupCoeff))^(effectiveLevel-1.)
-	local secondsPerLine = secondsPerRow / self.voxelsPerBlock
+	local secondsPerLine = secondsPerRow / self.cfg.voxelsPerBlock
 	-- how many ticks to wait before dropping a piece
 	self.ticksToFall = secondsPerLine / self.updateInterval
 --print('effectiveLevel', effectiveLevel, 'secondsPerRow', secondsPerRow, 'scondsPerLin', secondsPerLine, 'ticksToFall', self.ticksToFall)
 end
 
+-- fill in a new piece texture
+-- generate it based on the piece template
 function App:populatePiece(args)
-	local srcimage = pieceImages:pickRandom()
+	local srcimage = self.pieceImages:pickRandom()
 	local colorIndex = self.rng(#self.gameColors)
 	local color = self.gameColors[colorIndex]
 	local alpha = math.floor(colorIndex/#self.gameColors*0xff)
@@ -591,12 +604,12 @@ function App:populatePiece(args)
 	local dstp = ffi.cast('uint32_t*', args.tex.image.buffer)
 	for j=0,self.pieceSize.y-1 do
 		for i=0,self.pieceSize.x-1 do
-			local u = i % self.voxelsPerBlock + .5
-			local v = j % self.voxelsPerBlock + .5
+			local u = i % self.cfg.voxelsPerBlock + .5
+			local v = j % self.cfg.voxelsPerBlock + .5
 			local c = math.max(
-				math.abs(u - self.voxelsPerBlock/2),
-				math.abs(v - self.voxelsPerBlock/2)
-			) / (self.voxelsPerBlock/2)
+				math.abs(u - self.cfg.voxelsPerBlock/2),
+				math.abs(v - self.cfg.voxelsPerBlock/2)
+			) / (self.cfg.voxelsPerBlock/2)
 			local k = i + self.pieceSize.x * j
 			if srcp[0] ~= 0 then
 				local l = self.rng() * .25 + .75
@@ -654,9 +667,12 @@ local function vec3fto4ub(v)
 	)
 end
 
+-- called by new piece tex, and after rotating the pice
 App.pieceOutlineRadius = 5
 function App:updatePieceTex(player)
 	-- while we're here, find the first and last cols with content
+	-- use this for testing screen bounds
+	local pieceBuf = ffi.cast('uint32_t*', player.pieceTex.image.buffer)
 	for _,info in ipairs{
 		{0,self.pieceSize.x-1,1, 'pieceColMin'},
 		{self.pieceSize.x-1,0,-1, 'pieceColMax'},
@@ -665,7 +681,7 @@ function App:updatePieceTex(player)
 		for i=istart,iend,istep do
 			local found
 			for j=0,self.pieceSize.y-1 do
-				if ffi.cast('uint32_t*', player.pieceTex.image.buffer)[i + self.pieceSize.x * j] ~= 0 then
+				if pieceBuf[i + self.pieceSize.x * j] ~= 0 then
 					found = true
 					break
 				end
@@ -682,6 +698,7 @@ function App:updatePieceTex(player)
 	assert(player.pieceOutlineTex.width == self.pieceSize.x + 2 * self.pieceOutlineRadius)
 	assert(player.pieceOutlineTex.height == self.pieceSize.y + 2 * self.pieceOutlineRadius)
 	ffi.fill(player.pieceOutlineTex.image.buffer, 4 * player.pieceOutlineTex.width * player.pieceOutlineTex.height)
+	local outlineBuf = ffi.cast('uint32_t*', player.pieceOutlineTex.image.buffer)
 	for j=0,player.pieceOutlineTex.height-1 do
 		for i=0,player.pieceOutlineTex.width-1 do
 			local bestDistSq = math.huge
@@ -694,7 +711,7 @@ function App:updatePieceTex(player)
 					and y >= 0
 					and y < self.pieceSize.y
 					then
-						if ffi.cast('uint32_t*', player.pieceTex.image.buffer)[x + self.pieceSize.x * y] ~= 0 then
+						if pieceBuf[x + self.pieceSize.x * y] ~= 0 then
 							local distSq = math.max(1, ofx*ofx + ofy*ofy)
 							bestDistSq = math.min(bestDistSq, distSq)
 						end
@@ -704,7 +721,7 @@ function App:updatePieceTex(player)
 			if bestDistSq < math.huge then
 				--bestDistSq = math.sqrt(bestDistSq)
 				local frac = 1 / bestDistSq
-				ffi.cast('uint32_t*', player.pieceOutlineTex.image.buffer)[i + player.pieceOutlineTex.width * j] = vec3fto4ub(player.color * frac)
+				outlineBuf[i + player.pieceOutlineTex.width * j] = vec3fto4ub(player.color * frac)
 			end
 		end
 	end
@@ -770,10 +787,10 @@ function App:updateGame()
 		-- TODO key updates at higher interval than drop rate ...
 		-- but test collision for both
 		if player.keyPress.left then
-			player.piecePos.x = player.piecePos.x - self.movedx
+			player.piecePos.x = player.piecePos.x - self.cfg.movedx
 		end
 		if player.keyPress.right then
-			player.piecePos.x = player.piecePos.x + self.movedx
+			player.piecePos.x = player.piecePos.x + self.cfg.movedx
 		end
 		self:constrainPiecePos(player)
 
@@ -894,12 +911,17 @@ function App:updateGame()
 		end
 	end
 
+	-- TODO for sand model automata-gpu,
+	--  we don't need to update in case of 'needsCheckLine' alone
 	if needsCheckLine or anyMerged or anyCleared then
-		self.numSandVoxels = 0
-		local p = ffi.cast('uint32_t*', self.sandTex.image.buffer)
-		for i=0,w*h-1 do
-			if p[0] ~= 0 then self.numSandVoxels = self.numSandVoxels + 1 end
-			p = p + 1
+		-- only count voxles if we're showing debug info
+		if self.showDebug then
+			self.numSandVoxels = 0
+			local p = ffi.cast('uint32_t*', self.sandTex.image.buffer)
+			for i=0,w*h-1 do
+				if p[0] ~= 0 then self.numSandVoxels = self.numSandVoxels + 1 end
+				p = p + 1
+			end
 		end
 		self.sandTex:bind():subimage()
 	end
@@ -1129,7 +1151,6 @@ end
 
 function App:flipBoard()
 	self.sandmodel:flipBoard()
-	self.sandTex:bind():subimage()
 end
 
 -- static, used by gamestate and app
