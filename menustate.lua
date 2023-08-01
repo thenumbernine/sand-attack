@@ -210,6 +210,7 @@ function ConfigState:updateGUI()
 		end
 	end
 
+	self:centerText'Controls:'
 	self:centerLuatableTooltipSliderFloat('On-Screen Button Radius', app.cfg, 'screenButtonRadius', .001, 1)
 
 	if self:centerButton'Done' then

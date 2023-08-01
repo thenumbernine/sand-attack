@@ -765,6 +765,12 @@ function AutomataSandGPU:init(app)
 		},
 		minFilter = gl.GL_NEAREST,
 		magFilter = gl.GL_NEAREST,
+
+		-- pingpong arg
+		-- for desktop gl i'd attach a tex per attachment
+		-- but for gles2 / webgl1 this isn't ideal
+		-- (but for gles3 / webgl2 it's fine)
+		dontAttach = true,
 	}
 
 	--[[
@@ -1024,6 +1030,7 @@ function AutomataSandGPU:test()
 	os.exit()
 end
 
+local glreport = require 'gl.report'
 function AutomataSandGPU:update()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
@@ -1054,8 +1061,18 @@ function AutomataSandGPU:update()
 		for xofs=0,1 do
 			for yofs=0,1 do
 				-- update
+				--[[
 				self.pp:draw{
 					callback = function()
+				--]]
+				-- [[
+				--gl.glFramebufferTexture2D(gl.GL_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0 + self.pp.index-1, gl.GL_TEXTURE_2D, self.pp:cur().id, 0)
+				self.pp.fbo:bind()
+				self.pp.fbo:setColorAttachmentTex2D(self.pp:cur().id, 0)
+				local res,err = self.pp.fbo.check()
+				if not res then print(err) end
+				--gl.glDrawBuffer(gl.GL_COLOR_ATTACHMENT0)
+				--]]
 						gl.glUniform3i(self.updateShader.uniforms.ofs.loc,
 							bit.bxor(xofs, xofsxor),
 							bit.bxor(yofs, yofsxor),
@@ -1064,8 +1081,14 @@ function AutomataSandGPU:update()
 						tex:bind()
 						gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 						tex:unbind()
+				--[[
 					end,
 				}
+				--]]
+				-- [[
+				self.pp.fbo:unbind()
+				--]]
+
 				self.pp:swap()
 			end
 		end
