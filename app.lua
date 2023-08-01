@@ -173,7 +173,7 @@ function App:initGL(...)
 		print("failed to read config file: "..tostring(err))
 	end)
 	self.cfg = self.cfg or {}
-	
+
 	-- board size is 80 x 144 visible
 	-- piece is 4 blocks arranged
 	-- blocks are 8 x 8 by default
@@ -184,7 +184,7 @@ function App:initGL(...)
 	--self.cfg.voxelsPerBlock = self.cfg.voxelsPerBlock or 32		-- quadruple
 
 	self.cfg.gameScale = self.cfg.gameScale or (self.cfg.voxelsPerBlock/8)	-- TODO configurable
-	
+
 	self.cfg.effectVolume = self.cfg.effectVolume or 1
 	self.cfg.backgroundVolume = self.cfg.backgroundVolume or .3
 	self.cfg.startLevel = self.cfg.startLevel or 1
@@ -213,7 +213,7 @@ function App:initGL(...)
 	--self.cfg.boardSize = self.cfg.boardSize or {x=320, y=576}	-- quadruple
 	--self.cfg.boardSize = self.cfg.boardSize or {x=512, y=512}
 	self.cfg.numNextPieces = self.cfg.numNextPieces or 3
-	
+
 	self.pieceSize = self.pieceSizeInBlocks * self.cfg.voxelsPerBlock
 
 	self.numPlayers = 1
@@ -351,7 +351,7 @@ void main() {
 	float voxelsPerBlock = pieceSize.z;
 	vec2 uv = mod(ij, voxelsPerBlock );
 	float c = max(
-		abs(uv.x - voxelsPerBlock*.5), 
+		abs(uv.x - voxelsPerBlock*.5),
 		abs(uv.y - voxelsPerBlock*.5)
 	) / (voxelsPerBlock*.5);
 	float l = texture(randtex, texcoordv).r * .25 + .75;
@@ -361,6 +361,7 @@ void main() {
 ]],
 		uniforms = {
 			tex = 0,
+			randtex = 1,
 		},
 
 		attrs = {
@@ -431,6 +432,7 @@ function App:makeTexFromImage(img)
 		magFilter = gl.GL_NEAREST,
 		data = img.buffer,	-- stored
 	}
+		:unbind()
 	tex.image = img
 	return tex
 end
@@ -540,6 +542,7 @@ function App:reset()
 					bit.lshift(math.random(0,255), 16),
 					bit.lshift(math.random(0,255), 32)
 				)
+				ptr = ptr + 1
 			end
 		end
 		self.pieceRandomColorTex = self:makeTexFromImage(img)
@@ -666,45 +669,45 @@ function App:populatePiece(args)
 	local colorIndex = self.rng(#self.gameColors)
 	local color = self.gameColors[colorIndex]
 	local alpha = colorIndex/#self.gameColors
-	
+
 	local dsttex = args.tex
-	
-	-- [[ on gpu	
+	local shader = self.populatePieceShader
+
 	gl.glViewport(0, 0, self.pieceSize.x, self.pieceSize.y)
-	
+
 	self.pieceFBO:bind()
 	self.pieceFBO:setColorAttachmentTex2D(dsttex.id)
 	local res,err = self.pieceFBO.check()
 	if not res then print(err) end
-	
-	self.populatePieceShader
+
+	shader
 		:use()
 		:enableAttrs()
-	
+
 	self.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
 	gl.glUniformMatrix4fv(
-		self.populatePieceShader.uniforms.mvProjMat.loc,
+		shader.uniforms.mvProjMat.loc,
 		1,
 		gl.GL_FALSE,
 		self.mvProjMat.ptr)
-	gl.glUniform4f(self.populatePieceShader.uniforms.color.loc, color.x, color.y, color.z, alpha)
-	gl.glUniform3f(self.populatePieceShader.uniforms.pieceSize.loc,
+	gl.glUniform4f(shader.uniforms.color.loc, color.x, color.y, color.z, alpha)
+	gl.glUniform3f(shader.uniforms.pieceSize.loc,
 		self.pieceSize.x,
 		self.pieceSize.y,
 		self.cfg.voxelsPerBlock)
-	
+
 	srctex:bind(0)
 	self.pieceRandomColorTex:bind(1)
 
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
-	
+
 	self.pieceRandomColorTex:unbind(1)
-	srctex:unbind(0)	
-	
-	self.populatePieceShader
+	srctex:unbind(0)
+
+	shader
 		:disableAttrs()
 		:useNone()
-	
+
 	gl.glReadPixels(
 		0,						--GLint x,
 		0,						--GLint y,
@@ -713,45 +716,10 @@ function App:populatePiece(args)
 		gl.GL_RGBA,				--GLenum format,
 		gl.GL_UNSIGNED_BYTE,	--GLenum type,
 		dsttex.image.buffer)	--void *pixels
-	
+
 	self.pieceFBO:unbind()
-	
+
 	gl.glViewport(0, 0, self.width, self.height)
-	--]]
-	
-	--[[ on cpu
-	local srcimage = srctex.image
-	alpha = math.floor(alpha*0xff)
-	alpha = bit.lshift(alpha, 24)
-	local srcp = ffi.cast('uint32_t*', srcimage.buffer)
-	local dstp = ffi.cast('uint32_t*', dsttex.image.buffer)
-	for j=0,self.pieceSize.y-1 do
-		for i=0,self.pieceSize.x-1 do
-			local u = i % self.cfg.voxelsPerBlock + .5
-			local v = j % self.cfg.voxelsPerBlock + .5
-			local c = math.max(
-				math.abs(u - self.cfg.voxelsPerBlock/2),
-				math.abs(v - self.cfg.voxelsPerBlock/2)
-			) / (self.cfg.voxelsPerBlock/2)
-			local k = i + self.pieceSize.x * j
-			if srcp[0] ~= 0 then
-				local l = self.rng() * .25 + .75
-				l = l * (.25 + .75 * math.sqrt(1 - c*c))
-				dstp[0] = bit.bor(
-					math.floor(l * color.x * 255),
-					bit.lshift(math.floor(l * color.y * 255), 8),
-					bit.lshift(math.floor(l * color.z * 255), 16),
-					alpha
-				)
-			else
-				dstp[0] = 0
-			end
-			srcp = srcp + 1
-			dstp = dstp + 1
-		end
-	end
-	dsttex:bind():subimage()
-	--]]
 end
 
 function App:newPiece(player)
@@ -855,6 +823,57 @@ end
 
 function App:rotatePiece(player)
 	if not player.pieceTex then return end
+
+-- [[ on gpu
+	local srctex = player.pieceTex
+	local dsttex = self.rotPieceTex
+	local shader = self.displayShader
+	gl.glViewport(0, 0, self.pieceSize.x, self.pieceSize.y)
+
+	self.pieceFBO:bind()
+	self.pieceFBO:setColorAttachmentTex2D(dsttex.id)
+	local res,err = self.pieceFBO.check()
+	if not res then print(err) end
+
+	shader
+		:use()
+		:enableAttrs()
+
+	self.projMat:setOrtho(0, 1, 0, 1, -1, 1)
+	self.mvMat
+		:setTranslate(.5, .5, 0)
+		:applyRotate(90, 0, 0, 1)
+		:applyTranslate(-.5, -.5, 0)
+	self.mvProjMat:mul4x4(self.projMat, self.mvMat)
+	gl.glUniformMatrix4fv(
+		shader.uniforms.mvProjMat.loc,
+		1,
+		gl.GL_FALSE,
+		self.mvProjMat.ptr)
+	gl.glUniform1i(shader.uniforms.useAlpha.loc, 0)
+
+	srctex:bind()
+	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+	srctex:unbind()
+
+	shader
+		:disableAttrs()
+		:useNone()
+
+	gl.glReadPixels(
+		0,						--GLint x,
+		0,						--GLint y,
+		self.pieceSize.x,		--GLsizei width,
+		self.pieceSize.y,		--GLsizei height,
+		gl.GL_RGBA,				--GLenum format,
+		gl.GL_UNSIGNED_BYTE,	--GLenum type,
+		dsttex.image.buffer)	--void *pixels
+
+	self.pieceFBO:unbind()
+
+	gl.glViewport(0, 0, self.width, self.height)
+--]]
+--[[ on cpu
 	for j=0,self.pieceSize.x-1 do
 		for i=0,self.pieceSize.y-1 do
 			for ch=0,3 do
@@ -863,7 +882,10 @@ function App:rotatePiece(player)
 			end
 		end
 	end
+--]]
+
 	player.pieceTex, self.rotPieceTex = self.rotPieceTex, player.pieceTex
+
 	self:updatePieceTex(player)
 	self:constrainPiecePos(player)
 end

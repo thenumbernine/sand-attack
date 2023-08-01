@@ -17,7 +17,6 @@ end
 if cmdline.gl ~= nil then	-- allow cmdline override
 	glfn = cmdline.gl
 end
-print('using', glfn)
 require 'gl.setup'(glfn)
 --]]
 
