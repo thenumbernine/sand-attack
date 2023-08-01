@@ -190,9 +190,6 @@ function App:initGL(...)
 	self.cfg.voxelsPerBlock = self.cfg.voxelsPerBlock or 16	-- double
 	--self.cfg.voxelsPerBlock = self.cfg.voxelsPerBlock or 32		-- quadruple
 
-	self.gameScale = math.ceil(self.cfg.voxelsPerBlock/8)	-- TODO configurable
-	self.updatesPerFrame = self.gameScale	-- TODO configuratble
-
 	self.cfg.effectVolume = self.cfg.effectVolume or 1
 	self.cfg.backgroundVolume = self.cfg.backgroundVolume or .3
 	self.cfg.startLevel = self.cfg.startLevel or 1
@@ -218,8 +215,6 @@ function App:initGL(...)
 	--self.cfg.boardSizeInBlocks = self.cfg.boardSizeInBlocks or {x=10, y=45}
 	--self.cfg.boardSizeInBlocks = self.cfg.boardSizeInBlocks or {x=64, y=64}
 	self.cfg.numNextPieces = self.cfg.numNextPieces or 3
-
-	self.pieceSize = self.pieceSizeInBlocks * self.cfg.voxelsPerBlock
 
 	self.numPlayers = 1
 
@@ -521,10 +516,8 @@ end
 function App:reset()
 	self:saveConfig()
 
-	-- recalc until these become configurable
-	-- tho ... will they ever?
-	self.gameScale = math.ceil(self.cfg.voxelsPerBlock/8)	-- TODO configurable
-	self.updatesPerFrame = self.gameScale	-- TODO configuratble
+	self.gameScale = math.ceil(self.cfg.voxelsPerBlock/8)
+	self.updatesPerFrame = self.gameScale
 
 	--[[ do this upon every :reset, save seed, and save it in the high score as well
 	-- hmm, I need a rng object that is reproducible
@@ -540,6 +533,8 @@ function App:reset()
 
 
 	-- init pieces
+
+	self.pieceSize = self.pieceSizeInBlocks * self.cfg.voxelsPerBlock
 
 	self.pieceFBO = require 'gl.fbo'{width=self.pieceSize.x, height=self.pieceSize.y}
 		:unbind()
