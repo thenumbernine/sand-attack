@@ -115,48 +115,50 @@ function AutomataSandCPU:update()
 	local w, h = app.sandSize:unpack()
 
 	local needsCheckLine = false
-	-- update
-	local prow = ffi.cast('int32_t*', self.sandTex.image.buffer) + w
-	for j=1,h-1 do
-		-- 50/50 cycling left-to-right vs right-to-left
-		local istart, iend, istep
-		if app.rng(2) == 2 then
-			istart,iend,istep = 0, w-1, 1
-		else
-			istart,iend,istep = w-1, 0, -1
-		end
-		local p = prow + istart
-		for i=istart,iend,istep do
-			-- if the cell is blank and there's a sand cell above us ... pull it down
-			if p[0] ~= 0 then
-				if p[-w] == 0 then
-					p[0], p[-w] = p[-w], p[0]
-					needsCheckLine = true
-				-- hmm symmetry? check left vs right first?
-				elseif app.rng() < app.cfg.toppleChance then
-					-- 50/50 check left then right, vs check right then left
-					if app.rng(2) == 2 then
-						if i > 0 and p[-w-1] == 0 then
-							p[0], p[-w-1] = p[-w-1], p[0]
-							needsCheckLine = true
-						elseif i < w-1 and p[-w+1] == 0 then
-							p[0], p[-w+1] = p[-w+1], p[0]
-							needsCheckLine = true
-						end
-					else
-						if i < w-1 and p[-w+1] == 0 then
-							p[0], p[-w+1] = p[-w+1], p[0]
-							needsCheckLine = true
-						elseif i > 0 and p[-w-1] == 0 then
-							p[0], p[-w-1] = p[-w-1], p[0]
-							needsCheckLine = true
+	for i=1,app.updatesPerFrame do
+		-- update
+		local prow = ffi.cast('int32_t*', self.sandTex.image.buffer) + w
+		for j=1,h-1 do
+			-- 50/50 cycling left-to-right vs right-to-left
+			local istart, iend, istep
+			if app.rng(2) == 2 then
+				istart,iend,istep = 0, w-1, 1
+			else
+				istart,iend,istep = w-1, 0, -1
+			end
+			local p = prow + istart
+			for i=istart,iend,istep do
+				-- if the cell is blank and there's a sand cell above us ... pull it down
+				if p[0] ~= 0 then
+					if p[-w] == 0 then
+						p[0], p[-w] = p[-w], p[0]
+						needsCheckLine = true
+					-- hmm symmetry? check left vs right first?
+					elseif app.rng() < app.cfg.toppleChance then
+						-- 50/50 check left then right, vs check right then left
+						if app.rng(2) == 2 then
+							if i > 0 and p[-w-1] == 0 then
+								p[0], p[-w-1] = p[-w-1], p[0]
+								needsCheckLine = true
+							elseif i < w-1 and p[-w+1] == 0 then
+								p[0], p[-w+1] = p[-w+1], p[0]
+								needsCheckLine = true
+							end
+						else
+							if i < w-1 and p[-w+1] == 0 then
+								p[0], p[-w+1] = p[-w+1], p[0]
+								needsCheckLine = true
+							elseif i > 0 and p[-w-1] == 0 then
+								p[0], p[-w-1] = p[-w-1], p[0]
+								needsCheckLine = true
+							end
 						end
 					end
 				end
+				p = p + istep
 			end
-			p = p + istep
+			prow = prow + w
 		end
-		prow = prow + w
 	end
 
 	return needsCheckLine
@@ -1030,8 +1032,7 @@ function AutomataSandGPU:test()
 
 	gl.glViewport(0, 0, w, h)
 
-	local updatesPerFrame = math.ceil(app.cfg.gameScale)
-	for i=1,updatesPerFrame do
+	for i=1,app.updatesPerFrame do
 		for toppleRight=1,1 do
 			for yofs=0,0 do
 				for xofs=0,0 do
@@ -1090,8 +1091,7 @@ function AutomataSandGPU:update()
 	fbo:bind()
 	gl.glViewport(0, 0, w, h)
 
-	local updatesPerFrame = math.ceil(app.cfg.gameScale)
-	for i=1,updatesPerFrame do
+	for i=1,app.updatesPerFrame do
 		for toppleRight=0,1 do
 			for xofs=0,1 do
 				for yofs=0,1 do
@@ -1186,10 +1186,10 @@ end
 
 
 SandModel.subclasses = table{
+	AutomataSandGPU,
 	AutomataSandCPU,
 	SPHSand,
 	CFDSand,
-	AutomataSandGPU,
 }
 SandModel.subclassNames = SandModel.subclasses:mapi(function(cl) return cl.name end)
 

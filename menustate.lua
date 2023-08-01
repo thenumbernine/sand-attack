@@ -570,10 +570,11 @@ function HighScoreState:makeNewRecord()
 		elseif field == 'toppleChance'
 		or field == 'voxelsPerBlock'
 		or field == 'numColors'
-		or field == 'sandModel'
 		or field == 'speedupCoeff'
 		then
 			record[field] = app.cfg[field]
+		elseif field == 'sandModel' then
+			record[field] = SandModel.subclassNames[app.cfg[field]]
 		elseif field == 'boardWidth' then
 			record[field] = tonumber(app.cfg.boardSize.x)
 		elseif field == 'boardHeight' then

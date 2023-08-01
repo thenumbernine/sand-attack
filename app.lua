@@ -190,13 +190,14 @@ function App:initGL(...)
 	self.cfg.voxelsPerBlock = self.cfg.voxelsPerBlock or 16	-- double
 	--self.cfg.voxelsPerBlock = self.cfg.voxelsPerBlock or 32		-- quadruple
 
-	self.cfg.gameScale = self.cfg.gameScale or (self.cfg.voxelsPerBlock/8)	-- TODO configurable
+	self.gameScale = math.ceil(self.cfg.voxelsPerBlock/8)	-- TODO configurable
+	self.updatesPerFrame = self.gameScale	-- TODO configuratble
 
 	self.cfg.effectVolume = self.cfg.effectVolume or 1
 	self.cfg.backgroundVolume = self.cfg.backgroundVolume or .3
 	self.cfg.startLevel = self.cfg.startLevel or 1
-	self.cfg.movedx = self.cfg.movedx or self.cfg.gameScale				-- TODO configurable
-	self.cfg.dropSpeed = self.cfg.dropSpeed or (5*self.cfg.gameScale)
+	self.cfg.movedx = self.cfg.movedx or self.gameScale				-- TODO configurable
+	self.cfg.dropSpeed = self.cfg.dropSpeed or (5*self.gameScale)
 	self.cfg.sandModel = self.cfg.sandModel or 1
 	self.cfg.speedupCoeff = self.cfg.speedupCoeff or .007
 	self.cfg.toppleChance = self.cfg.toppleChance or 1
@@ -212,7 +213,7 @@ function App:initGL(...)
 			self.cfg.colors[i] = {table.unpack(color)}
 		end
 	end
-	self.cfg.boardSize = self.cfg.boardSize or {x=80*self.cfg.gameScale , y=144*self.cfg.gameScale }	-- original
+	self.cfg.boardSize = self.cfg.boardSize or {x=80*self.gameScale , y=144*self.gameScale }	-- original
 	--self.cfg.boardSize = self.cfg.boardSize or {x=160, y=200}
 	--self.cfg.boardSize = self.cfg.boardSize or {x=160, y=288}	-- double
 	--self.cfg.boardSize = self.cfg.boardSize or {x=80, y=360}
@@ -521,6 +522,11 @@ end
 
 function App:reset()
 	self:saveConfig()
+
+	-- recalc until these become configurable
+	-- tho ... will they ever?
+	self.gameScale = math.ceil(self.cfg.voxelsPerBlock/8)	-- TODO configurable
+	self.updatesPerFrame = self.gameScale	-- TODO configuratble
 
 	--[[ do this upon every :reset, save seed, and save it in the high score as well
 	-- hmm, I need a rng object that is reproducible
