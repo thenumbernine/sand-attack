@@ -28,9 +28,10 @@ end
 function SandModel:reset()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	ffi.fill(self:getSandTex().image.buffer, 4 * w * h)
-	assert(self:getSandTex().data == self:getSandTex().image.buffer)
-	self:getSandTex():bind():subimage():unbind()
+	local sandTex = self:getSandTex()
+	ffi.fill(sandTex.image.buffer, 4 * w * h)
+	assert(sandTex.data == sandTex.image.buffer)
+	sandTex:bind():subimage():unbind()
 end
 
 function SandModel:testPieceMerge(player)
@@ -1149,11 +1150,12 @@ end
 function AutomataSandGPU:clearBlob(blob)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
+	local sandTex = self:getSandTex()
 	local clearedCount = 0
 	for _,int in ipairs(blob) do
 		local iw = int.x2 - int.x1 + 1
 		clearedCount = clearedCount + iw
-		ffi.fill(self:getSandTex().image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
+		ffi.fill(sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
 		for k=0,4*iw-1 do
 			app.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 		end
@@ -1168,7 +1170,8 @@ function AutomataSandGPU:flipBoard()
 	-- should the sand model be responsible for the sandTex ?
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	local p1 = ffi.cast('int32_t*', self:getSandTex().image.buffer)
+	local sandTex = self:getSandTex()
+	local p1 = ffi.cast('int32_t*', sandTex.image.buffer)
 	local p2 = p1 + w * h - 1
 	for j=0,bit.rshift(h,1)-1 do
 		for i=0,w-1 do
@@ -1177,7 +1180,7 @@ function AutomataSandGPU:flipBoard()
 			p2 = p2 - 1
 		end
 	end
-	self:getSandTex():bind():subimage()
+	sandTex:bind():subimage()
 end
 
 function AutomataSandGPU:getSandTex()

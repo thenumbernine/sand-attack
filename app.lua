@@ -1007,7 +1007,8 @@ function App:updateGame()
 	--]]
 	self.gameTime = self.gameTime + self.updateInterval
 
-	local needsCheckLine = self.sandmodel:update()
+	local sandmodel = self.sandmodel
+	local needsCheckLine = sandmodel:update()
 
 	for _,player in ipairs(self.players) do
 		player.pieceLastPos:set(player.piecePos:unpack())
@@ -1063,15 +1064,15 @@ function App:updateGame()
 			player.piecePos.x = player.pieceLastPos.x
 			for y=-self.pieceSize.y,player.pieceLastPos.y do
 				player.piecePos.y = y
-				if not self.sandmodel:testPieceMerge(player) then break end
+				if not sandmodel:testPieceMerge(player) then break end
 			end
 			merge = true
 		else
-			if self.sandmodel:testPieceMerge(player) then
+			if sandmodel:testPieceMerge(player) then
 				player.piecePos.x = player.pieceLastPos.x
 				for y=player.piecePos.y+1,player.pieceLastPos.y do
 					player.piecePos.y = y
-					if not self.sandmodel:testPieceMerge(player) then break end
+					if not sandmodel:testPieceMerge(player) then break end
 				end
 				merge = true
 			end
@@ -1083,7 +1084,7 @@ function App:updateGame()
 				player.droppingPiece = false	-- stop dropping piece
 			end
 			needsCheckLine = true
-			self.sandmodel:mergePiece(player)
+			sandmodel:mergePiece(player)
 			self:newPiece(player)
 		end
 	end
@@ -1095,7 +1096,7 @@ function App:updateGame()
 	if needsCheckLine then
 		ffi.fill(self.currentClearImage.buffer, 4 * w * h)
 		local clearedCount = 0
-		local blobs = self.sandmodel:getSandTex().image:getBlobs(self.getBlobCtx)
+		local blobs = sandmodel:getSandTex().image:getBlobs(self.getBlobCtx)
 --print('#blobs', #blobs)
 		for _,blob in pairs(blobs) do
 			if blob.cl ~= 0 then
@@ -1108,7 +1109,7 @@ function App:updateGame()
 				local blobwidth = xmax - xmin + 1
 				if blobwidth == w then
 --print('clearing blob of class', blob.cl)
-					clearedCount = clearedCount + self.sandmodel:clearBlob(blob)
+					clearedCount = clearedCount + sandmodel:clearBlob(blob)
 				end
 			end
 		end
@@ -1141,8 +1142,8 @@ function App:updateGame()
 			self.flashTex:bind():subimage()
 			self.lastLineTime = self.gameTime
 
-			if self.sandmodel.doneClearingBlobs then
-				self.sandmodel:doneClearingBlobs()
+			if sandmodel.doneClearingBlobs then
+				sandmodel:doneClearingBlobs()
 			end
 		end
 	end
@@ -1150,16 +1151,17 @@ function App:updateGame()
 	-- TODO for sand model automata-gpu,
 	--  we don't need to update in case of 'needsCheckLine' alone
 	if needsCheckLine or anyMerged or anyCleared then
+		local sandTex = sandmodel:getSandTex()
 		-- only count voxles if we're showing debug info
 		if self.showDebug then
 			self.numSandVoxels = 0
-			local p = ffi.cast('uint32_t*', self.sandmodel:getSandTex().image.buffer)
+			local p = ffi.cast('uint32_t*', sandTex.image.buffer)
 			for i=0,w*h-1 do
 				if p[0] ~= 0 then self.numSandVoxels = self.numSandVoxels + 1 end
 				p = p + 1
 			end
 		end
-		self.sandmodel:getSandTex():bind():subimage()
+		sandTex:bind():subimage()
 	end
 
 	for _,player in ipairs(self.players) do
@@ -1176,6 +1178,7 @@ function App:update(...)
 	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 
 	local w, h = self.sandSize:unpack()
+	local sandmodel = self.sandmodel
 
 	if not self.paused then
 		-- if we haven't lost yet ...
@@ -1209,7 +1212,7 @@ function App:update(...)
 		gl.glEnable(gl.GL_ALPHA_TEST)
 		--]]
 
-		self.sandmodel:getSandTex():bind()
+		sandmodel:getSandTex():bind()
 		gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 
 		--[[ transparent for the background for sand area?
@@ -1278,7 +1281,7 @@ function App:update(...)
 			self.wasFlashing = false
 
 			local dsttex = self.flashTex
-			local fbo = self.sandmodel.fbo
+			local fbo = sandmodel.fbo
 
 			gl.glViewport(0, 0, w, h)
 			fbo:bind()
