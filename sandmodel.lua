@@ -328,7 +328,7 @@ function SPHSand:update()
 		local v = self.vel + (x + w * y)
 		g[0].vel.x = v[0].x / v[0].z
 		g[0].vel.y = v[0].y / v[0].z
-	end	
+	end
 	--]]
 
 	-- now clear and blit all grains onto the board
@@ -422,7 +422,7 @@ function CFDSand:init(app)
 	self.sandTexPrev = app:makeTexWithImage(app.sandSize)
 	self.div = make()
 	self.p = make()
-	
+
 	self.dx = 1/4
 end
 function CFDSand:update()
@@ -431,7 +431,7 @@ function CFDSand:update()
 
 	local dt = app.updateInterval
 	local grav = -9.8 * tonumber(app.pieceSize.x)
-	
+
 	local needsCheckLine = false
 	-- update
 	local sandip = ffi.cast('int32_t*', app.sandTex.image.buffer)
@@ -510,7 +510,7 @@ function CFDSand:update()
 		for i=0,w-1 do
 			local f = i/(w-1)
 			local v = self.v + (i + w * j)
-			v[0] = v[0] + grav * dt 
+			v[0] = v[0] + grav * dt
 		end
 	end
 	--]]
@@ -589,17 +589,17 @@ function CFDSand:advect(dir, dst, src, u, v, dt, nearest)
 			local i0 = math.floor(x)
 			local i1 = i0 + 1
 			local s1 = x - i0
-			
+
 			local y = j - dt_dy * v[i + w * j]
 			y = math.clamp(y, .5, h + .5)
 			local j0 = math.floor(y)
 			local j1 = j0 + 1
 			local t1 = y - j0
-		
+
 			if nearest then
-				dst[i + w * j] = 
+				dst[i + w * j] =
 					s1 < .5 and (
-						t1 < .5 
+						t1 < .5
 						and src[i0 + w * j0]
 						or src[i0 + w * j1]
 					) or (
@@ -745,10 +745,13 @@ local AutomataSandGPU = SandModel:subclass()
 
 AutomataSandGPU.name = 'Automata GPU'
 
+AutomataSandGPU.updatesPerFrame = 1	-- original resolution
+AutomataSandGPU.updatesPerFrame = 2	-- double resolution
+
 function AutomataSandGPU:init(app)
 	AutomataSandGPU.super.init(self, app)
 	local w, h = app.sandSize:unpack()
-	
+
 	self.pp = GLPingPong{
 		-- args copied from App:makeTexWithImage
 		internalFormat = gl.GL_RGBA,
@@ -774,25 +777,25 @@ for xofs=0 (fall right)
 
 +---+---+    +---+---+
 |   | ? |    |   | ? |
-+---+---+ => +---+---+ 
++---+---+ => +---+---+
 | ? | ? |    | ? | ? |
 +---+---+    +---+---+
 
 +---+---+    +---+---+
 | A | ? |    |   | ? |
-+---+---+ => +---+---+ 
++---+---+ => +---+---+
 |   | ? |    | A | ? |
 +---+---+    +---+---+
 
 +---+---+    +---+---+
 | A | ? |    |   | ? |
-+---+---+ => +---+---+ 
++---+---+ => +---+---+
 | B |   |    | B | A |
 +---+---+    +---+---+
 
 +---+---+    +---+---+
 | A | ? |    | A | ? |
-+---+---+ => +---+---+ 
++---+---+ => +---+---+
 | B | C |    | B | C |
 +---+---+    +---+---+
 
@@ -842,10 +845,10 @@ void main() {
 
 	//if we're on a 2x2 box that extends beneath the bottom ...
 	if (
-		ulitc.y < 0 || 
+		ulitc.y < 0 ||
 		ulitc.y >= texsize.y-1 ||
 
-		ulitc.x < 0 || 
+		ulitc.x < 0 ||
 		ulitc.x >= texsize.x-1
 	) {
 		// then just keep whatever's here
@@ -862,15 +865,15 @@ void main() {
 	c[1 + (0 << 1)] = texelFetch(tex, ulitc + ivec2(1, 0), 0);
 	c[0 + (1 << 1)] = texelFetch(tex, ulitc + ivec2(0, 1), 0);
 	c[1 + (1 << 1)] = texelFetch(tex, ulitc + ivec2(1, 1), 0);
-	
+
 	//fall down + right...
 	if (ofs.z == 0) {
 
 		// upper-left is empty
 		if (c[0 + (1 << 1)] == vec4(0.)) {
-			//then do nothing -- draw the output as input 
+			//then do nothing -- draw the output as input
 			fragColor = c[lc.x + (lc.y << 1)];
-		// upper-left isn't empty, but lower-left is ... 
+		// upper-left isn't empty, but lower-left is ...
 		} else if (c[0 + (0 << 1)] == vec4(0.)) {
 			// swap y for lc.x == ofs.x, keep y for xofs=1
 			if (lc.x == 0) {
@@ -886,19 +889,19 @@ void main() {
 			} else {
 				fragColor = c[lc.x + (lc.y << 1)];
 			}
-		// all are full -- keep 
+		// all are full -- keep
 		} else {
 			fragColor = c[lc.x + (lc.y << 1)];
 		}
-	
+
 	//fall down + left ...
 	} else {
-	
+
 		// upper-right is empty
 		if (c[1 + (1 << 1)] == vec4(0.)) {
-			//then do nothing -- draw the output as input 
+			//then do nothing -- draw the output as input
 			fragColor = c[lc.x + (lc.y << 1)];
-		// upper-right isn't empty, but lower-right is ... 
+		// upper-right isn't empty, but lower-right is ...
 		} else if (c[1 + (0 << 1)] == vec4(0.)) {
 			// swap y for lc.x == ofs.x, keep y for xofs=1
 			if (lc.x == 1) {
@@ -914,7 +917,7 @@ void main() {
 			} else {
 				fragColor = c[lc.x + (lc.y << 1)];
 			}
-		// all are full -- keep 
+		// all are full -- keep
 		} else {
 			fragColor = c[lc.x + (lc.y << 1)];
 		}
@@ -925,7 +928,7 @@ void main() {
 			tex = 0,
 			texsize = {w, h},
 		},
-		
+
 		attrs = {
 			vertex = app.quadVertexBuf,
 		},
@@ -943,7 +946,7 @@ local function printBuf(buf, w, h, yofs)
 			p=p+1
 		end
 		l = l .. '\n'
-		if j % 2 == yofs then 
+		if j % 2 == yofs then
 			l = l .. '\n'
 		end
 		s = l .. s
@@ -968,7 +971,7 @@ function AutomataSandGPU:test()
 
 	print'before'
 	local beforeStr = printBuf(app.sandTex.image.buffer, w, h, 0)
-	
+
 	-- copy sandtex to pingpong
 	self.pp:prev()
 		:bind()
@@ -986,27 +989,29 @@ function AutomataSandGPU:test()
 		gl.GL_FALSE,
 		app.mvProjMat.ptr)
 
-	for toppleRight=1,1 do
-		for yofs=0,0 do
-			for xofs=0,0 do
-				-- update
-				self.pp:draw{
-					viewport = {0, 0, w, h},
-					callback = function()
-						gl.glUniform3i(self.updateShader.uniforms.ofs.loc, xofs, yofs, toppleRight)
-						local tex = self.pp:prev()
-						tex:bind()
-						gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
-						tex:unbind()
-					end,
-				}
-				self.pp:swap()
-		
-				-- get pingpong
-				self.pp:prev():toCPU(app.sandTex.image.buffer)
+	for i=1,updatesPerFrame do
+		for toppleRight=1,1 do
+			for yofs=0,0 do
+				for xofs=0,0 do
+					-- update
+					self.pp:draw{
+						viewport = {0, 0, w, h},
+						callback = function()
+							gl.glUniform3i(self.updateShader.uniforms.ofs.loc, xofs, yofs, toppleRight)
+							local tex = self.pp:prev()
+							tex:bind()
+							gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+							tex:unbind()
+						end,
+					}
+					self.pp:swap()
 
-				print('after ofs', xofs, yofs, toppleRight)
-				local afterStr = printBuf(app.sandTex.image.buffer, w, h, yofs)
+					-- get pingpong
+					self.pp:prev():toCPU(app.sandTex.image.buffer)
+
+					print('after ofs', xofs, yofs, toppleRight)
+					local afterStr = printBuf(app.sandTex.image.buffer, w, h, yofs)
+				end
 			end
 		end
 	end
@@ -1038,7 +1043,11 @@ function AutomataSandGPU:update()
 		1,
 		gl.GL_FALSE,
 		app.mvProjMat.ptr)
-	
+
+	local rightxor = math.random(0,1)
+	local xofsxor = math.random(0,1)
+	local yofsxor = math.random(0,1)
+
 	for toppleRight=0,1 do
 		for xofs=0,1 do
 			for yofs=0,1 do
@@ -1046,7 +1055,10 @@ function AutomataSandGPU:update()
 				self.pp:draw{
 					viewport = {0, 0, w, h},
 					callback = function()
-						gl.glUniform3i(self.updateShader.uniforms.ofs.loc, xofs, yofs, toppleRight)
+						gl.glUniform3i(self.updateShader.uniforms.ofs.loc,
+							bit.bxor(xofs, xofsxor),
+							bit.bxor(yofs, yofsxor),
+							bit.bxor(toppleRight, rightxor))
 						local tex = self.pp:prev()
 						tex:bind()
 						gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
@@ -1057,11 +1069,11 @@ function AutomataSandGPU:update()
 			end
 		end
 	end
-	
+
 	self.updateShader
 		:disableAttrs()
 		:useNone()
-	
+
 	-- get pingpong
 	self.pp:prev():toCPU(app.sandTex.image.buffer)
 

@@ -77,7 +77,7 @@ App.sdlInitFlags = bit.bor(
 )
 
 App.useAudio = true	-- set to false to disable audio altogether
-App.showFPS = false	-- show fps in gui
+App.showFPS = true -- show fps in gui
 local dontCheckForLinesEver = false	-- means don't ever ever check for lines.  used for fps testing the sand topple simulation.
 
 App.updateInterval = 1/60
@@ -105,10 +105,16 @@ end
 -- board size is 80 x 144 visible
 -- piece is 4 blocks arranged
 -- blocks are 8 x 8
-App.voxelsPerBlock = 8	-- original
---App.voxelsPerBlock = 16
+-- TODO should this be configurable?
+--App.voxelsPerBlock = 8	-- original
+App.voxelsPerBlock = 16	-- double
+--App.voxelsPerBlock = 32		-- quadruple
 App.pieceSizeInBlocks = vec2i(4,4)
 App.pieceSize = App.pieceSizeInBlocks * App.voxelsPerBlock
+
+--App.movedx = 1	-- feels good at original resolution
+App.movedx = 2		-- double
+--App.movedx = 4	-- quadruple
 
 App.maxAudioDist = 10
 
@@ -185,7 +191,9 @@ function App:initGL(...)
 	self.cfg.effectVolume = self.cfg.effectVolume or 1
 	self.cfg.backgroundVolume = self.cfg.backgroundVolume or .3
 	self.cfg.startLevel = self.cfg.startLevel or 1
-	self.cfg.dropSpeed = self.cfg.dropSpeed or 5
+	--self.cfg.dropSpeed = self.cfg.dropSpeed or 5	-- 5 is good at original resolution
+	self.cfg.dropSpeed = self.cfg.dropSpeed or 10	-- double
+	--self.cfg.dropSpeed = self.cfg.dropSpeed or 20	-- quadruple
 	self.cfg.sandModel = self.cfg.sandModel or 1
 	self.cfg.speedupCoeff = self.cfg.speedupCoeff or .007
 	self.cfg.toppleChance = self.cfg.toppleChance or 1
@@ -202,10 +210,11 @@ function App:initGL(...)
 			self.cfg.colors[i] = {table.unpack(color)}
 		end
 	end
-	self.cfg.boardSize = self.cfg.boardSize or {x=80, y=144}	-- original
+	--self.cfg.boardSize = self.cfg.boardSize or {x=80, y=144}	-- original
 	--self.cfg.boardSize = self.cfg.boardSize or {x=160, y=200}
-	--self.cfg.boardSize = self.cfg.boardSize or {x=160, y=288}
+	--self.cfg.boardSize = self.cfg.boardSize or {x=160, y=288}	-- double
 	--self.cfg.boardSize = self.cfg.boardSize or {x=80, y=360}
+	self.cfg.boardSize = self.cfg.boardSize or {x=320, y=576}	-- quadruple
 	--self.cfg.boardSize = self.cfg.boardSize or {x=512, y=512}
 	self.cfg.numNextPieces = self.cfg.numNextPieces or 3
 
@@ -757,15 +766,14 @@ function App:updateGame()
 	-- now draw the shape over the sand
 	-- test piece for collision with sand
 	-- if it collides then merge it
-	local movedx = 1
 	for _,player in ipairs(self.players) do
 		-- TODO key updates at higher interval than drop rate ...
 		-- but test collision for both
 		if player.keyPress.left then
-			player.piecePos.x = player.piecePos.x - movedx
+			player.piecePos.x = player.piecePos.x - self.movedx
 		end
 		if player.keyPress.right then
-			player.piecePos.x = player.piecePos.x + movedx
+			player.piecePos.x = player.piecePos.x + self.movedx
 		end
 		self:constrainPiecePos(player)
 
@@ -1074,6 +1082,7 @@ function App:update(...)
 		if self.thisTime - self.lastFrameTime >= 1 then
 			local deltaTime = self.thisTime - self.lastFrameTime
 			self.fps = self.fpsSampleCount / deltaTime
+print(self.fps)
 			self.lastFrameTime = self.thisTime
 			self.fpsSampleCount = 0
 		end
@@ -1096,7 +1105,7 @@ function App:drawTouchRegions()
 	for i=1,self.numPlayers do
 		for _,keyname in ipairs(Player.keyNames) do
 			local e = self.cfg.playerKeys[i][keyname]
-			if e[1] == sdl.SDL_MOUSEBUTTONDOWN 
+			if e[1] == sdl.SDL_MOUSEBUTTONDOWN
 			or e[1] == sdl.SDL_FINGERDOWN
 			then
 				local x = e[2] * self.width
@@ -1156,7 +1165,7 @@ end
 
 function App:processButtonEvent(press, ...)
 	local buttonRadius = self.width * self.cfg.screenButtonRadius
-	
+
 	-- TODO put the callback somewhere, not a global
 	-- it's used by the New Game menu
 	if self.waitingForEvent then
@@ -1186,7 +1195,7 @@ function App:processButtonEvent(press, ...)
 							if dx*dx + dy*dy >= buttonRadius*buttonRadius then
 								match = false
 							end
-							-- skip the first 2 for values 
+							-- skip the first 2 for values
 							istart = 4
 						end
 					end

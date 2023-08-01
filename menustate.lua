@@ -13,7 +13,7 @@ local ig = require 'imgui'
 local getTime = require 'ext.timer'.getTime
 local SandModel = require 'sand-attack.sandmodel'
 
-local showDebug = false	-- show debug info in gui
+local showDebug = true	-- show debug info in gui
 
 local MenuState = class()
 function MenuState:init(app)
@@ -142,8 +142,8 @@ function PlayingState:updateGUI()
 	ig.igText('Score: '..tostring(app.score))
 	ig.igText('Lines: '..tostring(app.lines))
 
-	if app.showFPS then ig.igText('FPS: '..app.fps) end
 	if showDebug then
+		if app.showFPS then ig.igText('FPS: '..app.fps) end
 		ig.igText('Num Voxels: '..app.numSandVoxels)
 		ig.igText('Ticks to Fall: '..tostring(app.ticksToFall))
 		if app.sandmodel.updateDebugGUI then
