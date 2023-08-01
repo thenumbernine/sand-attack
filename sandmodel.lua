@@ -1060,11 +1060,11 @@ function AutomataSandGPU:update()
 		:subimage{data=self.sandTex.image.buffer}
 		:unbind()
 
-	app.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
-
 	self.updateShader
 		:use()
 		:enableAttrs()
+	
+	app.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
 	gl.glUniformMatrix4fv(
 		self.updateShader.uniforms.mvProjMat.loc,
 		1,
@@ -1076,9 +1076,6 @@ function AutomataSandGPU:update()
 	local yofsxor = math.random(0,1)
 	
 	self.pp.fbo:bind()
-	-- check per-bind or per-set-attachment?
-	local res,err = self.pp.fbo.check()
-	if not res then print(err) end
 	gl.glViewport(0, 0, w, h)
 	
 	local updatesPerFrame = math.ceil(app.cfg.gameScale)
@@ -1092,9 +1089,10 @@ function AutomataSandGPU:update()
 						callback = function()
 					--]]
 					-- [[
-					--gl.glFramebufferTexture2D(gl.GL_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0 + self.pp.index-1, gl.GL_TEXTURE_2D, self.pp:cur().id, 0)
-					self.pp.fbo:setColorAttachmentTex2D(self.pp:cur().id, 0)
-					--gl.glDrawBuffer(gl.GL_COLOR_ATTACHMENT0)
+					self.pp.fbo:setColorAttachmentTex2D(self.pp:cur().id)
+					-- check per-bind or per-set-attachment?
+					local res,err = self.pp.fbo.check()
+					if not res then print(err) end
 					--]]
 							gl.glUniform3i(self.updateShader.uniforms.ofs.loc,
 								bit.bxor(xofs, xofsxor),

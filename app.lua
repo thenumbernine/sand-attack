@@ -318,6 +318,56 @@ void main() {
 		},
 	}:useNone()
 
+	self.populatePieceShader = GLProgram{
+		vertexCode = [[
+#version ]]..self.glslVersion..[[
+
+precision highp float;
+
+in vec2 vertex;
+out vec2 texcoordv;
+uniform mat4 mvProjMat;
+void main() {
+	texcoordv = vertex;
+	gl_Position = mvProjMat * vec4(vertex, 0., 1.);
+}
+]],
+		fragmentCode = [[
+#version ]]..self.glslVersion..[[
+
+precision highp float;
+
+in vec2 texcoordv;
+out vec4 fragColor;
+
+uniform sampler2D tex;
+uniform sampler2D randtex;
+uniform vec4 color;
+uniform vec3 pieceSize;	//.z = voxelsPerBlock
+
+void main() {
+	vec4 dstc = texture(tex, texcoordv) * color;
+	vec2 ij = texcoordv * pieceSize.xy;
+	float voxelsPerBlock = pieceSize.z;
+	vec2 uv = mod(ij, voxelsPerBlock );
+	float c = max(
+		abs(uv.x - voxelsPerBlock*.5), 
+		abs(uv.y - voxelsPerBlock*.5)
+	) / (voxelsPerBlock*.5);
+	float l = texture(randtex, texcoordv).r * .25 + .75;
+	l *= .25 + .75 * sqrt(1. - c*c);
+	fragColor = vec4(dstc.xyz * l, dstc.w);
+}
+]],
+		uniforms = {
+			tex = 0,
+		},
+
+		attrs = {
+			vertex = self.quadVertexBuf,
+		},
+	}:useNone()
+
 	self.sounds = {}
 
 	if self.useAudio then
@@ -405,7 +455,22 @@ function App:makePieceImage(s)
 			end
 		end
 	end
-	return img
+	local tex = GLTex2D{
+		internalFormat = gl.GL_RGBA,
+		width = tonumber(self.pieceSize.x),
+		height = tonumber(self.pieceSize.y),
+		format = gl.GL_RGBA,
+		type = gl.GL_UNSIGNED_BYTE,
+		wrap = {
+			s = gl.GL_CLAMP_TO_EDGE,
+			t = gl.GL_CLAMP_TO_EDGE,
+		},
+		minFilter = gl.GL_NEAREST,
+		magFilter = gl.GL_NEAREST,
+		data = img.buffer,
+	}
+	tex.image = img
+	return tex
 end
 
 function App:loadSound(filename)
@@ -472,8 +537,43 @@ function App:reset()
 
 	-- init pieces
 
+	self.pieceFBO = require 'gl.fbo'{width=self.pieceSize.x, height=self.pieceSize.y}
+		:unbind()
 
-	self.pieceImages = table{
+	do
+		local size = self.pieceSize
+		local img = Image(size.x, size.y, 4, 'unsigned char')
+		local ptr = ffi.cast('uint32_t*', img.buffer)
+		for j=0,size.y-1 do
+			for i=0,size.x-1 do
+				ptr[0] = bit.bor(
+					math.random(0,255),
+					bit.lshift(math.random(0,255), 8),
+					bit.lshift(math.random(0,255), 16),
+					bit.lshift(math.random(0,255), 32)
+				)
+			end
+		end
+		local tex = GLTex2D{
+			internalFormat = gl.GL_RGBA,
+			width = tonumber(size.x),
+			height = tonumber(size.y),
+			format = gl.GL_RGBA,
+			type = gl.GL_UNSIGNED_BYTE,
+			wrap = {
+				s = gl.GL_CLAMP_TO_EDGE,
+				t = gl.GL_CLAMP_TO_EDGE,
+			},
+			minFilter = gl.GL_NEAREST,
+			magFilter = gl.GL_NEAREST,
+			data = img.buffer,	-- stored
+		}
+		tex.image = img
+		self.pieceRandomColorTex = tex
+	end
+
+
+	self.pieceSourceTexs = table{
 		self:makePieceImage[[
  #
  #
@@ -589,13 +689,69 @@ end
 -- fill in a new piece texture
 -- generate it based on the piece template
 function App:populatePiece(args)
-	local srcimage = self.pieceImages:pickRandom()
+	local srctex = self.pieceSourceTexs:pickRandom()
 	local colorIndex = self.rng(#self.gameColors)
 	local color = self.gameColors[colorIndex]
-	local alpha = math.floor(colorIndex/#self.gameColors*0xff)
+	local alpha = colorIndex/#self.gameColors
+	
+	local dsttex = args.tex
+	
+	-- [[ on gpu	
+	gl.glViewport(0, 0, self.pieceSize.x, self.pieceSize.y)
+	
+	self.pieceFBO:bind()
+	self.pieceFBO:setColorAttachmentTex2D(dsttex.id)
+	local res,err = self.pieceFBO.check()
+	if not res then print(err) end
+	
+	self.populatePieceShader
+		:use()
+		:enableAttrs()
+	
+	self.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
+	gl.glUniformMatrix4fv(
+		self.populatePieceShader.uniforms.mvProjMat.loc,
+		1,
+		gl.GL_FALSE,
+		self.mvProjMat.ptr)
+	gl.glUniform4f(self.populatePieceShader.uniforms.color.loc, color.x, color.y, color.z, alpha)
+	gl.glUniform3f(self.populatePieceShader.uniforms.pieceSize.loc,
+		self.pieceSize.x,
+		self.pieceSize.y,
+		self.cfg.voxelsPerBlock)
+	
+	srctex:bind(0)
+	self.pieceRandomColorTex:bind(1)
+
+	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+	
+	self.pieceRandomColorTex:unbind(1)
+	srctex:unbind(0)	
+	
+	self.populatePieceShader
+		:disableAttrs()
+		:useNone()
+	
+	gl.glReadPixels(
+		0,						--GLint x,
+		0,						--GLint y,
+		self.pieceSize.x,		--GLsizei width,
+		self.pieceSize.y,		--GLsizei height,
+		gl.GL_RGBA,				--GLenum format,
+		gl.GL_UNSIGNED_BYTE,	--GLenum type,
+		dsttex.image.buffer)	--void *pixels
+	
+	self.pieceFBO:unbind()
+	
+	gl.glViewport(0, 0, self.width, self.height)
+	--]]
+	
+	--[[ on cpu
+	local srcimage = srctex.image
+	alpha = math.floor(alpha*0xff)
 	alpha = bit.lshift(alpha, 24)
 	local srcp = ffi.cast('uint32_t*', srcimage.buffer)
-	local dstp = ffi.cast('uint32_t*', args.tex.image.buffer)
+	local dstp = ffi.cast('uint32_t*', dsttex.image.buffer)
 	for j=0,self.pieceSize.y-1 do
 		for i=0,self.pieceSize.x-1 do
 			local u = i % self.cfg.voxelsPerBlock + .5
@@ -621,7 +777,8 @@ function App:populatePiece(args)
 			dstp = dstp + 1
 		end
 	end
-	args.tex:bind():subimage()
+	dsttex:bind():subimage()
+	--]]
 end
 
 function App:newPiece(player)
