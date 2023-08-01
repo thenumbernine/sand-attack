@@ -109,6 +109,7 @@ App.lineFlashDuration = 1
 App.lineNumFlashes = 5
 
 App.cfgfilename = 'config.lua'
+App.highScoresFilename = 'highscores.lua'
 
 function App:initGL(...)
 	App.super.initGL(self, ...)
@@ -174,6 +175,14 @@ function App:initGL(...)
 	end)
 	self.cfg = self.cfg or {}
 
+	-- load high scores if it exists
+	xpcall(function()
+		self.highscores = fromlua(assert(path(self.highScoresFilename):read()))
+	end, function(err)
+		print("failed to read config file: "..tostring(err))
+	end)
+	self.highscores = self.highscores or {}
+
 	-- board size is 80 x 144 visible
 	-- piece is 4 blocks arranged
 	-- blocks are 8 x 8 by default
@@ -194,7 +203,6 @@ function App:initGL(...)
 	self.cfg.speedupCoeff = self.cfg.speedupCoeff or .007
 	self.cfg.toppleChance = self.cfg.toppleChance or 1
 	self.cfg.playerKeys = self.cfg.playerKeys or {}
-	self.cfg.highscores = self.cfg.highscores or {}
 	self.cfg.numColors = self.cfg.numColors or 4
 	self.cfg.screenButtonRadius = self.cfg.screenButtonRadius or .05
 	if self.cfg.continuousDrop == nil then
@@ -507,6 +515,10 @@ end
 
 function App:saveConfig()
 	path(self.cfgfilename):write(tolua(self.cfg))
+end
+
+function App:saveHighScores()
+	path(self.highScoresFilename):write(tolua(self.highscores))
 end
 
 function App:reset()

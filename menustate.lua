@@ -595,11 +595,11 @@ function HighScoreState:updateGUI()
 		if ig.igButton'Ok' then
 			self.needsName = false
 			local record = self:makeNewRecord()
-			table.insert(app.cfg.highscores, record)
-			table.sort(app.cfg.highscores, function(a,b)
+			table.insert(app.highscores, record)
+			table.sort(app.highscores, function(a,b)
 				return a.score > b.score
 			end)
-			app:saveConfig()
+			app:saveHighScores()
 		end
 		ig.igNewLine()
 	end
@@ -641,8 +641,8 @@ function HighScoreState:updateGUI()
 		end
 		ig.igTableHeadersRow()
 		local sortSpecs = ig.igTableGetSortSpecs()
-		if not self.rowindexes or #self.rowindexes ~= #app.cfg.highscores then
-			self.rowindexes = range(#app.cfg.highscores)
+		if not self.rowindexes or #self.rowindexes ~= #app.highscores then
+			self.rowindexes = range(#app.highscores)
 		end
 		if sortSpecs[0].SpecsDirty then
 			local typescore = {
@@ -654,8 +654,8 @@ function HighScoreState:updateGUI()
 			-- sort from imgui_demo.cpp CompareWithSortSpecs
 			-- TODO maybe put this in lua-imgui
 			table.sort(self.rowindexes, function(ia,ib)
-				local a = app.cfg.highscores[ia]
-				local b = app.cfg.highscores[ib]
+				local a = app.highscores[ia]
+				local b = app.highscores[ib]
 				for n=0,sortSpecs[0].SpecsCount-1 do
 					local sortSpec = sortSpecs[0].Specs[n]
 					local col = sortSpec.ColumnUserID
@@ -679,7 +679,7 @@ function HighScoreState:updateGUI()
 			sortSpecs[0].SpecsDirty = false
 		end
 		for _,i in ipairs(self.rowindexes) do
-			local score = app.cfg.highscores[i]
+			local score = app.highscores[i]
 			ig.igTableNextRow(0, 0)
 			for _,field in ipairs(self.fields) do
 				ig.igTableNextColumn()
@@ -694,8 +694,8 @@ function HighScoreState:updateGUI()
 		end
 		ig.igSameLine()
 		if ig.igButton'Clear' then
-			app.cfg.highscores = {}
-			app:saveConfig()
+			app.highscores = {}
+			app:saveHighScores()
 		end
 	end
 	self:endFullView()
