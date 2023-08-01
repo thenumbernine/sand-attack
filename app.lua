@@ -858,7 +858,9 @@ function App:rotatePiece(player)
 		:disableAttrs()
 		:useNone()
 
-	-- still needed by updatePieceTex for calculating pieceColMin and pieceColMax
+	-- still needed
+	-- 	- App:updatePieceTex for calculating pieceColMin and pieceColMax
+	--	- SandModel:testPieceMerge and SandModel:mergePiece
 	gl.glReadPixels(
 		0,						--GLint x,
 		0,						--GLint y,

@@ -11,10 +11,10 @@ local SandModel = class()
 
 function SandModel:init(app)
 	self.app = assert(app)
-	
+
 	self.sandTex = app:makeTexWithBlankImage(app.sandSize)
 		:unbind()
-	
+
 	-- FBO the size of the sand texture
 	self.fbo = require 'gl.fbo'{width=w, height=h}
 		:unbind()
@@ -1063,7 +1063,7 @@ function AutomataSandGPU:update()
 	self.updateShader
 		:use()
 		:enableAttrs()
-	
+
 	app.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
 	gl.glUniformMatrix4fv(
 		self.updateShader.uniforms.mvProjMat.loc,
@@ -1074,10 +1074,10 @@ function AutomataSandGPU:update()
 	local rightxor = math.random(0,1)
 	local xofsxor = math.random(0,1)
 	local yofsxor = math.random(0,1)
-	
+
 	self.pp.fbo:bind()
 	gl.glViewport(0, 0, w, h)
-	
+
 	local updatesPerFrame = math.ceil(app.cfg.gameScale)
 	for i=1,updatesPerFrame do
 		for toppleRight=0,1 do
@@ -1124,7 +1124,7 @@ function AutomataSandGPU:update()
 		gl.GL_RGBA,					--GLenum format,
 		gl.GL_UNSIGNED_BYTE,		--GLenum type,
 		self.sandTex.image.buffer)	--void *pixels
-	
+
 	self.pp.fbo:unbind()
 	gl.glViewport(0, 0, app.width, app.height)
 
