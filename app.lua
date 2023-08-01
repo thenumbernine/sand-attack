@@ -784,7 +784,6 @@ function App:updatePieceTex(player)
 			end
 		end
 	end
-	player.pieceTex:bind():subimage()
 
 	-- [[ update the piece outline
 	assert(player.pieceOutlineTex.width == self.pieceSize.x + 2 * self.pieceOutlineRadius)
@@ -824,7 +823,6 @@ end
 function App:rotatePiece(player)
 	if not player.pieceTex then return end
 
--- [[ on gpu
 	local srctex = player.pieceTex
 	local dsttex = self.rotPieceTex
 	local shader = self.displayShader
@@ -860,6 +858,7 @@ function App:rotatePiece(player)
 		:disableAttrs()
 		:useNone()
 
+	-- still needed by updatePieceTex for calculating pieceColMin and pieceColMax
 	gl.glReadPixels(
 		0,						--GLint x,
 		0,						--GLint y,
@@ -872,17 +871,6 @@ function App:rotatePiece(player)
 	self.pieceFBO:unbind()
 
 	gl.glViewport(0, 0, self.width, self.height)
---]]
---[[ on cpu
-	for j=0,self.pieceSize.x-1 do
-		for i=0,self.pieceSize.y-1 do
-			for ch=0,3 do
-				self.rotPieceTex.image.buffer[ch + 4 * (i + self.pieceSize.x * j)]
-				= player.pieceTex.image.buffer[ch + 4 * ((self.pieceSize.x - 1 - j) + self.pieceSize.x * i)]
-			end
-		end
-	end
---]]
 
 	player.pieceTex, self.rotPieceTex = self.rotPieceTex, player.pieceTex
 
