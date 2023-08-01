@@ -689,10 +689,11 @@ function HighScoreState:updateGUI()
 		end
 		ig.igEndTable()
 	end
+	if ig.igButton'Done' then
+		self.needsName = false
+		app.menustate = MainMenuState(app)
+	end
 	if not self.needsName then
-		if ig.igButton'Done' then
-			app.menustate = MainMenuState(app)
-		end
 		ig.igSameLine()
 		if ig.igButton'Clear' then
 			app.highscores = {}
