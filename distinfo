@@ -19,7 +19,20 @@ files = {
 		'sand-attack/app.lua',
 		'sand-attack/menustate.lua',
 		'sand-attack/player.lua',
-		'sand-attack/sandmodel',	-- subdir
+		
+		-- TODO hmm this copies directly as 'sandmodel', no dir preservation
+		-- but rlly I don't specify a way to preserve the destination dir, do I?
+		--'sand-attack/sandmodel',	-- subdir
+		-- do I preerve dest dir when copying individual files?
+		-- shoudln't I be doing this with subfolders too?
+		'sand-attack/sandmodel/all.lua',
+		'sand-attack/sandmodel/automatacpu.lua',
+		'sand-attack/sandmodel/automatagpu.lua',
+		'sand-attack/sandmodel/cfd.lua',
+		'sand-attack/sandmodel/sandmodel.lua',
+		'sand-attack/sandmodel/sph.lua',
+		-- TODO how about src=>dest like in luarocks, and have it work for folders and files alike...
+		
 		-- option #2: copy this dir and reference all resources from 'sand-attack/'
 		-- (this'll require a 'cd ..' every time you playtest it from within its cwd ...)
 		--'sand-attack',
