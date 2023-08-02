@@ -79,7 +79,7 @@ App.sdlInitFlags = bit.bor(
 
 App.useAudio = true	-- set to false to disable audio altogether
 App.showFPS = true -- show fps in gui / console
-App.showDebug = false	-- show some more debug stuff
+App.showDebug = true	-- show some more debug stuff
 local dontCheckForLinesEver = false	-- means don't ever ever check for lines.  used for fps testing the sand topple simulation.
 
 App.updateInterval = 1/60
@@ -273,12 +273,12 @@ function App:initGL(...)
 	--self.glslVersion = 430
 	--self.glslVersion = '320 es'	-- too new
 	self.glslVersion = '300 es'
+	self.shaderHeader = 
+'#version '..self.glslVersion..'\n'
+..'precision highp float;\n'
+
 	self.displayShader = GLProgram{
-		vertexCode = [[
-#version ]]..self.glslVersion..[[
-
-precision highp float;
-
+		vertexCode = self.shaderHeader..[[
 in vec2 vertex;
 out vec2 texcoordv;
 uniform mat4 mvProjMat;
@@ -287,11 +287,7 @@ void main() {
 	gl_Position = mvProjMat * vec4(vertex, 0., 1.);
 }
 ]],
-		fragmentCode = [[
-#version ]]..self.glslVersion..[[
-
-precision highp float;
-
+		fragmentCode = self.shaderHeader..[[
 in vec2 texcoordv;
 out vec4 fragColor;
 uniform sampler2D tex;
@@ -312,11 +308,7 @@ void main() {
 	}:useNone()
 
 	self.populatePieceShader = GLProgram{
-		vertexCode = [[
-#version ]]..self.glslVersion..[[
-
-precision highp float;
-
+		vertexCode = self.shaderHeader..[[
 in vec2 vertex;
 out vec2 texcoordv;
 uniform mat4 mvProjMat;
@@ -325,11 +317,7 @@ void main() {
 	gl_Position = mvProjMat * vec4(vertex, 0., 1.);
 }
 ]],
-		fragmentCode = [[
-#version ]]..self.glslVersion..[[
-
-precision highp float;
-
+		fragmentCode = self.shaderHeader..[[
 in vec2 texcoordv;
 out vec4 fragColor;
 
@@ -363,11 +351,7 @@ void main() {
 	}:useNone()
 
 	self.updatePieceOutlineShader = GLProgram{
-		vertexCode = [[
-#version ]]..self.glslVersion..[[
-
-precision highp float;
-
+		vertexCode = self.shaderHeader..[[
 in vec2 vertex;
 out vec2 texcoordv;
 uniform mat4 mvProjMat;
@@ -376,11 +360,7 @@ void main() {
 	gl_Position = mvProjMat * vec4(vertex, 0., 1.);
 }
 ]],
-		fragmentCode = [[
-#version ]]..self.glslVersion..[[
-
-precision highp float;
-
+		fragmentCode = self.shaderHeader..[[
 in vec2 texcoordv;
 out vec4 fragColor;
 
@@ -616,7 +596,7 @@ function App:reset()
 					math.random(0,255),
 					bit.lshift(math.random(0,255), 8),
 					bit.lshift(math.random(0,255), 16),
-					bit.lshift(math.random(0,255), 32)
+					bit.lshift(math.random(0,255), 24)
 				)
 				ptr = ptr + 1
 			end

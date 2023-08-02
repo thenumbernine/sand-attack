@@ -3,8 +3,10 @@ local math = require 'ext.math'
 local class = require 'ext.class'
 local table = require 'ext.table'
 local vec4ub = require 'vec-ffi.vec4ub'
+local vec2i = require 'vec-ffi.vec2i'
 local vec2f = require 'vec-ffi.vec2f'
 local Image = require 'image'
+local ig = require 'imgui'
 
 
 local SandModel = class()
@@ -121,7 +123,7 @@ function SandModel:mergePiece(player)
 	self.sandImageDirty = true
 end
 
---[[ using generic image blob detection
+-- [[ using generic image blob detection
 function SandModel:checkClearBlobs()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
@@ -147,7 +149,8 @@ function SandModel:checkClearBlobs()
 end
 --]]
 
--- [=[ tracking columns left to right, seeing what connects
+--[=[ tracking columns left to right, seeing what connects
+-- TODO still some kinks in it
 
 ffi.cdef[[
 typedef struct {
@@ -164,7 +167,8 @@ local ImageBlobColInterval_t = ffi.metatype('ImageBlobColInterval_t', {
 			..'y1='..self.y1..','
 			..'y2='..self.y2..','
 			..'x='..self.x..','
-			..'cl='..self.cl
+			..'cl='..self.cl..','
+			..'blob='..self.blob
 		..'}'
 	end,
 })
@@ -281,11 +285,13 @@ function SandModel:checkClearBlobs()
 		-- no intervals <-> no connection
 		if col.size == 0 then return 0 end
 
+		--[[ hmm there is always a chance that intervals loop back ...
 		if x > 0 then
 			local colL = colregions[x]	-- cuz colregions is 1-based
 			local colR = col
 			if self:pruneCols(colL, colR) then return 0 end
 		end
+		--]]
 	end
 
 	--[[
@@ -306,10 +312,12 @@ function SandModel:checkClearBlobs()
 	for x=w-1,0,-1 do
 		-- before doing any blob detection, prune our col with the next to see if it gets eliminated
 		local col = colregions[x+1]
+		--[[ hmm there is always a chance that intervals loop back ...
 		if x > 0 then
 			local colL = colregions[x]
 			if self:pruneCols(colL, col) then return 0 end
 		end
+		--]]
 		-- if col was empty then we've returned by now
 
 		if x == w-1 then
@@ -359,7 +367,7 @@ function SandModel:checkClearBlobs()
 						end
 					end
 					if int.blob == -1 then
-						local blob = Blob()
+						local blob = BlobCol()
 						blobs[nextblobindex] = blob
 						int.blob = nextblobindex
 						nextblobindex = nextblobindex + 1
@@ -376,13 +384,65 @@ function SandModel:checkClearBlobs()
 		end
 	end
 
+	for _,blobindex in ipairs(table.keys(blobs)) do
+		local blob = blobs[blobindex]
+		-- if the blob doesn't contain all columns ...
+		if #blob < w then
+			-- remove all cols that point to this blob
+			-- means cycling through all cols o this blob
+			-- means TODO blobs should key by col first, then be a vector of intervals next
+			for x=1,w do
+				local col = colregions[x]
+				for j=col.size-1,0,-1 do
+					local int = col.v[j]
+					if int.blob == blobindex then
+						col:erase(col.v+j,col.v+j+1)
+					end
+				end
+			end
+			blobs[blobindex] = nil
+		else
+			blob.debugColor = bit.bor(
+				math.random(0,255),
+				bit.lshift(math.random(0,255), 8),
+				bit.lshift(math.random(0,255), 16),
+				0xff000000
+			)
+		end
+	end
+
+	if #blobs == 0 then return 0 end
+
 	-- now that we're here we made it
-	print('found connection with', #blobs,'blobs')
+	--print('found connection with', #blobs,'blobs')
+	-- debug print
+	self.numBlobs = #blobs
+
+	local p = ffi.cast('uint32_t*', app.flashTex.image.buffer)
+	ffi.fill(p, 4*w*h)
+	for x=0,w-1 do
+		local col = colregions[x+1]
+		for i=0,col.size-1 do
+			local int = col.v[i]
+			for y=int.y1,int.y2 do
+assert(blobs[int.blob] and blobs[int.blob].debugColor, require 'ext.tolua'{blobs=blobs, int=int})
+				p[x + w * y] = blobs[int.blob].debugColor
+				--p[x + w * y] = 0xffffffff
+			end
+		end
+	end
+	
+	app.flashTex:bind():subimage()
+	app.lastLineTime = app.gameTime
 
 	-- TODO count blob size
 	local clearedCount = 0
 
 	return clearedCount
+end
+
+function SandModel:updateDebugGUI()
+	ig.igText('Num Blobs: '..tostring(self.numBlobs))
 end
 --]=]
 
@@ -1140,11 +1200,7 @@ for xofs=1 (fall left), same but mirrored
 
 	--]]
 	self.updateShader = GLProgram{
-		vertexCode = [[
-#version ]]..app.glslVersion..[[
-
-precision highp float;
-
+		vertexCode = app.shaderHeader..[[
 in vec2 vertex;
 
 out vec2 texcoordv;
@@ -1156,11 +1212,7 @@ void main() {
 	gl_Position = mvProjMat * vec4(vertex, 0., 1.);
 }
 ]],
-		fragmentCode = [[
-#version ]]..app.glslVersion..[[
-
-precision highp float;
-
+		fragmentCode = app.shaderHeader..[[
 in vec2 texcoordv;
 
 out vec4 fragColor;
@@ -1270,6 +1322,57 @@ void main() {
 			vertex = app.quadVertexBuf,
 		},
 	}
+
+if false then
+	self.testMergeShader = GLProgram{
+		vertexCode = app.shaderHeader..[[
+in vec2 vertex;
+
+out vec2 texcoordv;
+
+uniform mat4 mvProjMat;
+
+void main() {
+	texcoordv = vertex;
+	gl_Position = mvProjMat * vec4(vertex, 0., 1.);
+}
+]],
+		fragmentCode = app.shaderHeader..[[
+in vec2 texcoordv;
+
+out vec4 fragColor;
+
+uniform vec2 piecePos;
+uniform float row;
+
+uniform sampler2D boardTex;
+uniform sampler2D pieceTex;
+
+void main() {
+	TODO calculate texel on boardtex and on piecetex
+	vec4 boardColor = texelFetch(boardTex, boarditc, 0);
+	vec4 pieceColor = texelFetch(pieceTex, pieceitc, 0);
+
+	if (boardColor.w != 0. && pieceColor.w != 0.) {
+		fragColor = vec4(1.);
+	} else
+		fragColor = vec4(0.);
+	}
+}
+]],
+		uniforms = {
+			boardTex = 0,
+			pieceTex = 1,
+		},
+
+		attrs = {
+			vertex = app.quadVertexBuf,
+		},
+	}
+end
+
+	-- temp texture used for testing collisions
+	self.testMergeTex = app:makeTexWithBlankImage(vec2i(app.pieceSize.x, 1))
 end
 
 local function printBuf(buf, w, h, yofs)
@@ -1291,6 +1394,141 @@ local function printBuf(buf, w, h, yofs)
 	print(s)
 	return s
 end
+
+print('REMINDER: finish AutomataSandGPU:testPieceMerge and :mergePiece')
+--[[ how to test merge on GPU?
+-- same trick as histogram ...
+-- render to a FBO that is [pieceSize.x, 1] in size.
+-- input textures are the piece tex and current board tex
+-- shader writes '1' if either overlaps
+-- enable blend (one, one)
+-- then sum results with CPU
+function AutomataSandGPU:testPieceMerge(player)
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+	
+	local fbo = self.fbo
+	local dsttex = self.testMergeTex
+	local shader = self.testMergeShader
+
+	gl.glBlendFunc(gl.GL_ONE, gl.GL_ONE)
+	gl.glEnable(gl.GL_BLEND)
+
+	shader:use()
+		:enableAttrs()
+
+	gl.glViewport(0, 0, app.pieceSize.x, 1)
+	
+	fbo:bind()
+		:setColorAttachmentTex2D(dsttex.id)
+	local res, err = fbo.check()
+	if not res then print(err) end
+	
+	gl.glClearColor(0,0,0,0)
+	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+		
+	app.mvProjMat:setOrtho(0, 1, 0, app.pieceSize.x, -1, 1)
+	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
+	gl.glUniform2i(shader.uniforms.piecePos, player.piecePos.x, player.piecPos.y)
+			
+	self:getSandTex():bind(0)
+	player.pieceTex:bind(1)
+
+	for y=0,app.pieceSize.y-1 do
+		gl.glUniform2i(shader.uniforms.row, y)
+		gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+	end
+	
+	player.pieceTex:unbind(1)
+	self:getSandTex():unbind(0)
+
+	gl.glReadPixels(
+		0,							--GLint x,
+		0,							--GLint y,
+		app.pieceSize.x,			--GLsizei width,
+		1,							--GLsizei height,
+		gl.GL_RGBA,					--GLenum format,
+		gl.GL_UNSIGNED_BYTE,		--GLenum type,
+		dsttex.image.buffer)		--void *pixels
+
+	fbo:unbind()
+	
+	gl.glDisable(gl.GL_BLEND)
+
+	shader:disableAttrs()
+		:useNone()
+	
+	gl.glViewport(0, 0, app.width, app.height)
+end
+--]]
+
+--[[ TODO
+function AutomataSandGPU:mergePiece(player)
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+
+	local fbo = self.pp.fbo
+	local srctex = self.pp:prev()
+	local dsttex = self.pp:cur()
+	local shader = app.displayShader
+
+	gl.glViewport(0, 0, w, h)
+
+	fbo:bind()
+	fbo:setColorAttachmentTex2D(dsttex.id)
+	local res,err = fbo.check()
+	if not res then print(err) end
+
+	gl.glClearColor(0,0,0,0)
+	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+
+	shader:use()
+		:enableAttrs()
+
+	app.projMat:setOrtho(0, 1, 0, 1, -1, 1)
+	app.mvMat:setTranslate(
+			player.piecePos.x / w - .5,
+			player.piecePos.y / h - .5
+		)
+		:applyScale(app.pieceSize.x / w, app.pieceSize.y / h)
+	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
+	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
+	gl.glUniform1i(shader.uniforms.useAlpha.loc, 1)
+
+	player.pieceTex:bind()
+	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+
+	app.projMat:setOrtho(0, 1, 0, 1, -1, 1)
+	app.mvMat:setIdent()
+	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
+	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
+	gl.glUniform1i(shader.uniforms.useAlpha.loc, 0)
+
+	srctex:bind()
+	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+
+	shader:disableAttrs()
+		:useNone()
+
+	self.pp:swap()
+
+	gl.glReadPixels(
+		0,							--GLint x,
+		0,							--GLint y,
+		w,							--GLsizei width,
+		h,							--GLsizei height,
+		gl.GL_RGBA,					--GLenum format,
+		gl.GL_UNSIGNED_BYTE,		--GLenum type,
+		dsttex.image.buffer)		--void *pixels
+
+	fbo:unbind()
+
+	gl.glViewport(0, 0, app.width, app.height)
+
+	self.sandImageDirty = true
+end
+--]]
+
 
 function AutomataSandGPU:test()
 	local app = self.app
@@ -1482,73 +1720,6 @@ end
 function AutomataSandGPU:getSandTex()
 	return self.pp:prev()
 end
-
---[[ TODO
-function AutomataSandGPU:mergePiece(player)
-	local app = self.app
-	local w, h = app.sandSize:unpack()
-
-	local fbo = self.pp.fbo
-	local srctex = self.pp:prev()
-	local dsttex = self.pp:cur()
-	local shader = app.displayShader
-
-	gl.glViewport(0, 0, w, h)
-
-	fbo:bind()
-	fbo:setColorAttachmentTex2D(dsttex.id)
-	local res,err = fbo.check()
-	if not res then print(err) end
-
-	gl.glClearColor(0,0,0,0)
-	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
-
-	shader:use()
-		:enableAttrs()
-
-	app.projMat:setOrtho(0, 1, 0, 1, -1, 1)
-	app.mvMat:setTranslate(
-			player.piecePos.x / w - .5,
-			player.piecePos.y / h - .5
-		)
-		:applyScale(app.pieceSize.x / w, app.pieceSize.y / h)
-	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
-	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
-	gl.glUniform1i(shader.uniforms.useAlpha.loc, 1)
-
-	player.pieceTex:bind()
-	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
-
-	app.projMat:setOrtho(0, 1, 0, 1, -1, 1)
-	app.mvMat:setIdent()
-	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
-	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
-	gl.glUniform1i(shader.uniforms.useAlpha.loc, 0)
-
-	srctex:bind()
-	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
-
-	shader:disableAttrs()
-		:useNone()
-
-	self.pp:swap()
-
-	gl.glReadPixels(
-		0,							--GLint x,
-		0,							--GLint y,
-		w,							--GLsizei width,
-		h,							--GLsizei height,
-		gl.GL_RGBA,					--GLenum format,
-		gl.GL_UNSIGNED_BYTE,		--GLenum type,
-		dsttex.image.buffer)		--void *pixels
-
-	fbo:unbind()
-
-	gl.glViewport(0, 0, app.width, app.height)
-
-	self.sandImageDirty = true
-end
---]]
 
 SandModel.subclasses = table{
 	AutomataSandGPU,
