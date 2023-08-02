@@ -354,12 +354,12 @@ function AutomataSandGPU:testPieceMerge(player)
 end
 --]]
 
---[[
+-- [=[
 function AutomataSandGPU:mergePiece(player)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 
-	local fbo = self.pp.fbo
+	local fbo = self.fbo
 	local srctex = self.pp:prev()
 	local dsttex = self.pp:cur()
 	local shader = app.displayShader
@@ -376,25 +376,28 @@ function AutomataSandGPU:mergePiece(player)
 
 	shader:use()
 		:enableAttrs()
-
+	gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 1)
+	
 	app.projMat:setOrtho(0, 1, 0, 1, -1, 1)
-	app.mvMat:setTranslate(
-			player.piecePos.x / w - .5,
-			player.piecePos.y / h - .5
+	app.mvMat
+		:setIdent()
+		:applyTranslate(
+			player.piecePos.x / w,
+			player.piecePos.y / h
 		)
-		:applyScale(app.pieceSize.x / w, app.pieceSize.y / h)
+		:applyScale(
+			app.pieceSize.x / w,
+			app.pieceSize.y / h
+		)
 	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
 	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
-	gl.glUniform1i(shader.uniforms.useAlpha.loc, 1)
 
 	player.pieceTex:bind()
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 
-	app.projMat:setOrtho(0, 1, 0, 1, -1, 1)
 	app.mvMat:setIdent()
 	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
 	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
-	gl.glUniform1i(shader.uniforms.useAlpha.loc, 0)
 
 	srctex:bind()
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
@@ -402,6 +405,11 @@ function AutomataSandGPU:mergePiece(player)
 	shader:disableAttrs()
 		:useNone()
 
+	self.pp:swap()
+
+-- [[
+	-- read to srctex instead of dsttex because swap()
+	-- still needed for blob detection
 	gl.glReadPixels(
 		0,							--GLint x,
 		0,							--GLint y,
@@ -409,18 +417,19 @@ function AutomataSandGPU:mergePiece(player)
 		h,							--GLsizei height,
 		gl.GL_RGBA,					--GLenum format,
 		gl.GL_UNSIGNED_BYTE,		--GLenum type,
-		dsttex.image.buffer)		--void *pixels
+		self:getSandTex().image.buffer)		--void *pixels
+-- 	sandImageDirty says to copy cpu -> gpu so ...
+-- we're already on the gpu ...
+--	self.sandImageDirty = true
+--]]
 
 	fbo:unbind()
 
 	gl.glViewport(0, 0, app.width, app.height)
 	
-	self.pp:swap()
 	srctex:unbind()
-
-	self.sandImageDirty = true
 end
---]]
+--]=]
 
 local function printBuf(buf, w, h, yofs)
 	local p = ffi.cast('uint32_t*', buf)
@@ -575,6 +584,7 @@ function AutomataSandGPU:update()
 	end
 
 	-- [[ while we're here, readpixels into the image
+	-- still needed for blob detection
 	gl.glReadPixels(
 		0,							--GLint x,
 		0,							--GLint y,
@@ -630,6 +640,8 @@ function AutomataSandGPU:flipBoard()
 	sandTex:bind():subimage()
 end
 
+-- TODO :cur() should be current soooo
+-- ... swap usage of cur() and prev(), and put :swap() *before* the FBO update
 function AutomataSandGPU:getSandTex()
 	return self.pp:prev()
 end

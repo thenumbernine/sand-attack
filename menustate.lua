@@ -506,12 +506,12 @@ function SplashScreenState:update()
 	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
 	gl.glUniformMatrix4fv(app.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
 
-	gl.glUniform1i(app.displayShader.uniforms.useAlpha.loc, 1)
+	gl.glUniform1i(app.displayShader.uniforms.useAlphaTest.loc, 1)
 
 	app.splashTex:bind()
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 
-	gl.glUniform1i(app.displayShader.uniforms.useAlpha.loc, 0)
+	gl.glUniform1i(app.displayShader.uniforms.useAlphaTest.loc, 0)
 
 	app.splashTex:unbind()
 	app.displayShader

@@ -291,15 +291,15 @@ void main() {
 in vec2 texcoordv;
 out vec4 fragColor;
 uniform sampler2D tex;
-uniform bool useAlpha;
+uniform bool useAlphaTest;
 void main() {
 	fragColor = texture(tex, texcoordv);
-	if (useAlpha && fragColor.a == 0.) discard;
+	if (useAlphaTest && fragColor.a == 0.) discard;
 }
 ]],
 		uniforms = {
 			tex = 0,
-			useAlpha = false,
+			useAlphaTest = false,
 		},
 
 		attrs = {
@@ -932,7 +932,7 @@ function App:rotatePiece(player)
 		1,
 		gl.GL_FALSE,
 		self.mvProjMat.ptr)
-	gl.glUniform1i(shader.uniforms.useAlpha.loc, 0)
+	gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 0)
 
 	srctex:bind()
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
@@ -1070,7 +1070,8 @@ function App:updateGame()
 			end
 
 			sandmodel:mergePiece(player)
-
+			needsCheckLine = true
+			
 			self:newPiece(player)
 		end
 	end
@@ -1215,18 +1216,18 @@ function App:update(...)
 			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 			gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
-			gl.glUniform1i(shader.uniforms.useAlpha.loc, 1)
+			gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 1)
 			player.pieceTex:bind()
 			gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 
-			gl.glUniform1i(shader.uniforms.useAlpha.loc, 0)
+			gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 0)
 		end
 
 		-- draw flashing background if necessary
 		local flashDt = self.gameTime - self.lastLineTime
 		if flashDt < self.lineFlashDuration then
 			self.wasFlashing = true
-			gl.glUniform1i(shader.uniforms.useAlpha.loc, 1)
+			gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 1)
 			local flashInt = bit.band(math.floor(flashDt * self.lineNumFlashes * 2), 1) == 0
 			if flashInt then
 				self.mvMat
@@ -1238,7 +1239,7 @@ function App:update(...)
 				self.flashTex:bind()
 				gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 			end
-			gl.glUniform1i(shader.uniforms.useAlpha.loc, 0)
+			gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 0)
 		elseif self.wasFlashing then
 			-- clear once we're done flashing
 			self.wasFlashing = false
@@ -1277,10 +1278,10 @@ function App:update(...)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
-				gl.glUniform1i(shader.uniforms.useAlpha.loc, 1)
+				gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 1)
 				self.youloseTex:bind()
 				gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
-				gl.glUniform1i(shader.uniforms.useAlpha.loc, 0)
+				gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 0)
 			end
 		end
 
@@ -1346,7 +1347,7 @@ function App:drawTouchRegions()
 	self.displayShader
 		:use()
 		:enableAttrs()
-	gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 0)
+	gl.glUniform1i(self.displayShader.uniforms.useAlphaTest.loc, 0)
 	self.buttonTex:bind()
 	self.projMat:setOrtho(0,self.width,self.height,0,-1,1)
 	for i=1,self.numPlayers do
