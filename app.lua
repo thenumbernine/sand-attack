@@ -689,12 +689,6 @@ function App:reset()
 	-- I only really need to recreate the sand & flash texs if the board size changes ...
 	self.flashTex = self:makeTexWithBlankImage(self.sandSize)
 
-	-- [[ this is only for sph sand but meh
-	-- keep track of what is being cleared this frame
-	-- use this to test for what particles to remove
-	self.currentClearImage = Image(self.sandSize.x, self.sandSize.y, 4, 'unsigned char')
-	--]]
-
 	-- and I only really need to recreate these if the piece size changes ...
 	self.rotPieceTex = self:makeTexWithBlankImage(self.pieceSize)
 	self.nextPieces = range(self.cfg.numNextPieces):mapi(function(i)
@@ -1093,25 +1087,7 @@ function App:updateGame()
 		-- try to find a connection from left to right
 		local anyCleared
 		if needsCheckLine then
-			ffi.fill(self.currentClearImage.buffer, 4 * w * h)
-			local clearedCount = 0
-			local blobs = sandmodel:getSandTex().image:getBlobs(self.getBlobCtx)
-	--print('#blobs', #blobs)
-			for _,blob in pairs(blobs) do
-				if blob.cl ~= 0 then
-					local xmin = math.huge
-					local xmax = -math.huge
-					for _,int in ipairs(blob) do
-						xmin = math.min(xmin, int.x1)
-						xmax = math.max(xmax, int.x2)
-					end
-					local blobwidth = xmax - xmin + 1
-					if blobwidth == w then
-	--print('clearing blob of class', blob.cl)
-						clearedCount = clearedCount + sandmodel:clearBlob(blob)
-					end
-				end
-			end
+			local clearedCount = sandmodel:checkClearBlobs()
 			if clearedCount ~= 0 then
 				anyCleared = true
 

@@ -113,6 +113,30 @@ function SandModel:mergePiece(player)
 	self.sandImageDirty = true
 end
 
+function SandModel:checkClearBlobs()
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+	local clearedCount = 0
+	local blobs = self:getSandTex().image:getBlobs(app.getBlobCtx)
+--print('#blobs', #blobs)
+	for _,blob in pairs(blobs) do
+		if blob.cl ~= 0 then
+			local xmin = math.huge
+			local xmax = -math.huge
+			for _,int in ipairs(blob) do
+				xmin = math.min(xmin, int.x1)
+				xmax = math.max(xmax, int.x2)
+			end
+			local blobwidth = xmax - xmin + 1
+			if blobwidth == w then
+--print('clearing blob of class', blob.cl)
+				clearedCount = clearedCount + self:clearBlobHorz(blob)
+			end
+		end
+	end
+	return clearedCount
+end
+
 
 local AutomataSandCPU = SandModel:subclass()
 
@@ -173,7 +197,8 @@ function AutomataSandCPU:update()
 	return needsCheckLine
 end
 
-function AutomataSandCPU:clearBlob(blob)
+-- clear blobs represented as a list of horizontal intervals
+function AutomataSandCPU:clearBlobHorz(blob)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 	local clearedCount = 0
@@ -220,7 +245,9 @@ typedef struct {
 ]]
 
 local SPHSand = SandModel:subclass()
+
 SPHSand.name = 'SPH'
+
 function SPHSand:init(app)
 	SPHSand.super.init(self, app)
 	self.grains = vector'grain_t'
@@ -234,6 +261,14 @@ function SPHSand:init(app)
 	-- x,y, weight
 	self.vel = ffi.new('vec3f_t[?]', w * h)
 end
+
+function SPHSand:checkClearBlobs()
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+	ffi.fill(self.currentClearImage.buffer, 4 * w * h)
+	SPHSand.super.checkClearBlobs(self)
+end
+
 function SPHSand:update()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
@@ -393,7 +428,7 @@ function SPHSand:mergepixel(x,y,color)
 	--g.vel:set(0,0)
 	g.color = color
 end
-function SPHSand:clearBlob(blob)
+function SPHSand:clearBlobHorz(blob)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 	local clearedCount = 0
@@ -402,7 +437,7 @@ function SPHSand:clearBlob(blob)
 		clearedCount = clearedCount + iw
 		--ffi.fill(self.sandTex.image.buffer + 4 * (int.x1 + w * int.y), 4 * iw)
 		for k=0,4*iw-1 do
-			app.currentClearImage.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
+			self.currentClearImage.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 			app.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 		end
 	end
@@ -416,7 +451,7 @@ function SPHSand:doneClearingBlobs()
 		local x = math.floor(g.pos.x)
 		local y = math.floor(g.pos.y)
 		local ofs = x + w * y
-		if ffi.cast('uint32_t*', app.currentClearImage.buffer)[ofs] ~= 0 then
+		if ffi.cast('uint32_t*', self.currentClearImage.buffer)[ofs] ~= 0 then
 			ffi.cast('uint32_t*', self.sandTex.image.buffer)[ofs] = 0
 			self.grains:erase(g, g+1)
 		end
@@ -722,7 +757,7 @@ function CFDSand:mergepixel(x,y,color)
 	local v = self.v + x + w * y
 	v[0] = v[0] - 0
 end
-function CFDSand:clearBlob(blob)
+function CFDSand:clearBlobHorz(blob)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 	local clearedCount = 0
@@ -1159,7 +1194,7 @@ function AutomataSandGPU:update()
 	return true
 end
 
-function AutomataSandGPU:clearBlob(blob)
+function AutomataSandGPU:clearBlobHorz(blob)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 	local sandTex = self:getSandTex()
@@ -1231,6 +1266,7 @@ function AutomataSandGPU:mergePiece(player)
 		:applyScale(app.pieceSize.x / w, app.pieceSize.y / h)
 	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
 	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
+	gl.glUniform1i(shader.uniforms.useAlpha.loc, 1)
 	
 	player.pieceTex:bind()
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
@@ -1239,6 +1275,7 @@ function AutomataSandGPU:mergePiece(player)
 	app.mvMat:setIdent()
 	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
 	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
+	gl.glUniform1i(shader.uniforms.useAlpha.loc, 0)
 	
 	srctex:bind()
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
@@ -1255,7 +1292,7 @@ function AutomataSandGPU:mergePiece(player)
 		h,							--GLsizei height,
 		gl.GL_RGBA,					--GLenum format,
 		gl.GL_UNSIGNED_BYTE,		--GLenum type,
-		self.pp:prev().image.buffer)	--void *pixels
+		dsttex.image.buffer)		--void *pixels
 	
 	fbo:unbind()
 
