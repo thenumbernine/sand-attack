@@ -4,14 +4,13 @@ local class = require 'ext.class'
 local table = require 'ext.table'
 local range = require 'ext.range'
 local math = require 'ext.math'
-local tolua = require 'ext.tolua'
 local ops = require 'ext.op'
 local vec3f = require 'vec-ffi.vec3f'
 local gl = require 'gl'
-local GLTex2D = require 'gl.tex2d'
 local ig = require 'imgui'
 local getTime = require 'ext.timer'.getTime
-local SandModel = require 'sand-attack.sandmodel'
+
+local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 
 local MenuState = class()
 function MenuState:init(app)
@@ -49,7 +48,7 @@ function MenuState:endFullView()
 	ig.igEnd()
 	ig.igPopStyleVar(1)
 end
-local tmp = ffi.new('ImVec2[1]')
+local tmp = ffi.new'ImVec2[1]'
 function MenuState:centerGUI(fn, text, ...)
 	-- TODO put in lua-imgui
 	-- TODO TODO for buttons and text this is fine, but for inputs the width can be *much wider* than the text width.
@@ -195,7 +194,7 @@ function ConfigState:updateGUI()
 	self:centerLuatableTooltipInputInt('Pixels Per Block', app.cfg, 'voxelsPerBlock')
 	app.cfg.voxelsPerBlock = math.max(1, app.cfg.voxelsPerBlock)
 
-	ig.luatableCombo('Sand Model', app.cfg, 'sandModel', SandModel.subclassNames)
+	ig.luatableCombo('Sand Model', app.cfg, 'sandModel', sandModelClassNames)
 
 	if app.useAudio then
 		self:centerText'Audio:'
@@ -575,7 +574,7 @@ function HighScoreState:makeNewRecord()
 		then
 			record[field] = app.cfg[field]
 		elseif field == 'sandModel' then
-			record[field] = SandModel.subclassNames[app.cfg[field]]
+			record[field] = sandModelClassNames[app.cfg[field]]
 		elseif field == 'boardWidth' then
 			record[field] = tonumber(app.cfg.boardSizeInBlocks.x)
 		elseif field == 'boardHeight' then

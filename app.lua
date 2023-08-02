@@ -18,7 +18,6 @@ local GLArrayBuffer = require 'gl.arraybuffer'
 local GLFBO = require 'gl.fbo'
 local glreport = require 'gl.report'
 local vec2i = require 'vec-ffi.vec2i'
-local vec2f = require 'vec-ffi.vec2f'
 local vec3f = require 'vec-ffi.vec3f'
 local getTime = require 'ext.timer'.getTime
 local ig = require 'imgui'
@@ -28,7 +27,8 @@ local AudioSource = require 'audio.source'
 local AudioBuffer = require 'audio.buffer'
 local Player = require 'sand-attack.player'
 local MenuState = require 'sand-attack.menustate'
-local SandModel = require 'sand-attack.sandmodel'
+local SandModel = require 'sand-attack.sandmodel.sandmodel'
+local sandModelClasses = require 'sand-attack.sandmodel.all'.classes
 
 -- I'm trying to make reproducible random #s
 -- it is reproducible up to the generation of the next pieces
@@ -655,7 +655,7 @@ function App:reset()
 
 	self.loseTime = nil
 
-	local sandModelClass = assert(SandModel.subclasses[self.cfg.sandModel])
+	local sandModelClass = assert(sandModelClasses[self.cfg.sandModel])
 	self.sandmodel = sandModelClass(self)
 
 	-- I only really need to recreate the sand & flash texs if the board size changes ...
