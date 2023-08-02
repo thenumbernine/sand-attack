@@ -210,7 +210,7 @@ function SandModel:checkClearBlobs()
 	return clearedCount
 end
 --]]
---[[ tracking columsn left to right, seeing what connects
+--[=[ tracking columsn left to right, seeing what connects
 function SandModel:checkClearBlobs()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
@@ -328,7 +328,7 @@ function SandModel:checkClearBlobs()
 
 	return clearedCount
 end
---]]
+--]=]
 
 local AutomataSandCPU = SandModel:subclass()
 
