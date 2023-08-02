@@ -1191,15 +1191,16 @@ function App:update(...)
 		local aspectRatio = self.width / self.height
 		local s = w / h
 
+		local shader = self.displayShader
+
 		self.projMat:setOrtho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
-		self.displayShader
-			:use()
+		shader:use()
 			:enableAttrs()
 
 		self.mvMat:setTranslate(-.5 * s, -.5)
 			:applyScale(s, 1)
 		self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-		gl.glUniformMatrix4fv(self.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+		gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 		--[[ transparent for the background for sand area?
 		gl.glEnable(gl.GL_ALPHA_TEST)
@@ -1224,7 +1225,7 @@ function App:update(...)
 						(self.pieceSize.x + 2 * self.pieceOutlineRadius) / w * s,
 						(self.pieceSize.y + 2 * self.pieceOutlineRadius) / h)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-				gl.glUniformMatrix4fv(self.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 				gl.glEnable(gl.GL_BLEND)
 				gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
@@ -1243,32 +1244,32 @@ function App:update(...)
 				)
 				:applyScale(self.pieceSize.x / w * s, self.pieceSize.y / h)
 			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-			gl.glUniformMatrix4fv(self.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+			gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
-			gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 1)
+			gl.glUniform1i(shader.uniforms.useAlpha.loc, 1)
 			player.pieceTex:bind()
 			gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 
-			gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 0)
+			gl.glUniform1i(shader.uniforms.useAlpha.loc, 0)
 		end
 
 		-- draw flashing background if necessary
 		local flashDt = self.gameTime - self.lastLineTime
 		if flashDt < self.lineFlashDuration then
 			self.wasFlashing = true
-			gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 1)
+			gl.glUniform1i(shader.uniforms.useAlpha.loc, 1)
 			local flashInt = bit.band(math.floor(flashDt * self.lineNumFlashes * 2), 1) == 0
 			if flashInt then
 				self.mvMat
 					:setTranslate(-.5 * s, -.5)
 					:applyScale(s, 1)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-				gl.glUniformMatrix4fv(self.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 				self.flashTex:bind()
 				gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 			end
-			gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 0)
+			gl.glUniform1i(shader.uniforms.useAlpha.loc, 0)
 		elseif self.wasFlashing then
 			-- clear once we're done flashing
 			self.wasFlashing = false
@@ -1305,12 +1306,12 @@ function App:update(...)
 					:setTranslate(-.5 * s, -.5)
 					:applyScale(s, 1)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-				gl.glUniformMatrix4fv(self.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
-				gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 1)
+				gl.glUniform1i(shader.uniforms.useAlpha.loc, 1)
 				self.youloseTex:bind()
 				gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
-				gl.glUniform1i(self.displayShader.uniforms.useAlpha.loc, 0)
+				gl.glUniform1i(shader.uniforms.useAlpha.loc, 0)
 			end
 		end
 
@@ -1324,14 +1325,14 @@ function App:update(...)
 				:setTranslate(aspectRatio * .5 - nextPieceSize, .5 - (i-1) * dy)
 				:applyScale(nextPieceSize, -nextPieceSize)
 			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-			gl.glUniformMatrix4fv(self.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+			gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
 			it.tex:bind()
 			gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 		end
 
 		GLTex2D:unbind()
-		self.displayShader
+		shader
 			:disableAttrs()
 			:useNone()
 	end

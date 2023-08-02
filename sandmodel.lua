@@ -1200,6 +1200,70 @@ function AutomataSandGPU:getSandTex()
 	return self.pp:prev()
 end
 
+--[[ TODO
+function AutomataSandGPU:mergePiece(player)
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+	
+	local fbo = self.pp.fbo
+	local srctex = self.pp:prev()
+	local dsttex = self.pp:cur()
+	local shader = app.displayShader
+	
+	gl.glViewport(0, 0, w, h)
+
+	fbo:bind()
+	fbo:setColorAttachmentTex2D(dsttex.id)
+	local res,err = fbo.check()
+	if not res then print(err) end
+
+	gl.glClearColor(0,0,0,0)
+	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+
+	shader:use()
+		:enableAttrs()
+
+	app.projMat:setOrtho(0, 1, 0, 1, -1, 1)
+	app.mvMat:setTranslate(
+			player.piecePos.x / w - .5,
+			player.piecePos.y / h - .5
+		)
+		:applyScale(app.pieceSize.x / w, app.pieceSize.y / h)
+	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
+	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
+	
+	player.pieceTex:bind()
+	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+
+	app.projMat:setOrtho(0, 1, 0, 1, -1, 1)
+	app.mvMat:setIdent()
+	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
+	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
+	
+	srctex:bind()
+	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+	
+	shader:disableAttrs()
+		:useNone()
+	
+	self.pp:swap()
+
+	gl.glReadPixels(
+		0,							--GLint x,
+		0,							--GLint y,
+		w,							--GLsizei width,
+		h,							--GLsizei height,
+		gl.GL_RGBA,					--GLenum format,
+		gl.GL_UNSIGNED_BYTE,		--GLenum type,
+		self.pp:prev().image.buffer)	--void *pixels
+	
+	fbo:unbind()
+
+	gl.glViewport(0, 0, app.width, app.height)
+	
+	self.sandImageDirty = true
+end
+--]]
 
 SandModel.subclasses = table{
 	AutomataSandGPU,
