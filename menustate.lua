@@ -142,7 +142,8 @@ function PlayingState:updateGUI()
 
 	if app.showDebug then
 		if app.showFPS then ig.igText('FPS: '..app.fps) end
-		ig.igText('Num Voxels: '..app.numSandVoxels)
+		-- TODO readpixels or something to copy latest sand image
+		--ig.igText('Num Voxels: '..app.numSandVoxels)
 		ig.igText('Ticks to Fall: '..tostring(app.ticksToFall))
 		if app.sandmodel.updateDebugGUI then
 			app.sandmodel:updateDebugGUI()

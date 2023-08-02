@@ -404,7 +404,7 @@ float lenSq(vec2 v) {
 void main() {
 	float maxDistSq = float(pieceOutlineSize.x + pieceOutlineSize.y);
 	float bestDistSq = maxDistSq;
-	
+
 	int pieceOutlineRadius = pieceOutlineSize.z;
 	ivec2 ij = ivec2(texcoordv * vec2(pieceOutlineSize));
 	ivec2 ofs;
@@ -871,13 +871,13 @@ function App:updatePieceTex(player)
 			end
 		end
 	end
- 
+
 	-- [[ update the piece outline
 	local fbo = self.pieceOutlineFBO
 	local dsttex = player.pieceOutlineTex
 	local shader = self.updatePieceOutlineShader
 	local srctex = player.pieceTex
-	
+
 	gl.glViewport(0, 0, fbo.width, fbo.height)
 
 	fbo:bind()
@@ -911,7 +911,7 @@ function App:updatePieceTex(player)
 		:useNone()
 
 	fbo:unbind()
-	
+
 	gl.glViewport(0, 0, self.width, self.height)
 	--]]
 end
@@ -1057,7 +1057,6 @@ function App:updateGame()
 		end
 	end
 
-	local anyMerged
 	for _,player in ipairs(self.players) do
 		local merge
 		if player.piecePos.y <= -self.pieceSize.y then
@@ -1078,90 +1077,84 @@ function App:updateGame()
 			end
 		end
 		if merge then
-			anyMerged = true
 			self:playSound'sfx/place.wav'
 			if not self.cfg.continuousDrop then
 				player.droppingPiece = false	-- stop dropping piece
 			end
-			needsCheckLine = true
+
 			sandmodel:mergePiece(player)
+
 			self:newPiece(player)
 		end
 	end
 
-	if dontCheckForLinesEver then needsCheckLine = false end
+	if not dontCheckForLinesEver then
 
-	-- try to find a connection from left to right
-	local anyCleared
-	if needsCheckLine then
-		ffi.fill(self.currentClearImage.buffer, 4 * w * h)
-		local clearedCount = 0
-		local blobs = sandmodel:getSandTex().image:getBlobs(self.getBlobCtx)
---print('#blobs', #blobs)
-		for _,blob in pairs(blobs) do
-			if blob.cl ~= 0 then
-				local xmin = math.huge
-				local xmax = -math.huge
-				for _,int in ipairs(blob) do
-					xmin = math.min(xmin, int.x1)
-					xmax = math.max(xmax, int.x2)
+		-- try to find a connection from left to right
+		local anyCleared
+		if needsCheckLine then
+			ffi.fill(self.currentClearImage.buffer, 4 * w * h)
+			local clearedCount = 0
+			local blobs = sandmodel:getSandTex().image:getBlobs(self.getBlobCtx)
+	--print('#blobs', #blobs)
+			for _,blob in pairs(blobs) do
+				if blob.cl ~= 0 then
+					local xmin = math.huge
+					local xmax = -math.huge
+					for _,int in ipairs(blob) do
+						xmin = math.min(xmin, int.x1)
+						xmax = math.max(xmax, int.x2)
+					end
+					local blobwidth = xmax - xmin + 1
+					if blobwidth == w then
+	--print('clearing blob of class', blob.cl)
+						clearedCount = clearedCount + sandmodel:clearBlob(blob)
+					end
 				end
-				local blobwidth = xmax - xmin + 1
-				if blobwidth == w then
---print('clearing blob of class', blob.cl)
-					clearedCount = clearedCount + sandmodel:clearBlob(blob)
+			end
+			if clearedCount ~= 0 then
+				anyCleared = true
+
+				if self.gameTime - self.lastLineTime < self.chainDuration then
+					self.scoreChain = self.scoreChain + 1
+				else
+					self.scoreChain = 0
 				end
-			end
-		end
-		if clearedCount ~= 0 then
-			anyCleared = true
+				-- piece chain count, score multipliers, etc
+				-- https://tetris.fandom.com/wiki/Scoring
+				-- 2 => x2*5/4, 3 => x3*2*5/4, 4 => x4*3*2*5/4
+				local modifier = self.scoreChain == 0 and 1 or math.factorial(self.scoreChain+1) * 5/4
+	--print('scoreChain '..self.scoreChain, 'modifier', modifier)
 
-			if self.gameTime - self.lastLineTime < self.chainDuration then
-				self.scoreChain = self.scoreChain + 1
-			else
-				self.scoreChain = 0
-			end
-			-- piece chain count, score multipliers, etc
-			-- https://tetris.fandom.com/wiki/Scoring
-			-- 2 => x2*5/4, 3 => x3*2*5/4, 4 => x4*3*2*5/4
-			local modifier = self.scoreChain == 0 and 1 or math.factorial(self.scoreChain+1) * 5/4
---print('scoreChain '..self.scoreChain, 'modifier', modifier)
+				self.score = self.score + math.ceil(self.level * clearedCount * modifier)
+				self.lines = self.lines + 1
+				if self.lines % 10 == 0 then
+					self.level = self.level + 1
+					self:playSound'sfx/levelup.wav'
+					self:upateFallSpeed()
+				end
 
-			self.score = self.score + math.ceil(self.level * clearedCount * modifier)
-			self.lines = self.lines + 1
-			if self.lines % 10 == 0 then
-				self.level = self.level + 1
-				self:playSound'sfx/levelup.wav'
-				self:upateFallSpeed()
-			end
+				self:playSound'sfx/line.wav'
 
-			self:playSound'sfx/line.wav'
-			
-			-- flashTex was filled in by sandmodel:clearBlob
-			-- ... which is still on CPU
-			self.flashTex:bind():subimage()
-			self.lastLineTime = self.gameTime
+				-- flashTex was filled in by sandmodel:clearBlob
+				-- ... which is still on CPU
+				self.flashTex:bind():subimage()
+				self.lastLineTime = self.gameTime
 
-			if sandmodel.doneClearingBlobs then
-				sandmodel:doneClearingBlobs()
+				-- sph only
+				if sandmodel.doneClearingBlobs then
+					sandmodel:doneClearingBlobs()
+				end
 			end
 		end
 	end
 
 	-- TODO for sand model automata-gpu,
 	--  we don't need to update in case of 'needsCheckLine' alone
-	if needsCheckLine or anyMerged or anyCleared then
+	if sandmodel.sandImageDirty then
 		local sandTex = sandmodel:getSandTex()
-		-- only count voxles if we're showing debug info
-		if self.showDebug then
-			self.numSandVoxels = 0
-			local p = ffi.cast('uint32_t*', sandTex.image.buffer)
-			for i=0,w*h-1 do
-				if p[0] ~= 0 then self.numSandVoxels = self.numSandVoxels + 1 end
-				p = p + 1
-			end
-		end
 		sandTex:bind():subimage()
+		sandmodel.sandImageDirty = false
 	end
 
 	for _,player in ipairs(self.players) do

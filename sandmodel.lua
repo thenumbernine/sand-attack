@@ -9,6 +9,11 @@ local Image = require 'image'
 
 local SandModel = class()
 
+-- for cpu driven sandTex
+-- this flag means we need to copy from sandTex.image to sandTex
+-- used to aggregate some changes during App:updateGame
+SandModel.sandImageDirty = false
+
 function SandModel:init(app)
 	self.app = assert(app)
 
@@ -64,7 +69,8 @@ function SandModel:mergePiece(player)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 	local sandTex = self:getSandTex()
-	local ptr = ffi.cast('uint32_t*', sandTex.image.buffer)
+	local dstp = ffi.cast('uint32_t*', sandTex.image.buffer)
+	local srcp = ffi.cast('uint32_t*', player.pieceTex.image.buffer)
 	for j=0,app.pieceSize.y-1 do
 		-- I could abstract out the merge code to each sandmodel
 		-- but meh, sph wants random col order, automata doesn't care,
@@ -86,24 +92,25 @@ function SandModel:mergePiece(player)
 		for i=istart,iend,istep do
 		--]]
 			local k = i + app.pieceSize.x * j
-			local color = ffi.cast('uint32_t*', player.pieceTex.image.buffer)[k]
+			local color = srcp[k]
 			if color ~= 0 then
 				local x = player.piecePos.x + i
 				local y = player.piecePos.y + j
 				if x >= 0 and x < w
 				and y >= 0 and y < h
-				and ptr[x + w * y] == 0
+				and dstp[x + w * y] == 0
 				then
-					ptr[x + w * y] = color
+					dstp[x + w * y] = color
 					-- [[ this is only for sph sand
-					if app.sandmodel.mergepixel then
-						app.sandmodel:mergepixel(x,y,color)
+					if self.mergepixel then
+						self:mergepixel(x,y,color)
 					end
 					--]]
 				end
 			end
 		end
 	end
+	self.sandImageDirty = true
 end
 
 
@@ -162,6 +169,7 @@ function AutomataSandCPU:update()
 		end
 	end
 
+	self.sandImageDirty = needsCheckLine
 	return needsCheckLine
 end
 
@@ -177,6 +185,7 @@ function AutomataSandCPU:clearBlob(blob)
 			app.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 		end
 	end
+	self.sandImageDirty = true
 	return clearedCount
 end
 
@@ -371,6 +380,7 @@ function SPHSand:update()
 	end
 	--print('numOverlaps ',numOverlaps)
 
+	self.sandImageDirty = needsCheckLine
 	return needsCheckLine
 end
 function SPHSand:mergepixel(x,y,color)
@@ -541,6 +551,7 @@ function CFDSand:update()
 	self:velocityStep(visc, dt)
 	self:densityStep(diff, dt)
 
+	self.sandImageDirty = needsCheckLine
 	return needsCheckLine
 end
 function CFDSand:densityStep(diff, dt)
@@ -725,6 +736,7 @@ function CFDSand:clearBlob(blob)
 			self.v[k + 4 * (int.x1 + w * int.y)] = 0
 		end
 	end
+	self.sandImageDirty = true
 	return clearedCount
 end
 function CFDSand:flipBoard()
@@ -792,7 +804,7 @@ function AutomataSandGPU:init(app)
 		-- (but for gles3 / webgl2 it's fine)
 		dontAttach = true,
 	}
-	
+
 	-- give each pingpong buffer an image
 	for _,t in ipairs(self.pp.hist) do
 		local size = app.sandSize
@@ -1128,7 +1140,7 @@ function AutomataSandGPU:update()
 		end
 	end
 
-	-- while we're here, readpixels into the image
+	-- [[ while we're here, readpixels into the image
 	gl.glReadPixels(
 		0,							--GLint x,
 		0,							--GLint y,
@@ -1137,13 +1149,13 @@ function AutomataSandGPU:update()
 		gl.GL_RGBA,					--GLenum format,
 		gl.GL_UNSIGNED_BYTE,		--GLenum type,
 		self.pp:prev().image.buffer)	--void *pixels
+	--]]
 
 	fbo:unbind()
 	gl.glViewport(0, 0, app.width, app.height)
 
 	shader:disableAttrs()
 		:useNone()
-
 	return true
 end
 
@@ -1160,6 +1172,7 @@ function AutomataSandGPU:clearBlob(blob)
 			app.flashTex.image.buffer[k + 4 * (int.x1 + w * int.y)] = 0xff
 		end
 	end
+	self.sandImageDirty = true
 	return clearedCount
 end
 
