@@ -1071,7 +1071,7 @@ function App:updateGame()
 
 			sandmodel:mergePiece(player)
 			needsCheckLine = true
-			
+
 			self:newPiece(player)
 		end
 	end
@@ -1171,6 +1171,8 @@ function App:update(...)
 			:applyScale(s, 1)
 		self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 		gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+
+		gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 0)
 
 		--[[ transparent for the background for sand area?
 		gl.glEnable(gl.GL_ALPHA_TEST)
@@ -1342,12 +1344,14 @@ App.fpsSampleCount = 0
 function App:drawTouchRegions()
 	local buttonRadius = self.width * self.cfg.screenButtonRadius
 
+	local shader = self.displayShader
+
 	gl.glEnable(gl.GL_BLEND)
 	gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
-	self.displayShader
+	shader
 		:use()
 		:enableAttrs()
-	gl.glUniform1i(self.displayShader.uniforms.useAlphaTest.loc, 0)
+	gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 0)
 	self.buttonTex:bind()
 	self.projMat:setOrtho(0,self.width,self.height,0,-1,1)
 	for i=1,self.numPlayers do
@@ -1363,13 +1367,13 @@ function App:drawTouchRegions()
 					y-buttonRadius)
 					:applyScale(2*buttonRadius, 2*buttonRadius)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-				gl.glUniformMatrix4fv(self.displayShader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 				gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 			end
 		end
 	end
 	self.buttonTex:unbind()
-	self.displayShader
+	shader
 		:disableAttrs()
 		:useNone()
 	gl.glDisable(gl.GL_BLEND)

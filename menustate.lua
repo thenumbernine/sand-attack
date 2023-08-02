@@ -495,11 +495,11 @@ function SplashScreenState:update()
 
 	local aspectRatio = app.width / app.height
 
-	app.projMat:setOrtho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
 	app.displayShader
 		:use()
 		:enableAttrs()
 
+	app.projMat:setOrtho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
 	app.mvMat
 		:setTranslate(-.5 * aspectRatio, -.5)
 		:applyScale(aspectRatio, 1)
@@ -511,13 +511,10 @@ function SplashScreenState:update()
 	app.splashTex:bind()
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 
-	gl.glUniform1i(app.displayShader.uniforms.useAlphaTest.loc, 0)
-
 	app.splashTex:unbind()
 	app.displayShader
 		:disableAttrs()
 		:useNone()
-
 
 	if getTime() - self.startTime > self.duration then
 		app.menustate = MainMenuState(app)

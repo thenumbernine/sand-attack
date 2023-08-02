@@ -402,8 +402,6 @@ function AutomataSandGPU:mergePiece(player)
 	srctex:bind()
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 	srctex:unbind()
-	
-	gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 0)
 
 	shader:disableAttrs()
 		:useNone()
