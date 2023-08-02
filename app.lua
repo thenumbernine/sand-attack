@@ -253,14 +253,6 @@ function App:initGL(...)
 		magFilter = gl.GL_NEAREST,
 	}
 
-	--[[
-	image's getBlobs is a mess... straighten it out
-	should probably be a BlobGetter() class which holds the context, classify callback, results, etc.
-	--]]
-	self.getBlobCtx = {
-		classify = function(p) return p[3] end,	-- classify by alpha channel
-	}
-
 	-- TODO use self.view with .useBuiltinMatrixMath=true
 	self.projMat = matrix({4,4},'float'):zeros()
 	self.mvMat = matrix({4,4},'float'):zeros()

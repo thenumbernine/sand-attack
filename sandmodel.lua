@@ -23,6 +23,14 @@ function SandModel:init(app)
 	-- FBO the size of the sand texture
 	self.fbo = require 'gl.fbo'{width=w, height=h}
 		:unbind()
+
+	--[[
+	image's getBlobs is a mess... straighten it out
+	should probably be a BlobGetter() class which holds the context, classify callback, results, etc.
+	--]]
+	self.getBlobCtx = {
+		classify = function(p) return p[3] end,	-- classify by alpha channel
+	}
 end
 
 function SandModel:getSandTex()
@@ -113,11 +121,24 @@ function SandModel:mergePiece(player)
 	self.sandImageDirty = true
 end
 
+ffi.cdef[[
+typedef struct {
+	int x1;
+	int x2;
+	int y;
+	int cl;		//classification
+	int blob;	//blob index
+} ImageBlobRowInterval_t;
+]]
+
+local vector = require 'ffi.cpp.vector'
+
+-- [[ using generic image blob detection
 function SandModel:checkClearBlobs()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 	local clearedCount = 0
-	local blobs = self:getSandTex().image:getBlobs(app.getBlobCtx)
+	local blobs = self:getSandTex().image:getBlobs(self.getBlobCtx)
 --print('#blobs', #blobs)
 	for _,blob in pairs(blobs) do
 		if blob.cl ~= 0 then
@@ -136,7 +157,94 @@ function SandModel:checkClearBlobs()
 	end
 	return clearedCount
 end
+--]]
+--[[ tracking columsn left to right, seeing what connects
+function SandModel:checkClearBlobs()
+	local app = self.app
+	local w, h = app.sandSize:unpack()
 
+	local sandTex = self:getSandTex()
+	local ptr = ffi.cast('uint8_t*', sandTex.image.buffer)
+
+
+	-- get first column of intervals
+	local cols = table()
+	for x = 0,w-1 do
+		local col = table()
+		local p = ptr + 4 * x
+		local y = 0
+		local cl = p[3]
+		repeat
+			local cl2
+			local lhs = y
+			repeat
+				y = y + 1
+				p = p + 4 * y
+				if y == h then break end
+				cl2 = p[3]
+			until cl ~= cl2
+			local int = {}
+			int.y1 = lhs
+			int.y2 = y - 1
+			int.x = 0
+			int.cl = cl
+			col:insert(int)
+		until y == h
+	
+		if #cols > 0 then
+			local lastcol = cols:last()
+			-- scan through last cols
+			-- if any on it dont touch matching colors in this col then get rid of them
+			-- same with intervals in this col / touching last col
+			for il=#lastcol,1,-1 do
+				local intl = lastcol[il]
+				local touches = false
+				for _,intr in ipairs(col) do
+					if intr.y1 > intl.y2 then break end	-- too far
+					if intr.y2 <= intl.y1 then
+						if intr.cl == intl.cl then
+							touches = true
+							break
+						end
+					end
+				end
+				if not touches then lastcol:remove(il) end
+			end
+			if #lastcol == 0 then
+				-- no intervals touch - short-circuit that we're done
+				return 0
+			end
+			for ir=#col,1,-1 do
+				local intr = col[ir]
+				local touches = false
+				for _,intl in ipairs(lastcol) do
+					if intl.y1 > intr.y2 then break end	-- too far
+					if intl.y2 <= intr.y1 then
+						if intl.cl == intr.cl then
+							touches = true
+							break
+						end
+					end
+				end
+				if not touches then col:remove(ir) end
+			end	
+			if #col == 0 then
+				-- no intervals touch - short-circuit that we're done
+				return 0
+			end
+		end
+
+		cols:insert(col)
+	end
+	
+	-- now that we're here we made it
+	print'made it'
+
+	local clearedCount = 0
+
+	return clearedCount
+end
+--]]
 
 local AutomataSandCPU = SandModel:subclass()
 
