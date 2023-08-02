@@ -123,15 +123,67 @@ end
 
 ffi.cdef[[
 typedef struct {
-	int x1;
-	int x2;
-	int y;
+	int y1;
+	int y2;
+	int x;
 	int cl;		//classification
 	int blob;	//blob index
-} ImageBlobRowInterval_t;
+} ImageBlobColInterval_t;
 ]]
+local ImageBlobColInterval_t = ffi.metatype('ImageBlobColInterval_t', {
+	__tostring = function(self)
+		return 'ImageBlobColInterval_t{'
+			..'y1='..self.y1..','
+			..'y2='..self.y2..','
+			..'x='..self.x..','
+			..'cl='..self.cl
+		..'}'
+	end,
+})
 
 local vector = require 'ffi.cpp.vector'
+
+-- unlike Image's Blob, this is a collection of column intervals
+-- maybe I should move it to Image, but then again, its usage here is pretty specialized
+local BlobCol = class()
+BlobCol.init = table.init
+BlobCol.insert = table.insert
+BlobCol.append = table.append
+
+
+-- prune a pair of columns from any intervals that are not touching one another and have matching class ids
+function SandModel:pruneCols(colL, colR)
+	for swap=0,1 do
+		-- scan through last colregions
+		-- if any on it dont touch matching colors in this col then get rid of them
+		-- same with intervals in this col / touching last col
+		for il=colL.size-1,0,-1 do
+			local intl = colL.v[il]
+			local touches = false
+			for ir=0,colR.size-1 do
+				local intr = colR.v[ir]
+--print('testing', intl, intr)
+				if intr.y1 > intl.y2 then break end	-- too far
+				if intr.y2 >= intl.y1 then
+					if intr.cl == intl.cl then
+--print('touches')
+						touches = true
+						break
+					end
+				end
+			end
+			if not touches then
+				colL:erase(colL.v+il, colL.v+il+1)
+--print('not touches, erasing', il, 'colL size is now', colL.size)
+			end
+		end
+		if colL.size == 0 then
+			-- no intervals touch - short-circuit that we're done
+			return true
+		end
+		colL, colR = colR, colL
+	end
+end
 
 -- [[ using generic image blob detection
 function SandModel:checkClearBlobs()
@@ -163,80 +215,112 @@ function SandModel:checkClearBlobs()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 
+	self.colctx = self.colctx or {}
+	local ctx = self.colctx
+
+	local colregions = ctx.colregions
+	if not colregions then
+		colregions = {}
+		ctx.colregions = colregions
+	end
+	for j=1,h do
+		local col = colregions[j]
+		if not col then
+			col = vector'ImageBlobColInterval_t'
+			colregions[j] = col
+		else
+			col:clear()
+		end
+	end
+	for j=h+1,#colregions do
+		colregions[j] = nil
+	end
+
+	--[[
+	local blobs = ctx.blobs
+	if not blobs then
+		blobs = Blobs()
+		ctx.blobs = blobs
+	else
+		for k in pairs(blobs) do blobs[k] = nil end
+	end
+	local nextblobindex = 1
+	--]]
+
 	local sandTex = self:getSandTex()
 	local ptr = ffi.cast('uint8_t*', sandTex.image.buffer)
 
-
 	-- get first column of intervals
-	local cols = table()
 	for x = 0,w-1 do
-		local col = table()
+		local col = colregions[x+1]
+
 		local p = ptr + 4 * x
 		local y = 0
 		local cl = p[3]
 		repeat
 			local cl2
-			local lhs = y
+			local ystart = y
 			repeat
 				y = y + 1
-				p = p + 4 * y
+				p = p + 4 * w
 				if y == h then break end
 				cl2 = p[3]
 			until cl ~= cl2
-			local int = {}
-			int.y1 = lhs
-			int.y2 = y - 1
-			int.x = 0
-			int.cl = cl
-			col:insert(int)
+			if cl ~= 0 then
+				local c = col:emplace_back()
+				c.y1 = ystart
+				c.y2 = y - 1
+				c.x = x
+				c.cl = cl
+				c.blob = -1
+			end
+			-- prepare for next col
+			cl = cl2
 		until y == h
-	
-		if #cols > 0 then
-			local lastcol = cols:last()
-			-- scan through last cols
-			-- if any on it dont touch matching colors in this col then get rid of them
-			-- same with intervals in this col / touching last col
-			for il=#lastcol,1,-1 do
-				local intl = lastcol[il]
-				local touches = false
-				for _,intr in ipairs(col) do
-					if intr.y1 > intl.y2 then break end	-- too far
-					if intr.y2 <= intl.y1 then
-						if intr.cl == intl.cl then
-							touches = true
-							break
-						end
-					end
-				end
-				if not touches then lastcol:remove(il) end
-			end
-			if #lastcol == 0 then
-				-- no intervals touch - short-circuit that we're done
-				return 0
-			end
-			for ir=#col,1,-1 do
-				local intr = col[ir]
-				local touches = false
-				for _,intl in ipairs(lastcol) do
-					if intl.y1 > intr.y2 then break end	-- too far
-					if intl.y2 <= intr.y1 then
-						if intl.cl == intr.cl then
-							touches = true
-							break
-						end
-					end
-				end
-				if not touches then col:remove(ir) end
-			end	
-			if #col == 0 then
-				-- no intervals touch - short-circuit that we're done
-				return 0
-			end
-		end
 
-		cols:insert(col)
+		-- no intervals <-> no connection
+		if col.size == 0 then return 0 end
+
+		if x > 0 then
+			local colL = colregions[x]	-- cuz colregions is 1-based
+			local colR = col
+			if self:pruneCols(colL, colR) then return 0 end
+		end
 	end
-	
+
+	--[[
+	for x=0,w-1 do
+		io.write(x)
+		local col = colregions[x+1]
+		for i=0,col.size-1 do
+			local c = col.v[i]
+			io.write(tostring(c))
+			--' [',c.y1,',',c.y2,':',c.cl,']')
+		end
+		print()
+	end
+	--]]
+	-- find connection
+	-- go back and check intervals and eliminate any that are not connected
+	-- also form blobs while we go
+	for x=w-1,0,-1 do
+		local col = colregions[x+1]
+		if x > 0 then
+			local colL = colregions[x]
+			if self:pruneCols(colL, col) then return 0 end
+		end
+		-- if col was empty then we've returned by now
+
+		if x == w-1 then
+			-- init blobs
+			for i=0,col.size-1 do
+				local int = col.v[i]
+				local blob = BlobCol()
+			end
+
+		else
+	end
+
 	-- now that we're here we made it
 	print'made it'
 
@@ -1347,12 +1431,12 @@ end
 function AutomataSandGPU:mergePiece(player)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	
+
 	local fbo = self.pp.fbo
 	local srctex = self.pp:prev()
 	local dsttex = self.pp:cur()
 	local shader = app.displayShader
-	
+
 	gl.glViewport(0, 0, w, h)
 
 	fbo:bind()
@@ -1375,7 +1459,7 @@ function AutomataSandGPU:mergePiece(player)
 	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
 	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
 	gl.glUniform1i(shader.uniforms.useAlpha.loc, 1)
-	
+
 	player.pieceTex:bind()
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 
@@ -1384,13 +1468,13 @@ function AutomataSandGPU:mergePiece(player)
 	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
 	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
 	gl.glUniform1i(shader.uniforms.useAlpha.loc, 0)
-	
+
 	srctex:bind()
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
-	
+
 	shader:disableAttrs()
 		:useNone()
-	
+
 	self.pp:swap()
 
 	gl.glReadPixels(
@@ -1401,11 +1485,11 @@ function AutomataSandGPU:mergePiece(player)
 		gl.GL_RGBA,					--GLenum format,
 		gl.GL_UNSIGNED_BYTE,		--GLenum type,
 		dsttex.image.buffer)		--void *pixels
-	
+
 	fbo:unbind()
 
 	gl.glViewport(0, 0, app.width, app.height)
-	
+
 	self.sandImageDirty = true
 end
 --]]
