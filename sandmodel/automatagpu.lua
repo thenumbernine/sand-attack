@@ -354,7 +354,7 @@ function AutomataSandGPU:testPieceMerge(player)
 end
 --]]
 
---[[ TODO
+--[[
 function AutomataSandGPU:mergePiece(player)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
@@ -402,8 +402,6 @@ function AutomataSandGPU:mergePiece(player)
 	shader:disableAttrs()
 		:useNone()
 
-	self.pp:swap()
-
 	gl.glReadPixels(
 		0,							--GLint x,
 		0,							--GLint y,
@@ -416,6 +414,9 @@ function AutomataSandGPU:mergePiece(player)
 	fbo:unbind()
 
 	gl.glViewport(0, 0, app.width, app.height)
+	
+	self.pp:swap()
+	srctex:unbind()
 
 	self.sandImageDirty = true
 end
