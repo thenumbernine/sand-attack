@@ -18,8 +18,8 @@ files = {
 		-- option #1: put all individual script files here:
 		'sand-attack/app.lua',
 		'sand-attack/menustate.lua',
-		'sand-attack/sandmodel.lua',
 		'sand-attack/player.lua',
+		'sand-attack/sandmodel',	-- subdir
 		-- option #2: copy this dir and reference all resources from 'sand-attack/'
 		-- (this'll require a 'cd ..' every time you playtest it from within its cwd ...)
 		--'sand-attack',

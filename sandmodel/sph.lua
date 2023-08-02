@@ -43,7 +43,7 @@ function SPHSand:checkClearBlobs()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 	ffi.fill(self.currentClearImage.buffer, 4 * w * h)
-	SPHSand.super.checkClearBlobs(self)
+	return SPHSand.super.checkClearBlobs(self)
 end
 
 function SPHSand:update()
