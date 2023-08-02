@@ -273,7 +273,7 @@ function App:initGL(...)
 	--self.glslVersion = 430
 	--self.glslVersion = '320 es'	-- too new
 	self.glslVersion = '300 es'
-	self.shaderHeader = 
+	self.shaderHeader =
 '#version '..self.glslVersion..'\n'
 ..'precision highp float;\n'
 
@@ -718,9 +718,9 @@ end
 -- generate it based on the piece template
 function App:populatePiece(args)
 	local srctex = self.pieceSourceTexs:pickRandom()
-	local colorIndex = self.rng(#self.gameColors)
+	local colorIndex = self.rng(#self.gameColors)	-- 1..n for n colors
 	local color = self.gameColors[colorIndex]
-	local alpha = colorIndex/#self.gameColors
+	local alpha = colorIndex/#self.gameColors		-- [1/n, 1]
 
 	local fbo = self.pieceFBO
 	local dsttex = args.tex
@@ -838,6 +838,27 @@ function App:updatePieceTex(player)
 		end
 	end
 
+	-- same thing with rows to determine max row, to determine when we hit th ground
+	for _,info in ipairs{
+		{0,self.pieceSize.y-1,1, 'pieceRowMin'},
+		{self.pieceSize.y-1,0,-1, 'pieceRowMax'},
+	} do
+		local jstart, jend, jstep, jfield = table.unpack(info)
+		for j=jstart,jend,jstep do
+			local found
+			for i=0,self.pieceSize.x-1 do
+				if pieceBuf[i + self.pieceSize.x * j] ~= 0 then
+					found = true
+					break
+				end
+			end
+			if found then
+				player[jfield] = j
+				break
+			end
+		end
+	end
+
 	-- [[ update the piece outline
 	local fbo = self.pieceOutlineFBO
 	local dsttex = player.pieceOutlineTex
@@ -921,7 +942,7 @@ function App:rotatePiece(player)
 		:disableAttrs()
 		:useNone()
 
-	-- still needed
+	-- still needed by
 	-- 	- App:updatePieceTex for calculating pieceColMin and pieceColMax
 	--	- SandModel:testPieceMerge and SandModel:mergePiece
 	gl.glReadPixels(

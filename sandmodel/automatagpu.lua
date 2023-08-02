@@ -217,39 +217,39 @@ void main() {
 		},
 	}
 
-if false then
 	self.testMergeShader = GLProgram{
 		vertexCode = app.shaderHeader..[[
 in vec2 vertex;
-
 out vec2 texcoordv;
-
 uniform mat4 mvProjMat;
 
 void main() {
-	texcoordv = vertex;
-	gl_Position = mvProjMat * vec4(vertex, 0., 1.);
+	texcoordv = vertex.xy;
+	gl_Position = mvProjMat * vec4(vertex.xy, 0., 1.);
 }
 ]],
 		fragmentCode = app.shaderHeader..[[
 in vec2 texcoordv;
-
 out vec4 fragColor;
 
-uniform vec2 piecePos;
-uniform float row;
+uniform ivec2 piecePos;
+uniform ivec2 pieceSize;
+uniform int row;
 
 uniform sampler2D boardTex;
 uniform sampler2D pieceTex;
 
 void main() {
-	TODO calculate texel on boardtex and on piecetex
+	int itcx = int(texcoordv.x * float(pieceSize.x));
+	// calculate texel on boardtex and on piecetex
+	ivec2 pieceitc = ivec2(itcx, row);
+	ivec2 boarditc = pieceitc + piecePos;
 	vec4 boardColor = texelFetch(boardTex, boarditc, 0);
 	vec4 pieceColor = texelFetch(pieceTex, pieceitc, 0);
 
 	if (boardColor.w != 0. && pieceColor.w != 0.) {
 		fragColor = vec4(1.);
-	} else
+	} else {
 		fragColor = vec4(0.);
 	}
 }
@@ -263,34 +263,12 @@ void main() {
 			vertex = app.quadVertexBuf,
 		},
 	}
-end
 
 	-- temp texture used for testing collisions
 	self.testMergeTex = app:makeTexWithBlankImage(vec2i(app.pieceSize.x, 1))
 end
 
-local function printBuf(buf, w, h, yofs)
-	local p = ffi.cast('uint32_t*', buf)
-	local s = ''
-	for j=0,h-1 do
-		local l = ''
-		for i=0,w-1 do
-			local c = ('| %8x '):format(p[0])
-			l = l .. c
-			p=p+1
-		end
-		l = l .. '\n'
-		if j % 2 == yofs then
-			l = l .. '\n'
-		end
-		s = l .. s
-	end
-	print(s)
-	return s
-end
-
-print('REMINDER: finish AutomataSandGPU:testPieceMerge and :mergePiece')
---[[ how to test merge on GPU?
+-- [[ how to test merge on GPU?
 -- same trick as histogram ...
 -- render to a FBO that is [pieceSize.x, 1] in size.
 -- input textures are the piece tex and current board tex
@@ -300,10 +278,18 @@ print('REMINDER: finish AutomataSandGPU:testPieceMerge and :mergePiece')
 function AutomataSandGPU:testPieceMerge(player)
 	local app = self.app
 	local w, h = app.sandSize:unpack()
-	
+
+	-- test board bottom boundary ...
+	if player.pieceRowMin	-- if we have a shape ...
+	and player.piecePos.y + player.pieceRowMin <= 0
+	then
+		return true
+	end
+
 	local fbo = self.fbo
 	local dsttex = self.testMergeTex
 	local shader = self.testMergeShader
+	local sandTex = self:getSandTex()
 
 	gl.glBlendFunc(gl.GL_ONE, gl.GL_ONE)
 	gl.glEnable(gl.GL_BLEND)
@@ -312,29 +298,29 @@ function AutomataSandGPU:testPieceMerge(player)
 		:enableAttrs()
 
 	gl.glViewport(0, 0, app.pieceSize.x, 1)
-	
+
 	fbo:bind()
 		:setColorAttachmentTex2D(dsttex.id)
 	local res, err = fbo.check()
 	if not res then print(err) end
-	
+
 	gl.glClearColor(0,0,0,0)
 	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
-		
-	app.mvProjMat:setOrtho(0, 1, 0, app.pieceSize.x, -1, 1)
+
+	app.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
 	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
-	gl.glUniform2i(shader.uniforms.piecePos, player.piecePos.x, player.piecPos.y)
-			
-	self:getSandTex():bind(0)
+	gl.glUniform2i(shader.uniforms.piecePos.loc, player.piecePos:unpack())
+	gl.glUniform2i(shader.uniforms.pieceSize.loc, app.pieceSize:unpack())
+	sandTex:bind(0)
 	player.pieceTex:bind(1)
 
-	for y=0,app.pieceSize.y-1 do
-		gl.glUniform2i(shader.uniforms.row, y)
+	for row=0,app.pieceSize.y-1 do
+		gl.glUniform1i(shader.uniforms.row.loc, row)
 		gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 	end
-	
+
 	player.pieceTex:unbind(1)
-	self:getSandTex():unbind(0)
+	sandTex:unbind(0)
 
 	gl.glReadPixels(
 		0,							--GLint x,
@@ -346,13 +332,25 @@ function AutomataSandGPU:testPieceMerge(player)
 		dsttex.image.buffer)		--void *pixels
 
 	fbo:unbind()
-	
+
 	gl.glDisable(gl.GL_BLEND)
 
 	shader:disableAttrs()
 		:useNone()
-	
+
 	gl.glViewport(0, 0, app.width, app.height)
+
+	local overlap
+	local p = dsttex.image.buffer
+	for i=0,app.pieceSize.x-1 do
+		if p[3] ~= 0 then
+			overlap = true
+			break
+		end
+		p = p + 4
+	end
+
+	return overlap
 end
 --]]
 
@@ -422,6 +420,26 @@ function AutomataSandGPU:mergePiece(player)
 	self.sandImageDirty = true
 end
 --]]
+
+local function printBuf(buf, w, h, yofs)
+	local p = ffi.cast('uint32_t*', buf)
+	local s = ''
+	for j=0,h-1 do
+		local l = ''
+		for i=0,w-1 do
+			local c = ('| %8x '):format(p[0])
+			l = l .. c
+			p=p+1
+		end
+		l = l .. '\n'
+		if j % 2 == yofs then
+			l = l .. '\n'
+		end
+		s = l .. s
+	end
+	print(s)
+	return s
+end
 
 
 function AutomataSandGPU:test()
@@ -615,4 +633,4 @@ function AutomataSandGPU:getSandTex()
 	return self.pp:prev()
 end
 
-return AutomataSandGPU 
+return AutomataSandGPU

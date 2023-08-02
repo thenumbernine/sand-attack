@@ -45,6 +45,13 @@ function SandModel:reset()
 end
 
 function SandModel:testPieceMerge(player)
+	-- test board bottom boundary ...
+	if player.pieceRowMin	-- if we have a shape ...
+	and player.piecePos.y + player.pieceRowMin <= 0
+	then
+		return true
+	end
+
 	local app = self.app
 	local w, h = app.sandSize:unpack()
 	local sandTex = self:getSandTex()
@@ -426,7 +433,7 @@ assert(blobs[int.blob] and blobs[int.blob].debugColor, require 'ext.tolua'{blobs
 			end
 		end
 	end
-	
+
 	app.flashTex:bind():subimage()
 	app.lastLineTime = app.gameTime
 
@@ -441,4 +448,4 @@ function SandModel:updateDebugGUI()
 end
 --]=]
 
-return SandModel 
+return SandModel
