@@ -121,6 +121,34 @@ function SandModel:mergePiece(player)
 	self.sandImageDirty = true
 end
 
+--[[ using generic image blob detection
+function SandModel:checkClearBlobs()
+	local app = self.app
+	local w, h = app.sandSize:unpack()
+	local clearedCount = 0
+	local blobs = self:getSandTex().image:getBlobs(self.getBlobCtx)
+--print('#blobs', #blobs)
+	for _,blob in pairs(blobs) do
+		if blob.cl ~= 0 then
+			local xmin = math.huge
+			local xmax = -math.huge
+			for _,int in ipairs(blob) do
+				xmin = math.min(xmin, int.x1)
+				xmax = math.max(xmax, int.x2)
+			end
+			local blobwidth = xmax - xmin + 1
+			if blobwidth == w then
+--print('clearing blob of class', blob.cl)
+				clearedCount = clearedCount + self:clearBlobHorz(blob)
+			end
+		end
+	end
+	return clearedCount
+end
+--]]
+
+-- [=[ tracking columns left to right, seeing what connects
+
 ffi.cdef[[
 typedef struct {
 	int y1;
@@ -185,32 +213,6 @@ function SandModel:pruneCols(colL, colR)
 	end
 end
 
--- [[ using generic image blob detection
-function SandModel:checkClearBlobs()
-	local app = self.app
-	local w, h = app.sandSize:unpack()
-	local clearedCount = 0
-	local blobs = self:getSandTex().image:getBlobs(self.getBlobCtx)
---print('#blobs', #blobs)
-	for _,blob in pairs(blobs) do
-		if blob.cl ~= 0 then
-			local xmin = math.huge
-			local xmax = -math.huge
-			for _,int in ipairs(blob) do
-				xmin = math.min(xmin, int.x1)
-				xmax = math.max(xmax, int.x2)
-			end
-			local blobwidth = xmax - xmin + 1
-			if blobwidth == w then
---print('clearing blob of class', blob.cl)
-				clearedCount = clearedCount + self:clearBlobHorz(blob)
-			end
-		end
-	end
-	return clearedCount
-end
---]]
---[=[ tracking columsn left to right, seeing what connects
 function SandModel:checkClearBlobs()
 	local app = self.app
 	local w, h = app.sandSize:unpack()
@@ -236,16 +238,14 @@ function SandModel:checkClearBlobs()
 		colregions[j] = nil
 	end
 
-	--[[
 	local blobs = ctx.blobs
 	if not blobs then
-		blobs = Blobs()
+		blobs = table()
 		ctx.blobs = blobs
 	else
 		for k in pairs(blobs) do blobs[k] = nil end
 	end
 	local nextblobindex = 1
-	--]]
 
 	local sandTex = self:getSandTex()
 	local ptr = ffi.cast('uint8_t*', sandTex.image.buffer)
@@ -304,6 +304,7 @@ function SandModel:checkClearBlobs()
 	-- go back and check intervals and eliminate any that are not connected
 	-- also form blobs while we go
 	for x=w-1,0,-1 do
+		-- before doing any blob detection, prune our col with the next to see if it gets eliminated
 		local col = colregions[x+1]
 		if x > 0 then
 			local colL = colregions[x]
@@ -316,14 +317,69 @@ function SandModel:checkClearBlobs()
 			for i=0,col.size-1 do
 				local int = col.v[i]
 				local blob = BlobCol()
+				blobs[nextblobindex] = blob
+				int.blob = nextblobindex
+				nextblobindex = nextblobindex + 1
+				blob:insert(int)
+				blob.cl = int.cl
 			end
-
 		else
+			local lastcol = colregions[x+2]
+			if col.size > 0 then
+				for i=0,col.size-1 do
+					local int = col.v[i]
+					for j=0,lastcol.size-1 do
+						local lint = lastcol.v[j]
+						if lint.blob <= -1 then
+							print("col["..x.."] previous-col interval had no blob "..lint.blob)
+							error'here'
+						end
+						if lint.y1 <= int.y2
+						and lint.y2 >= int.y1
+						then
+							-- touching - make sure they are in the same blob
+							if int.blob ~= lint.blob
+							and int.cl == lint.cl
+							then
+								local oldblobindex = int.blob
+								if oldblobindex > -1 then
+									local oldblob = blobs[oldblobindex]
+									-- remove the old blob
+									blobs[oldblobindex] = nil
+
+									for _,oint in ipairs(oldblob) do
+										oint.blob = lint.blob
+									end
+									blobs[lint.blob]:append(oldblob)
+								else
+									int.blob = lint.blob
+									blobs[lint.blob]:insert(int)
+								end
+							end
+						end
+					end
+					if int.blob == -1 then
+						local blob = Blob()
+						blobs[nextblobindex] = blob
+						int.blob = nextblobindex
+						nextblobindex = nextblobindex + 1
+						blob:insert(int)
+						blob.cl = int.cl
+					end
+				end
+			end
+		end
+		for i=0,col.size-1 do
+			if col.v[i].blob <= -1 then
+				print("on col "..x.." failed to assign all intervals to blobs")
+			end
+		end
 	end
 
 	-- now that we're here we made it
-	print'made it'
+	print('found connection with', #blobs,'blobs')
 
+	-- TODO count blob size
 	local clearedCount = 0
 
 	return clearedCount
