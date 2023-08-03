@@ -18,6 +18,7 @@ local GLArrayBuffer = require 'gl.arraybuffer'
 local GLFBO = require 'gl.fbo'
 local glreport = require 'gl.report'
 local vec2i = require 'vec-ffi.vec2i'
+local vec2f = require 'vec-ffi.vec2f'
 local vec3f = require 'vec-ffi.vec3f'
 local getTime = require 'ext.timer'.getTime
 local ig = require 'imgui'
@@ -793,11 +794,11 @@ function App:newPiece(player)
 		lastPiece.tex = tex
 	end
 	self:populatePiece(lastPiece)
-
 	--]]
+
 	self:updatePieceTex(player)
-	player.piecePos = vec2i(bit.rshift(w-self.pieceSize.x,1), h-1)
-	player.pieceLastPos = vec2i(player.piecePos)
+	player.piecePos = vec2f((w-self.pieceSize.x)*.5, h-1)
+	player.piecePosLast = vec2f(player.piecePos)
 	if self.sandmodel:testPieceMerge(player) then
 		-- but this means you can pause mid-losing ... meh
 		self.loseTime = self.thisTime
@@ -999,7 +1000,7 @@ function App:updateGame()
 	local needsCheckLine = sandmodel:update()
 
 	for _,player in ipairs(self.players) do
-		player.pieceLastPos:set(player.piecePos:unpack())
+		player.piecePosLast:set(player.piecePos:unpack())
 	end
 
 	-- now draw the shape over the sand
@@ -1008,6 +1009,8 @@ function App:updateGame()
 	for _,player in ipairs(self.players) do
 		-- TODO key updates at higher interval than drop rate ...
 		-- but test collision for both
+		-- TODO tap to move vs hold to move ... just like with dropping?  nah cuz that is still hold-to-go-full-speed
+		-- maybe something more like original tetris, push to go one block, hold past a delay to go full speed
 		local dx = 0
 		if player.keyPress.left then
 			dx = dx - 1
@@ -1017,7 +1020,7 @@ function App:updateGame()
 		end
 		-- same as with dropSpeed...
 		--player.piecePos.x = player.piecePos.x + dx * self.cfg.movedx * self.gameScale
-		player.piecePos.x = player.piecePos.x + math.sign(dx) * math.ceil(math.abs(dx) * self.cfg.movedx * self.gameScaleFloat)
+		player.piecePos.x = player.piecePos.x + dx * self.cfg.movedx * self.gameScaleFloat
 		self:constrainPiecePos(player)
 
 		-- don't allow holding down through multiple drops ... ?
@@ -1033,7 +1036,7 @@ function App:updateGame()
 			-- gameScale seems like a nice var at first, but it is integer based on pixels-per-block/8, so it's 1 for pixels-per-block ranging [1,8]
 			--player.piecePos.y = player.piecePos.y - self.cfg.dropSpeed * self.gameScale
 			-- so I want smaller resolution here...
-			player.piecePos.y = player.piecePos.y - math.ceil(self.cfg.dropSpeed * self.gameScaleFloat)
+			player.piecePos.y = player.piecePos.y - self.cfg.dropSpeed * self.gameScaleFloat
 		end
 		if player.keyPress.up and not player.keyPressLast.up then
 			self:rotatePiece(player)
@@ -1046,7 +1049,7 @@ function App:updateGame()
 	self.fallTick = self.fallTick + 1
 	if self.fallTick >= self.ticksToFall then
 		self.fallTick = 0
-		local falldy = math.max(1, 1/self.ticksToFall)
+		local falldy = 1/self.ticksToFall
 		for _,player in ipairs(self.players) do
 			player.piecePos.y = player.piecePos.y - falldy
 		end
@@ -1055,16 +1058,16 @@ function App:updateGame()
 	for _,player in ipairs(self.players) do
 		local merge
 		if player.piecePos.y <= -self.pieceSize.y then
-			player.piecePos.x = player.pieceLastPos.x
-			for y=-self.pieceSize.y,player.pieceLastPos.y do
+			player.piecePos.x = player.piecePosLast.x
+			for y=-self.pieceSize.y,math.floor(player.piecePosLast.y) do
 				player.piecePos.y = y
 				if not sandmodel:testPieceMerge(player) then break end
 			end
 			merge = true
 		else
 			if sandmodel:testPieceMerge(player) then
-				player.piecePos.x = player.pieceLastPos.x
-				for y=player.piecePos.y+1,player.pieceLastPos.y do
+				player.piecePos.x = player.piecePosLast.x
+				for y=math.floor(player.piecePos.y)+1,math.floor(player.piecePosLast.y) do
 					player.piecePos.y = y
 					if not sandmodel:testPieceMerge(player) then break end
 				end
@@ -1205,8 +1208,8 @@ function App:update(...)
 			-- draw outline for multiplayer
 			if self.numPlayers > 1 then
 				self.mvMat:setTranslate(
-						((player.piecePos.x - self.pieceOutlineRadius) / w - .5) * s,
-						(player.piecePos.y - self.pieceOutlineRadius) / h - .5
+						((math.floor(player.piecePos.x) - self.pieceOutlineRadius) / w - .5) * s,
+						(math.floor(player.piecePos.y) - self.pieceOutlineRadius) / h - .5
 					)
 					:applyScale(
 						(self.pieceSize.x + 2 * self.pieceOutlineRadius) / w * s,
@@ -1226,8 +1229,8 @@ function App:update(...)
 			-- draw piece
 
 			self.mvMat:setTranslate(
-					(player.piecePos.x / w - .5) * s,
-					player.piecePos.y / h - .5
+					(math.floor(player.piecePos.x) / w - .5) * s,
+					math.floor(player.piecePos.y) / h - .5
 				)
 				:applyScale(self.pieceSize.x / w * s, self.pieceSize.y / h)
 			self.mvProjMat:mul4x4(self.projMat, self.mvMat)

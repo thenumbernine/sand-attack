@@ -47,7 +47,7 @@ end
 function SandModel:testPieceMerge(player)
 	-- test board bottom boundary ...
 	if player.pieceRowMin	-- if we have a shape ...
-	and player.piecePos.y + player.pieceRowMin <= 0
+	and math.floor(player.piecePos.y) + player.pieceRowMin <= 0
 	then
 		return true
 	end
@@ -61,8 +61,8 @@ function SandModel:testPieceMerge(player)
 			local k = i + app.pieceSize.x * j
 			local color = ffi.cast('uint32_t*', player.pieceTex.image.buffer)[k]
 			if color ~= 0 then
-				local x = player.piecePos.x + i
-				local y = player.piecePos.y + j
+				local x = math.floor(player.piecePos.x) + i
+				local y = math.floor(player.piecePos.y) + j
 				-- if the piece hit the bottom, consider it a merge for the sake of converting to sand
 				if y < 0 then return true end
 				-- otherwise test vs pixels
@@ -106,8 +106,8 @@ function SandModel:mergePiece(player)
 			local k = i + app.pieceSize.x * j
 			local color = srcp[k]
 			if color ~= 0 then
-				local x = player.piecePos.x + i
-				local y = player.piecePos.y + j
+				local x = math.floor(player.piecePos.x) + i
+				local y = math.floor(player.piecePos.y) + j
 				if x >= 0 and x < w
 				and y >= 0 and y < h
 				and dstp[x + w * y] == 0

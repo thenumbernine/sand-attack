@@ -188,7 +188,7 @@ function ConfigState:updateGUI()
 
 	self:centerLuatableTooltipInputInt('Number of Next Pieces', app.cfg, 'numNextPieces')
 	self:centerLuatableTooltipSliderFloat('Drop Speed', app.cfg, 'dropSpeed', .1, 100, nil, ig.ImGuiSliderFlags_Logarithmic)
-	self:centerLuatableTooltipInputInt('Move Speed', app.cfg, 'movedx')
+	self:centerLuatableTooltipSliderFloat('Move Speed', app.cfg, 'movedx', .1, 100, nil, ig.ImGuiSliderFlags_Logarithmic)
 	self:centerLuatableCheckbox('Continuous Drop', app.cfg, 'continuousDrop')
 
 	self:centerLuatableTooltipSliderFloat('Per-Level Speedup Coeff', app.cfg, 'speedupCoeff', .07, .00007, '%.5f', ig.ImGuiSliderFlags_Logarithmic)

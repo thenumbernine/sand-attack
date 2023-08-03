@@ -281,7 +281,7 @@ function AutomataSandGPU:testPieceMerge(player)
 
 	-- test board bottom boundary ...
 	if player.pieceRowMin	-- if we have a shape ...
-	and player.piecePos.y + player.pieceRowMin <= 0
+	and math.floor(player.piecePos.y) + player.pieceRowMin <= 0
 	then
 		return true
 	end
@@ -309,7 +309,7 @@ function AutomataSandGPU:testPieceMerge(player)
 
 	app.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
 	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
-	gl.glUniform2i(shader.uniforms.piecePos.loc, player.piecePos:unpack())
+	gl.glUniform2i(shader.uniforms.piecePos.loc, math.floor(player.piecePos.x), math.floor(player.piecePos.y))
 	gl.glUniform2i(shader.uniforms.pieceSize.loc, app.pieceSize:unpack())
 	sandTex:bind(0)
 	player.pieceTex:bind(1)
@@ -382,8 +382,8 @@ function AutomataSandGPU:mergePiece(player)
 	app.mvMat
 		:setIdent()
 		:applyTranslate(
-			player.piecePos.x / w,
-			player.piecePos.y / h
+			math.floor(player.piecePos.x) / w,
+			math.floor(player.piecePos.y) / h
 		)
 		:applyScale(
 			app.pieceSize.x / w,
