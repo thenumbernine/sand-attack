@@ -587,6 +587,7 @@ function App:reset()
 
 	self.pieceOutlineSize = self.pieceSize + 2 * self.pieceOutlineRadius
 	self.pieceOutlineFBO = GLFBO{width=self.pieceOutlineSize.x, height=self.pieceOutlineSize.y}
+		:unbind()
 
 	do
 		local size = self.pieceSize
