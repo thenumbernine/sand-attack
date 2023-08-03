@@ -17,7 +17,6 @@ files = {
 		-- resources and run.lua are relative to sand-attack/
 		-- option #1: put all individual script files here:
 		'sand-attack/app.lua',
-		'sand-attack/menustate.lua',
 		'sand-attack/player.lua',
 
 		-- TODO hmm this copies directly as 'sandmodel', no dir preservation
