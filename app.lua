@@ -560,7 +560,8 @@ end
 function App:reset()
 	self:saveConfig()
 
-	self.gameScale = math.ceil(self.cfg.voxelsPerBlock/8)
+	self.gameScaleFloat = self.cfg.voxelsPerBlock / 8
+	self.gameScale = math.ceil(self.gameScaleFloat)
 	self.updatesPerFrame = self.gameScale
 
 	--[[ do this upon every :reset, save seed, and save it in the high score as well
@@ -1007,12 +1008,16 @@ function App:updateGame()
 	for _,player in ipairs(self.players) do
 		-- TODO key updates at higher interval than drop rate ...
 		-- but test collision for both
+		local dx = 0
 		if player.keyPress.left then
-			player.piecePos.x = player.piecePos.x - self.cfg.movedx * self.gameScale
+			dx = dx - 1
 		end
 		if player.keyPress.right then
-			player.piecePos.x = player.piecePos.x + self.cfg.movedx * self.gameScale
+			dx = dx + 1
 		end
+		-- same as with dropSpeed...
+		--player.piecePos.x = player.piecePos.x + dx * self.cfg.movedx * self.gameScale
+		player.piecePos.x = player.piecePos.x + math.sign(dx) * math.ceil(math.abs(dx) * self.cfg.movedx * self.gameScaleFloat)
 		self:constrainPiecePos(player)
 
 		-- don't allow holding down through multiple drops ... ?
@@ -1025,7 +1030,10 @@ function App:updateGame()
 			player.droppingPiece = false
 		end
 		if player.droppingPiece then
-			player.piecePos.y = player.piecePos.y - self.cfg.dropSpeed * self.gameScale
+			-- gameScale seems like a nice var at first, but it is integer based on pixels-per-block/8, so it's 1 for pixels-per-block ranging [1,8]
+			--player.piecePos.y = player.piecePos.y - self.cfg.dropSpeed * self.gameScale
+			-- so I want smaller resolution here...
+			player.piecePos.y = player.piecePos.y - math.ceil(self.cfg.dropSpeed * self.gameScaleFloat)
 		end
 		if player.keyPress.up and not player.keyPressLast.up then
 			self:rotatePiece(player)
