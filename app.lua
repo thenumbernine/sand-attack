@@ -1080,6 +1080,13 @@ function App:updateGame()
 			sandmodel:mergePiece(player)
 			needsCheckLine = true
 
+			-- piece Y + pieceRowMin is the row [0,h)
+			-- so Y + pieceRowMax is the top ...
+			-- so if that is ever >= h then we lose
+			if player.piecePos.y + player.pieceRowMin >= h then
+				self.loseTime = self.thisTime
+			end
+
 			self:newPiece(player)
 		end
 	end
