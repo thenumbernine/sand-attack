@@ -267,7 +267,7 @@ function App:initGL(...)
 	self.quadVertexBuf = GLArrayBuffer{
 		size = ffi.sizeof(vtxbufCPU),
 		data = vtxbufCPU,
-	}
+	}:unbind()
 
 	--self.glslVersion = 460	-- too new
 	--self.glslVersion = 430
