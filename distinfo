@@ -19,7 +19,7 @@ files = {
 		'sand-attack/app.lua',
 		'sand-attack/menustate.lua',
 		'sand-attack/player.lua',
-		
+
 		-- TODO hmm this copies directly as 'sandmodel', no dir preservation
 		-- but rlly I don't specify a way to preserve the destination dir, do I?
 		--'sand-attack/sandmodel',	-- subdir
@@ -32,7 +32,14 @@ files = {
 		'sand-attack/sandmodel/sandmodel.lua',
 		'sand-attack/sandmodel/sph.lua',
 		-- TODO how about src=>dest like in luarocks, and have it work for folders and files alike...
-		
+		'sand-attack/menustate/config.lua',
+		'sand-attack/menustate/highscore.lua',
+		'sand-attack/menustate/main.lua',
+		'sand-attack/menustate/menustate.lua',
+		'sand-attack/menustate/playing.lua',
+		'sand-attack/menustate/splashscreen.lua',
+		'sand-attack/menustate/startnewgame.lua',
+
 		-- option #2: copy this dir and reference all resources from 'sand-attack/'
 		-- (this'll require a 'cd ..' every time you playtest it from within its cwd ...)
 		--'sand-attack',

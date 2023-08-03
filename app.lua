@@ -27,7 +27,6 @@ local Audio = require 'audio'
 local AudioSource = require 'audio.source'
 local AudioBuffer = require 'audio.buffer'
 local Player = require 'sand-attack.player'
-local MenuState = require 'sand-attack.menustate'
 local SandModel = require 'sand-attack.sandmodel.sandmodel'
 local sandModelClasses = require 'sand-attack.sandmodel.all'.classes
 
@@ -80,7 +79,7 @@ App.sdlInitFlags = bit.bor(
 
 App.useAudio = true	-- set to false to disable audio altogether
 App.showFPS = true -- show fps in gui / console
-App.showDebug = true	-- show some more debug stuff
+App.showDebug = false	-- show some more debug stuff
 local dontCheckForLinesEver = false	-- means don't ever ever check for lines.  used for fps testing the sand topple simulation.
 
 App.updateInterval = 1/60
@@ -455,7 +454,8 @@ void main() {
 		end)
 	end
 
-	self.menustate = MenuState.SplashScreenState(self)
+	local SplashScreenState = require 'sand-attack.menustate.splashscreen'
+	self.menustate = SplashScreenState(self)
 
 	self:reset()
 
@@ -1331,7 +1331,8 @@ function App:update(...)
 		-- TODO maybe go to a high score screen instead?
 		self.loseTime = nil
 		self.paused = true
-		self.menustate = MenuState.HighScoreState(self, true)
+		local HighScoreState = require 'sand-attack.menustate.highscore'
+		self.menustate = HighScoreState(self, true)
 	end
 
 	-- update GUI
@@ -1375,9 +1376,10 @@ function App:drawTouchRegions()
 	for i=1,self.numPlayers do
 		for _,keyname in ipairs(Player.keyNames) do
 			local e = self.cfg.playerKeys[i][keyname]
-			if e[1] == sdl.SDL_MOUSEBUTTONDOWN
-			or e[1] == sdl.SDL_FINGERDOWN
-			then
+			if e	-- might not exist for new players >2 ...
+			and (e[1] == sdl.SDL_MOUSEBUTTONDOWN
+				or e[1] == sdl.SDL_FINGERDOWN
+			) then
 				local x = e[2] * self.width
 				local y = e[3] * self.height
 				self.mvMat:setTranslate(
