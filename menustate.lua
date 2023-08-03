@@ -79,35 +79,41 @@ end
 -- TODO fix somehow
 function MenuState:centerLuatableInputInt(...)
 	self.overrideTextWidth = 360
-	self:centerGUI(ig.luatableInputInt, ...)
+	local result = self:centerGUI(ig.luatableInputInt, ...)
 	self.overrideTextWidth = nil
+	return result
 end
 function MenuState:centerLuatableTooltipInputInt(...)
 	self.overrideTextWidth = 360
-	self:centerGUI(ig.luatableTooltipInputInt, ...)
+	local result = self:centerGUI(ig.luatableTooltipInputInt, ...)
 	self.overrideTextWidth = nil
+	return result
 end
 function MenuState:centerLuatableInputFloat(...)
 	print"WARNING imgui gamepad nav can't change input float"
 	self.overrideTextWidth = 360
-	self:centerGUI(ig.luatableInputFloat, ...)
+	local result = self:centerGUI(ig.luatableInputFloat, ...)
 	self.overrideTextWidth = nil
+	return result
 end
 function MenuState:centerLuatableTooltipInputFloat(...)
 	print"WARNING imgui gamepad nav can't change input float"
 	self.overrideTextWidth = 360
-	self:centerGUI(ig.luatableTooltipInputFloat, ...)
+	local result = self:centerGUI(ig.luatableTooltipInputFloat, ...)
 	self.overrideTextWidth = nil
+	return result
 end
 function MenuState:centerLuatableSliderFloat(...)
 	self.overrideTextWidth = 360
-	self:centerGUI(ig.luatableSliderFloat, ...)
+	local result = self:centerGUI(ig.luatableSliderFloat, ...)
 	self.overrideTextWidth = nil
+	return result
 end
 function MenuState:centerLuatableTooltipSliderFloat(...)
 	self.overrideTextWidth = 360
-	self:centerGUI(ig.luatableTooltipSliderFloat, ...)
+	local result = self:centerGUI(ig.luatableTooltipSliderFloat, ...)
 	self.overrideTextWidth = nil
+	return result
 end
 
 
@@ -190,9 +196,13 @@ function ConfigState:updateGUI()
 	self:centerText'Board:'
 	self:centerLuatableTooltipInputInt('Board Width', app.cfg.boardSizeInBlocks, 'x')
 	self:centerLuatableTooltipInputInt('Board Height', app.cfg.boardSizeInBlocks, 'y')
+
+	if self:centerLuatableTooltipInputInt('Pixels Per Block', app.cfg, 'voxelsPerBlock') then
+		app.cfg.voxelsPerBlock = math.max(1, app.cfg.voxelsPerBlock)
+	end
+
+	-- TODO this is only for AutomataCPU ...
 	self:centerLuatableTooltipSliderFloat('Topple Chance', app.cfg, 'toppleChance', 0, 1)
-	self:centerLuatableTooltipInputInt('Pixels Per Block', app.cfg, 'voxelsPerBlock')
-	app.cfg.voxelsPerBlock = math.max(1, app.cfg.voxelsPerBlock)
 
 	ig.luatableCombo('Sand Model', app.cfg, 'sandModel', sandModelClassNames)
 
@@ -207,6 +217,7 @@ function ConfigState:updateGUI()
 			--]]
 		end
 		if self:centerLuatableTooltipSliderFloat('BG Volume', app.cfg, 'backgroundVolume', 0, 1) then
+print('updating bg volume to ', app.cfg.backgroundVolume)
 			app.bgAudioSource:setGain(app.cfg.backgroundVolume)
 		end
 	end
