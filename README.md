@@ -36,21 +36,32 @@ external libraries required:
 
 # TODO:
 
-- multiplayer-versus where you can drop sand on your opponent
-	and a color that they have to clear-touching to reveal to other random colors
-	like that other tris game ...
-- varying board width for # of players
-- gameplay option of increasing # colors
-- I've got SPH stuff but it's behavior is still meh. with it: exploding pieces, tilting board, obstacles in the board, etc
-- choose music? 
-- faster blob detection
-- submit high scores? meh.  in a game, record seed, record all players' keystates per frame, and allow replaying and submitting of gamestates.  cheat-proof and pro-TAS.
-- better notification of score-modifier for chaining lines
-- option for multipalyer-coop sharing next-pieces vs separate next-pieces
-- imgui:
-- - with gamepad navigation, tooltips only work with Slider.  with Input they only show after you select the text (which you can't type) or for a brief moment after pushing + or -.
-- - centering stuff horizontally is painful at best.  then try adding more than one item on the same line ...
-- - InputFloat can't be edited with gamepad navigation
+-	gameplay
+	-	multiplayer-versus where you can drop sand on your opponent
+		-	and a color that they have to clear-touching to reveal to other random colors
+		-	like that other tris game ...
+	-	automatically vary the board width for # of players
+	-	allow player to set update cycles for resolution-of-blocks (right now it is 8 pixels-per-block = 1 update, scales accordingly ...)
+	-	gameplay option of increasing # colors?
+	-	more gametype options ...
+		-	puzzle mode?
+		-	high score for fixed time mode?
+		-	incrasing # of colors mode
+		-	increasing speed mode
+		-	for some specific board shape?  tall boards , wide boards, etc. ..
+	-	choose music? or music-per-level? or music-per-gametype?
+	-	submit high scores? meh.  in a game, record seed, record all players' keystates per frame, and allow replaying and submitting of gamestates.  cheat-proof and pro-TAS.
+	-	better notification of score-modifier for chaining lines ... like some floating text or something
+	-	option for multipalyer-coop sharing next-pieces vs separate next-pieces
+-	gui:
+	-	with gamepad navigation, tooltips only work with Slider.  with Input they only show after you select the text (which you can't type) or for a brief moment after pushing + or -.
+	-	centering stuff horizontally is painful at best.  then try adding more than one item on the same line ... can ImGui handle centered-text yet?
+	-	InputFloat can't be edited with gamepad navigation
+-	sand models:
+	-	SPH sand is so/so
+	-	CFD sand is not functional
+-	performance
+	-	faster blob detection
 
 # Music Credit:
 
