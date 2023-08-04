@@ -38,11 +38,6 @@ ffi.cdef([[
 typedef uint32_t gameTick_t;
 
 typedef uint64_t randSeed_t;
-
-typedef struct {
-	gameTick_t t;
-	bool button[]]..#Player.gameKeyNames..[[];
-} recordingEvent_t;
 ]])
 
 -- I'm trying to make reproducible random #s
@@ -608,10 +603,22 @@ function App:reset(args)
 		self.recordingDemoFile = nil
 	end
 
+	--[[
+	recording file format:
+	struct {
+		randSeed_t randSeed;
+		struct {
+			gameTick_t gameTick;
+			uint8_t buttonFlags[ceil(numPlayers * #gameKeyNames / 8)];
+		} events[];
+	} recordedDemoFile;
+	... with all structs packed
+	--]]
 	if not args.dontRecordOrPlay then
 		if args.playingDemoFileName then
 			xpcall(function()
 				local data = assert(path(args.playingDemoFileName):read())
+				-- TODO why reinvent the wheel.  just use fread/feof.
 				self.playingDemo = setmetatable({
 					ptr = ffi.cast('uint8_t*', data),
 					data = data,
