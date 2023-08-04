@@ -8,10 +8,10 @@ local MenuState = require 'sand-attack.menustate.menustate'
 -- default key mappings for first few players
 local defaultKeys
 
-local StartNewGameState = MenuState:subclass()
+local NewGameState = MenuState:subclass()
 
-function StartNewGameState:init(app, multiplayer)
-	StartNewGameState.super.init(self, app)
+function NewGameState:init(app, multiplayer)
+	NewGameState.super.init(self, app)
 	self.multiplayer = multiplayer
 	if multiplayer then
 		app.numPlayers = math.max(app.numPlayers, 2)
@@ -44,7 +44,7 @@ function StartNewGameState:init(app, multiplayer)
 end
 
 -- if we're editing keys then show keys
-function StartNewGameState:update()
+function NewGameState:update()
 	if self.currentPlayerIndex then
 		self.app:drawTouchRegions()
 	end
@@ -53,7 +53,7 @@ end
 local tmpcolor = ig.ImVec4()	-- for imgui button
 local tmpcolorv = vec3f()		-- for imgui color picker
 
-function StartNewGameState:updateGUI()
+function NewGameState:updateGUI()
 	local Player = require 'sand-attack.player'
 	local app = self.app
 
@@ -204,4 +204,4 @@ function StartNewGameState:updateGUI()
 	self:endFullView()
 end
 
-return StartNewGameState 
+return NewGameState

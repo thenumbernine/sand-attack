@@ -26,12 +26,12 @@ function MainMenuState:updateGUI()
 
 	if self:centerButton'New Game' then
 		-- TODO choose gametype and choose level
-		local StartNewGameState = require 'sand-attack.menustate.startnewgame'
-		app.menustate = StartNewGameState(app)
+		local NewGameState = require 'sand-attack.menustate.newgame'
+		app.menustate = NewGameState(app)
 	end
 	if self:centerButton'New Game Co-op' then
-		local StartNewGameState = require 'sand-attack.menustate.startnewgame'
-		app.menustate = StartNewGameState(app, true)
+		local NewGameState = require 'sand-attack.menustate.newgame'
+		app.menustate = NewGameState(app, true)
 		-- TODO pick same as before except pick # of players
 	end
 	-- TODO RESUME GAME here

@@ -1,3 +1,7 @@
+--[[
+TODO move the game-specific config stuff into the New Game menu.
+Then the game-not-specific stuff (button size, volume, etc) allow accessible from in-game pause menu.
+--]]
 local ig = require 'imgui'
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 local MenuState = require 'sand-attack.menustate.menustate'
