@@ -32,7 +32,7 @@ local sandModelClasses = require 'sand-attack.sandmodel.all'.classes
 
 ffi.cdef([[
 // what type to use for time?
-// 60 fps ... 
+// 60 fps ...
 // 2 bytes = 65535 ticks = 1092 seconds @ 60 fps = 18.2 minutes
 // 4 bytes = 4294967295 ticks = 71582788.25 seconds = 1193046.4708333 minutes = 19884.107847222 hours = 828.50449363426 days = 27.388578301959 months = 2.268321680039 years
 typedef uint32_t gameTick_t;
@@ -606,13 +606,20 @@ function App:reset(args)
 	--[[
 	recording file format:
 	struct {
-		randSeed_t randSeed;
+		char recordInLua[untilNullTerm];
 		struct {
-			gameTick_t gameTick;
-			uint8_t buttonFlags[ceil(numPlayers * #gameKeyNames / 8)];
-		} events[];
+			randSeed_t randSeed;
+			struct {
+				gameTick_t gameTick;
+				uint8_t buttonFlags[ceil(numPlayers * #gameKeyNames / 8)];
+			} events[untilEndOfFile];
+		} recordEvents;
 	} recordedDemoFile;
 	... with all structs packed
+
+	TODO later maybe I'll merge this with the highscore record entries and just combine them all into one file.
+	put the record as a pascal-string at the beginning of the file.
+	then append the demo after it.
 	--]]
 	if not args.dontRecordOrPlay then
 		if args.playingDemoFileName then
@@ -620,7 +627,7 @@ function App:reset(args)
 				local data = assert(path(args.playingDemoFileName):read())
 				-- TODO why reinvent the wheel.  just use fread/feof.
 				self.playingDemo = setmetatable({
-					ptr = ffi.cast('uint8_t*', data),
+					ptr = ptr,
 					data = data,
 					index = 0,
 					size = #data,
@@ -638,16 +645,41 @@ function App:reset(args)
 							local resultsize = ffi.sizeof(ctype)
 							local result = self:get(resultsize)
 							if not result then return result end
-							self.index = self.index + resultsize 
+							self.index = self.index + resultsize
 							return ffi.cast(ctype..'*', result)[0]
+						end,
+						-- return str value and advance
+						readstr = function(self, len)
+							local s, msg = self:get(len)
+							if not s then return s, msg end
+							return ffi.string(s, len)
 						end,
 					},
 				})
+				
+				--[[
+				self.playingDemo.config = assert((tolua(
+					self.playingDemo:readstr(
+						ffi.C.strlen(self.playingDemo.ptr)
+					)
+				)))
+				self.playingDemo:read(1)	-- skip the \0
+				--]]	
+
+				-- TODO move the rng seed into the lua record
+				-- then TODO upon reading the config now we have to cnoigure the board based on the lua record
+				-- but what happens if the replay config is bad?
+				-- should we lose the old config?
+				-- or what if it's good?
+				-- should we allow the demo config to overwrite the previous config?
+				-- ....   
 				self.rng = RNG(assert(self.playingDemo:read'randSeed_t'))
+			
 			end, function(err)
 				print('failed to load demo: '..tostring(err))
 				-- for more info
 				--print(err..'\n'..debug.traceback())
+				self.playingDemo = nil
 			end)
 		end
 		if not self.playingDemo then
@@ -655,6 +687,11 @@ function App:reset(args)
 			local randseed = ffi.new('randSeed_t[1]', tonumber(os.time()))
 			self.rng = RNG(randseed[0])
 			self.recordingDemoFile = path(self.lastDemoFileName):open'wb'
+			
+			--[[
+			TODO here write the lua table of the config here ... and merge the rand seed into it.
+			--]]
+
 			self.recordingDemoFile:write(ffi.string(randseed, ffi.sizeof'randSeed_t'))
 		end
 	else
@@ -1094,7 +1131,7 @@ function App:updateGame()
 	if self.recordingDemoFile then
 		ffi.fill(self.recordingEvent, self.recordingEventSize)
 		ffi.cast('gameTick_t*', self.recordingEvent)[0] = self.gameTick
-		local buttonsPtr = ffi.cast('uint8_t*', self.recordingEvent) + ffi.sizeof'gameTick_t' 
+		local buttonsPtr = ffi.cast('uint8_t*', self.recordingEvent) + ffi.sizeof'gameTick_t'
 		local flagindex = 0
 		local needwrite
 		for playerIndex,player in ipairs(self.players) do
@@ -1106,7 +1143,7 @@ function App:updateGame()
 				if player.keyPress[k] ~= player.keyPressLast[k] then
 					needwrite = true
 				end
-				flagindex = flagindex + 1 
+				flagindex = flagindex + 1
 				if flagindex == 8 then
 					flagindex = 0
 					buttonsPtr = buttonsPtr + 1
@@ -1143,7 +1180,7 @@ print()
 			for playerIndex,player in ipairs(self.players) do
 				for _,k in ipairs(player.gameKeyNames) do
 					player.keyPress[k] = 1 == bit.band(1, bit.rshift(buttonsPtr[0], flagindex))
-					flagindex = flagindex + 1 
+					flagindex = flagindex + 1
 					if flagindex == 8 then
 						flagindex = 0
 						buttonsPtr = buttonsPtr + 1
