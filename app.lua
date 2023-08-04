@@ -462,6 +462,10 @@ void main() {
 	local SplashScreenState = require 'sand-attack.menustate.splashscreen'
 	self.menustate = SplashScreenState(self)
 
+	-- initial reset
+	-- needed for a few things that i'm too lazy to change
+	-- so i guess i could play a demo in the background when the game starts
+	-- like so many other games
 	self:reset()
 
 	glreport'here'
@@ -570,29 +574,41 @@ function App:updateGameScale()
 	self.updatesPerFrame = self.gameScale
 end
 
-function App:reset()
+function App:reset(args)
+	args = args or {}
+
 	self:saveConfig()
 	self:updateGameScale()
 
+	if args.playingDemo then
+		xpcall(function()
+			self.playingDemo = assert(fromlua(assert(path(args.playingDemo):read())))
+		end, function(err)
+			print('failed to load demo: '..tostring(err))
+			-- for getting more info
+			--print(err..'\n'..debug.traceback())
+		end)
+	end
+	if not self.playingDemo then
+		-- TODO if we're playing a demo ..
+		-- else ...
+		local randseed = 2106791791
+		self.recordingDemo = table{
+			seed = randseed,
+		}
 
-	-- TODO if we're playing a demo ..
-	-- else ...
-	local randseed = 2106791791
-	self.recordingDemo = table{
-		seed = randseed,
-	}
-
-	--[[ do this upon every :reset, save seed, and save it in the high score as well
-	-- hmm, I need a rng object that is reproducible
-	ffi.C.srand(ffi.C.time(nil))
-	self.seed = ffi.C.rand()
-	--]]
-	-- [[
-	self.rng = RNG(randseed)
-	--]]
-	--[[
-	self.rng = RNG(os.time())
-	--]]
+		--[[ do this upon every :reset, save seed, and save it in the high score as well
+		-- hmm, I need a rng object that is reproducible
+		ffi.C.srand(ffi.C.time(nil))
+		self.seed = ffi.C.rand()
+		--]]
+		-- [[
+		self.rng = RNG(randseed)
+		--]]
+		--[[
+		self.rng = RNG(os.time())
+		--]]
+	end
 
 
 	-- init pieces
@@ -1032,21 +1048,24 @@ function App:updateGame()
 			for _,k in ipairs(player.keyNames) do
 				if player.keyPress[k] ~= player.keyPressLast[k] then
 					event = event or {t=self.gameTick}
-					event[playerIndex..k] = true
+					event[playerIndex..k] = player.keyPress[k]
 				end
 			end
 		end
 		self.recordingDemo:insert(event)
 	elseif self.playingDemo then
 		local event = self.playingDemo[1]
-		if event and event.t == self.gameTick then 
+		if event and event.t == self.gameTick then
 			self.playingDemo:remove(1)
 		else
 			event = nil
 		end
 		for playerIndex,player in ipairs(self.players) do
 			for _,k in ipairs(player.keyNames) do
-				player.keyPress[k] = event and event[playerIndex..k] or false
+				local v = event[playerIndex..k]
+				if v ~= nil then
+					player.keyPress[k] = v
+				end
 			end
 		end
 	end
@@ -1376,20 +1395,27 @@ function App:update(...)
 	end
 
 	if self.loseTime and self.thisTime - self.loseTime > self.loseScreenDuration then
+		-- TODO same for 'End Time'
 		-- TODO maybe go to a high score screen instead?
 		self.loseTime = nil
 		self.paused = true
-		
+
 		local HighScoreState = require 'sand-attack.menustate.highscore'
 		self.menustate = HighScoreState(self, true)
-	
+
 		-- while we're here, write out the last key recording
 		-- maybe in th future it'll go into the highscores data
 		-- or maybe i'll compress it further meh
 		-- Do this after opening the high-scores menu so that it has the option of doing something with this file?
 		-- or maybe highscores overall will handle it?
 		if self.recordingDemo then
-			path'last-game-demo.lua':write(tolua(self.recordingDemo))
+			path'last-game-demo.lua':write(tolua(self.recordingDemo, {
+				serializeForType = {
+					cdata = function(state, x, tab, path, keyRef)
+						return tostring(x)
+					end,
+				},
+			}))
 			self.recordingDemo = nil
 		end
 	end
