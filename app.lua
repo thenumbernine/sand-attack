@@ -95,13 +95,6 @@ App.defaultColors = table{
 	{0,1,1},
 	{1,1,1},
 }
--- populate # colors
-while #App.defaultColors < 255 do
-	App.defaultColors:insert{vec3f():map(function()
-		return math.random()
-	end):normalize():unpack()}
-end
--- ... but not all 8 bit alpha channels are really 8 bits ...
 
 App.maxAudioDist = 10
 
@@ -114,6 +107,18 @@ App.highScoresFilename = 'highscores.lua'
 
 function App:initGL(...)
 	App.super.initGL(self, ...)
+
+	-- populate # colors
+	-- don't worry about rng?  or should i seed this by some default value?
+	-- I am saving them anyways for the case of color customization, so if you remove a few color and re-add them it remembers
+	-- TODO maybe only generate/save colors that have been used so far?
+	while #self.defaultColors < 255 do
+		self.defaultColors:insert{vec3f():map(function()
+			return math.random()
+		end):normalize():unpack()}
+	end
+	-- ... but not all 8 bit alpha channels are really 8 bits ...
+
 
 	-- allow keys to navigate menu
 	-- TODO how to make it so player keys choose menus, not just space bar/
