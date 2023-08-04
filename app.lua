@@ -563,12 +563,16 @@ function App:saveHighScores()
 	path(self.highScoresFilename):write(tolua(self.highscores))
 end
 
-function App:reset()
-	self:saveConfig()
-
+function App:updateGameScale()
+	self.cfg.voxelsPerBlock = math.max(1, self.cfg.voxelsPerBlock)
 	self.gameScaleFloat = self.cfg.voxelsPerBlock / 8
 	self.gameScale = math.ceil(self.gameScaleFloat)
 	self.updatesPerFrame = self.gameScale
+end
+
+function App:reset()
+	self:saveConfig()
+	self:updateGameScale()
 
 	--[[ do this upon every :reset, save seed, and save it in the high score as well
 	-- hmm, I need a rng object that is reproducible

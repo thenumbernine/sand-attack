@@ -20,8 +20,10 @@ function ConfigState:updateGUI()
 	self:centerLuatableTooltipInputInt('Board Height', app.cfg.boardSizeInBlocks, 'y')
 
 	if self:centerLuatableTooltipInputInt('Pixels Per Block', app.cfg, 'voxelsPerBlock') then
-		app.cfg.voxelsPerBlock = math.max(1, app.cfg.voxelsPerBlock)
+		app:updateGameScale()
 	end
+	-- TODO should this be customizable?
+	self:centerText('(updates/tick: '..app.gameScale..')')
 
 	-- TODO this is only for AutomataCPU ...
 	self:centerLuatableTooltipSliderFloat('Topple Chance', app.cfg, 'toppleChance', 0, 1)
@@ -39,7 +41,6 @@ function ConfigState:updateGUI()
 			--]]
 		end
 		if self:centerLuatableTooltipSliderFloat('BG Volume', app.cfg, 'backgroundVolume', 0, 1) then
-print('updating bg volume to ', app.cfg.backgroundVolume)
 			app.bgAudioSource:setGain(app.cfg.backgroundVolume)
 		end
 	end
