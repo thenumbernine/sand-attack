@@ -60,10 +60,7 @@ function PlayingState:updateGUI()
 			app.menustate = ConfigState(app)
 		end
 		if ig.igButton'End Game' then
-			app.loseTime = nil
-			app.paused = true
-			local HighScoreState = require 'sand-attack.menustate.highscore'
-			app.menustate = HighScoreState(app, true)
+			app:endGame()
 		end
 		ig.igEnd()
 	end

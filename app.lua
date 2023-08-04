@@ -30,6 +30,21 @@ local Player = require 'sand-attack.player'
 local SandModel = require 'sand-attack.sandmodel.sandmodel'
 local sandModelClasses = require 'sand-attack.sandmodel.all'.classes
 
+ffi.cdef([[
+// what type to use for time?
+// 60 fps ... 
+// 2 bytes = 65535 ticks = 1092 seconds @ 60 fps = 18.2 minutes
+// 4 bytes = 4294967295 ticks = 71582788.25 seconds = 1193046.4708333 minutes = 19884.107847222 hours = 828.50449363426 days = 27.388578301959 months = 2.268321680039 years
+typedef uint32_t gameTick_t;
+
+typedef uint64_t randSeed_t;
+
+typedef struct {
+	gameTick_t t;
+	bool button[]]..#Player.gameKeyNames..[[];
+} recordingEvent_t;
+]])
+
 -- I'm trying to make reproducible random #s
 -- it is reproducible up to the generation of the next pieces
 -- but the very next piece after will always be dif
@@ -60,7 +75,7 @@ end
 -- but is only a singleton...
 local RNG = class()
 function RNG:init(seed)
-	math.randomseed(seed)
+	math.randomseed(tonumber(seed))
 end
 function RNG:__call(...)
 	return math.random(...)
@@ -104,6 +119,8 @@ App.lineNumFlashes = 5
 
 App.cfgfilename = 'config.lua'
 App.highScoresFilename = 'highscores.lua'
+
+App.lastDemoFileName = 'last-game-demo.bin'
 
 function App:initGL(...)
 	App.super.initGL(self, ...)
@@ -583,34 +600,58 @@ function App:reset(args)
 	self:saveConfig()
 	self:updateGameScale()
 
-	self.recordingDemo = nil
+	self.recordingEventSize = ffi.sizeof'gameTick_t' + math.ceil(self.numPlayers * #Player.gameKeyNames / 8)
+	self.recordingEvent = ffi.new('uint8_t[?]', self.recordingEventSize)
 	self.playingDemo = nil
+	if self.recordingDemoFile then
+		self.recordingDemoFile:close()
+		self.recordingDemoFile = nil
+	end
 
 	if not args.dontRecordOrPlay then
-		if args.playingDemo then
+		if args.playingDemoFileName then
 			xpcall(function()
-				self.playingDemo = setmetatable(
-					assert(fromlua(
-						assert(path(args.playingDemo):read())
-					)),
-					table
-				)
-				self.rng = RNG(self.playingDemo.seed)
+				local data = assert(path(args.playingDemoFileName):read())
+				self.playingDemo = setmetatable({
+					ptr = ffi.cast('uint8_t*', data),
+					data = data,
+					index = 0,
+					size = #data,
+				}, {
+					__index = {
+						-- without advancing, returns ptr
+						get = function(self, size)
+							if self.index + size > self.size then
+								return nil, "tried to read past end of file"
+							end
+							return self.ptr + self.index
+						end,
+						-- return value and advance
+						read = function(self, ctype)
+							local resultsize = ffi.sizeof(ctype)
+							local result = self:get(resultsize)
+							if not result then return result end
+							self.index = self.index + resultsize 
+							return ffi.cast(ctype..'*', result)[0]
+						end,
+					},
+				})
+				self.rng = RNG(assert(self.playingDemo:read'randSeed_t'))
 			end, function(err)
 				print('failed to load demo: '..tostring(err))
-				-- for getting more info
+				-- for more info
 				--print(err..'\n'..debug.traceback())
 			end)
 		end
 		if not self.playingDemo then
-			local randseed = os.time()
-			self.rng = RNG(randseed)
-			self.recordingDemo = table{
-				seed = randseed,
-			}
+			-- ... then record
+			local randseed = ffi.new('randSeed_t[1]', tonumber(os.time()))
+			self.rng = RNG(randseed[0])
+			self.recordingDemoFile = path(self.lastDemoFileName):open'wb'
+			self.recordingDemoFile:write(ffi.string(randseed, ffi.sizeof'randSeed_t'))
 		end
 	else
-		local randseed = os.time()
+		local randseed = ffi.new('randSeed_t', tonumber(os.time()))
 		self.rng = RNG(randseed)
 	end
 
@@ -729,7 +770,7 @@ function App:reset(args)
 
 	self.lastUpdateTime = getTime()
 	self.gameTime = 0
-	self.gameTick = ffi.new('uint64_t', 0)
+	self.gameTick = ffi.new('gameTick_t', 0)
 	self.fallTick = 0
 	self.lastLineTime = -math.huge
 	self.score = 0
@@ -1043,33 +1084,62 @@ function App:updateGame()
 		player.piecePosLast:set(player.piecePos:unpack())
 	end
 
-	-- [[ hack for testing RNG
-	-- soon this'll drive demo input :
-
-	if self.recordingDemo then
-		local event
+	if self.recordingDemoFile then
+		ffi.fill(self.recordingEvent, self.recordingEventSize)
+		ffi.cast('gameTick_t*', self.recordingEvent)[0] = self.gameTick
+		local buttonsPtr = ffi.cast('uint8_t*', self.recordingEvent) + ffi.sizeof'gameTick_t' 
+		local flagindex = 0
+		local needwrite
 		for playerIndex,player in ipairs(self.players) do
-			for _,k in ipairs(player.gameKeyNames) do
+			for keyIndex,k in ipairs(player.gameKeyNames) do
+				buttonsPtr[0] = bit.bor(
+					buttonsPtr[0],
+					bit.lshift(player.keyPress[k] and 1 or 0, flagindex)
+				)
 				if player.keyPress[k] ~= player.keyPressLast[k] then
-					event = event or {t=self.gameTick}
-					event[playerIndex..k] = player.keyPress[k]
+					needwrite = true
+				end
+				flagindex = flagindex + 1 
+				if flagindex == 8 then
+					flagindex = 0
+					buttonsPtr = buttonsPtr + 1
 				end
 			end
 		end
-		self.recordingDemo:insert(event)
+		if needwrite then
+--[[
+io.write(('%08x'):format(ffi.cast('gameTick_t*', self.recordingEvent)[0]))
+for i=ffi.sizeof'gameTick_t',self.recordingEventSize-1 do
+	io.write((' %02x'):format(self.recordingEvent[i]))
+end
+print()
+--]]
+			self.recordingDemoFile:write(ffi.string(self.recordingEvent, self.recordingEventSize))
+		end
 	elseif self.playingDemo then
-		local event = self.playingDemo[1]
-		if event and event.t == self.gameTick then
-			self.playingDemo:remove(1)
+		local event = self.playingDemo:get(self.recordingEventSize)
+		if event and ffi.cast('gameTick_t*', event)[0] == self.gameTick then
+--[[
+io.write(('%08x'):format(ffi.cast('gameTick_t*', event)[0]))
+for i=ffi.sizeof'gameTick_t',self.recordingEventSize-1 do
+	io.write((' %02x'):format(event[i]))
+end
+print()
+--]]
+			self.playingDemo.index = self.playingDemo.index + self.recordingEventSize
 		else
 			event = nil
 		end
 		if event then
+			local buttonsPtr = ffi.cast('uint8_t*', event) + ffi.sizeof'gameTick_t'
+			local flagindex = 0
 			for playerIndex,player in ipairs(self.players) do
 				for _,k in ipairs(player.gameKeyNames) do
-					local v = event[playerIndex..k]
-					if v ~= nil then
-						player.keyPress[k] = v
+					player.keyPress[k] = 1 == bit.band(1, bit.rshift(buttonsPtr[0], flagindex))
+					flagindex = flagindex + 1 
+					if flagindex == 8 then
+						flagindex = 0
+						buttonsPtr = buttonsPtr + 1
 					end
 				end
 			end
@@ -1401,34 +1471,14 @@ function App:update(...)
 	end
 
 	if self.loseTime and self.thisTime - self.loseTime > self.loseScreenDuration then
-		-- TODO same for 'End Time'
-		-- TODO maybe go to a high score screen instead?
-		self.loseTime = nil
-		self.paused = true
-
 		if self.playingDemo then
 			self.playingDemo = nil
+			self.loseTime = nil
+			self.paused = true
 			local MainMenuState = require 'sand-attack.menustate.main'
 			self.menustate = MainMenuState(self, true)
 		else
-			local HighScoreState = require 'sand-attack.menustate.highscore'
-			self.menustate = HighScoreState(self, true)
-
-			-- while we're here, write out the last key recording
-			-- maybe in th future it'll go into the highscores data
-			-- or maybe i'll compress it further meh
-			-- Do this after opening the high-scores menu so that it has the option of doing something with this file?
-			-- or maybe highscores overall will handle it?
-			if self.recordingDemo then
-				path'last-game-demo.lua':write(tolua(self.recordingDemo, {
-					serializeForType = {
-						cdata = function(state, x, tab, path, keyRef)
-							return tostring(x)
-						end,
-					},
-				}))
-				self.recordingDemo = nil
-			end
+			self:endGame()
 		end
 	end
 
@@ -1456,6 +1506,23 @@ print(self.fps)
 end
 App.lastFrameTime = 0
 App.fpsSampleCount = 0
+
+-- called from menu upon early end
+function App:endGame()
+	-- while we're here, write out the last key recording
+	-- maybe in th future it'll go into the highscores data
+	-- or maybe i'll compress it further meh
+	-- Do this after opening the high-scores menu so that it has the option of doing something with this file?
+	-- or maybe highscores overall will handle it?
+	self.loseTime = nil
+	self.paused = true
+	if self.recordingDemoFile then
+		self.recordingDemoFile:close()
+		self.recordingDemoFile = nil
+	end
+	local HighScoreState = require 'sand-attack.menustate.highscore'
+	self.menustate = HighScoreState(self, true)
+end
 
 function App:drawTouchRegions()
 	local buttonRadius = self.width * self.cfg.screenButtonRadius

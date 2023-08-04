@@ -30,10 +30,10 @@ function MainMenuState:updateGUI()
 		local NewGameState = require 'sand-attack.menustate.newgame'
 		app.menustate = NewGameState(app)
 	end
-	if path'last-game-demo.lua':exists() then
+	if path(app.lastDemoFileName):exists() then
 		if self:centerButton'Replay Last Game' then
 			app:reset{
-				playingDemo = 'last-game-demo.lua',
+				playingDemoFileName = app.lastDemoFileName,
 			}
 			local PlayingState = require 'sand-attack.menustate.playing'
 			app.menustate = PlayingState(app)	-- sets paused=false
