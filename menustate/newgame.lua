@@ -1,12 +1,9 @@
 local table = require 'ext.table'
 local math = require 'ext.math'
-local sdl = require 'ffi.req' 'sdl'
 local vec3f = require 'vec-ffi.vec3f'
 local ig = require 'imgui'
 local MenuState = require 'sand-attack.menustate.menustate'
-
--- default key mappings for first few players
-local defaultKeys
+local PlayerKeysEditor = require 'sand-attack.menustate.playerkeys'
 
 local NewGameState = MenuState:subclass()
 
@@ -19,48 +16,25 @@ function NewGameState:init(app, multiplayer)
 		app.numPlayers = 1
 	end
 
-	local App = require 'sand-attack.app'
-	defaultKeys = {
-		{
-			up = {sdl.SDL_KEYDOWN, sdl.SDLK_UP},
-			down = {sdl.SDL_KEYDOWN, sdl.SDLK_DOWN},
-			left = {sdl.SDL_KEYDOWN, sdl.SDLK_LEFT},
-			right = {sdl.SDL_KEYDOWN, sdl.SDLK_RIGHT},
-			pause = {sdl.SDL_KEYDOWN, sdl.SDLK_ESCAPE},
-		},
-		{
-			up = {sdl.SDL_KEYDOWN, ('w'):byte()},
-			down = {sdl.SDL_KEYDOWN, ('s'):byte()},
-			left = {sdl.SDL_KEYDOWN, ('a'):byte()},
-			right = {sdl.SDL_KEYDOWN, ('d'):byte()},
-			pause = {},	-- sorry keypad player 2
-		},
-	}
-	for _,keyEvents in ipairs(defaultKeys) do
-		for keyName,event in pairs(keyEvents) do
-			event.name = App:getEventName(table.unpack(event))
-		end
-	end
+	self.playerKeysEditor = PlayerKeysEditor(app)
 end
 
 -- if we're editing keys then show keys
 function NewGameState:update()
-	if self.currentPlayerIndex then
-		self.app:drawTouchRegions()
-	end
+	self.playerKeysEditor:update()
 end
 
 local tmpcolor = ig.ImVec4()	-- for imgui button
 local tmpcolorv = vec3f()		-- for imgui color picker
 
 function NewGameState:updateGUI()
-	local Player = require 'sand-attack.player'
 	local app = self.app
 
 	self:beginFullView(self.multiplayer and 'New Game Multiplayer' or 'New Game', 3 * 32)
 
 	--ig.igSameLine() -- how to work with centered multiple widgets...
 	if self:centerButton'Go!' then
+		app:saveConfig()
 		app:reset()
 		local PlayingState = require 'sand-attack.menustate.playing'
 		app.menustate = PlayingState(app)	-- sets paused=false
@@ -76,72 +50,26 @@ function NewGameState:updateGUI()
 		app.numPlayers = math.max(app.numPlayers, 2)
 	end
 
-	-- should player keys be here or config?
-	-- config: because it is in every other game
-	-- here: because key config is based on # players, and # players is set here.
-	for i=1,app.numPlayers do
-		if not app.cfg.playerKeys[i] then
-			app.cfg.playerKeys[i] = {}
-			local defaultsrc = defaultKeys[i]
-			for _,keyname in ipairs(Player.keyNames) do
-				app.cfg.playerKeys[i][keyname] = defaultsrc and defaultsrc[keyname] or {}
-			end
-		end
-		if ig.igButton(not self.multiplayer and 'change keys' or 'change player '..i..' keys') then
-			self.currentPlayerIndex = i
-			ig.igOpenPopup_Str('Edit Keys', 0)
-		end
-	end
-	if self.currentPlayerIndex then
-		assert(self.currentPlayerIndex >= 1 and self.currentPlayerIndex <= app.numPlayers)
-		-- this is modal but it makes the drawn onscreen gui hard to see
-		if ig.igBeginPopupModal'Edit Keys' then
-		-- this isn't modal so you can select off this window
-		--if ig.igBeginPopup('Edit Keys', 0) then
-			for _,keyname in ipairs(Player.keyNames) do
-				ig.igPushID_Str(keyname)
-				ig.igText(keyname)
-				ig.igSameLine()
-				local ev = app.cfg.playerKeys[self.currentPlayerIndex][keyname]
-				if ig.igButton(
-					app.waitingForEvent
-					and app.waitingForEvent.key == keyname
-					and app.waitingForEvent.playerIndex == self.currentPlayerIndex
-					and 'Press Button...' or (ev and ev.name) or '?')
-				then
-					app.waitingForEvent = {
-						key = keyname,
-						playerIndex = self.currentPlayerIndex,
-						callback = function(ev)
-							--[[ always reserve escape?  or allow player to configure it as the pause key?
-							if ev[1] == sdl.SDL_KEYDOWN and ev[2] == sdl.SDLK_ESCAPE then
-								app.cfg.playerKeys[self.currentPlayerIndex][keyname] = {}
-								return
-							end
-							--]]
-							-- mouse/touch requires two clicks to determine size? meh... no, confusing.
-							app.cfg.playerKeys[self.currentPlayerIndex][keyname] = ev
-						end,
-					}
-				end
-				ig.igPopID()
-			end
-			if ig.igButton'Done' then
-				app:saveConfig()
-				ig.igCloseCurrentPopup()
-				self.currentPlayerIndex = nil
-			end
-			ig.igEnd()
-		end
-	end
-
+	self.playerKeysEditor:updateGUI()
 
 	self:centerText'Level:'
 	self:centerLuatableTooltipInputInt('Level', app.cfg, 'startLevel')
-	app.cfg.startLevel = math.clamp(app.cfg.startLevel, 1, 20)
+	app.cfg.startLevel = math.clamp(app.cfg.startLevel, 1, 10)
 
 	-- [[ allow modifying colors
-	self:centerText'Colors:'
+	-- modifying colors should be do-able mid-game
+	-- however there's no system atm for adjusting current sand pixel colors live mid-game
+	-- though there could be if I encode th sand board as just 2 channels (luminance & color-index)
+	-- then I could dynamically update the RGB colors of the color-index live
+	-- but then I wouldn't be able to put sailor moon gifs on my blocks or any other RGB image ... more on that later
+	-- so either way
+	-- overall choice
+	-- no adjusting colors live.
+	-- only adjust colors in the 'new game' menu.
+	ig.igNewLine()
+	ig.igSeparatorText'Colors'
+	ig.igNewLine()
+
 	if ig.igButton'+' then
 		app.cfg.numColors = app.cfg.numColors + 1
 	end
@@ -150,6 +78,7 @@ function NewGameState:updateGUI()
 		app.cfg.numColors = app.cfg.numColors - 1
 	end
 	ig.igSameLine()
+
 
 	for i=1,app.cfg.numColors do
 		local c = app.cfg.colors[i]
@@ -201,6 +130,34 @@ function NewGameState:updateGUI()
 		end
 	end
 	--]]
+
+	ig.igNewLine()
+	ig.igSeparatorText'Advanced'
+	ig.igNewLine()
+
+	self:centerLuatableTooltipInputInt('Number of Next Pieces', app.cfg, 'numNextPieces')
+	self:centerLuatableTooltipSliderFloat('Drop Speed', app.cfg, 'dropSpeed', .1, 100, nil, ig.ImGuiSliderFlags_Logarithmic)
+	self:centerLuatableTooltipSliderFloat('Move Speed', app.cfg, 'movedx', .1, 100, nil, ig.ImGuiSliderFlags_Logarithmic)
+	self:centerLuatableCheckbox('Continuous Drop', app.cfg, 'continuousDrop')
+
+	self:centerLuatableTooltipSliderFloat('Per-Level Speedup Coeff', app.cfg, 'speedupCoeff', .07, .00007, '%.5f', ig.ImGuiSliderFlags_Logarithmic)
+
+	self:centerText'Board:'
+	self:centerLuatableTooltipInputInt('Board Width', app.cfg.boardSizeInBlocks, 'x')
+	self:centerLuatableTooltipInputInt('Board Height', app.cfg.boardSizeInBlocks, 'y')
+
+	if self:centerLuatableTooltipInputInt('Pixels Per Block', app.cfg, 'voxelsPerBlock') then
+		app:updateGameScale()
+	end
+	-- TODO should this be customizable?
+	self:centerText('(updates/tick: '..app.gameScale..')')
+
+	-- TODO this is only for AutomataCPU ...
+	self:centerLuatableTooltipSliderFloat('Topple Chance', app.cfg, 'toppleChance', 0, 1)
+
+	local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
+	ig.luatableCombo('Sand Model', app.cfg, 'sandModel', sandModelClassNames)
+
 	self:endFullView()
 end
 

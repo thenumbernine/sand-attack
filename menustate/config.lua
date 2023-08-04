@@ -3,39 +3,39 @@ TODO move the game-specific config stuff into the New Game menu.
 Then the game-not-specific stuff (button size, volume, etc) allow accessible from in-game pause menu.
 --]]
 local ig = require 'imgui'
-local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 local MenuState = require 'sand-attack.menustate.menustate'
+local PlayerKeysEditor = require 'sand-attack.menustate.playerkeys'
 
 local ConfigState = MenuState:subclass()
+
+function ConfigState:init(app, ...)
+	ConfigState.super.init(self, app, ...)
+	self.playerKeysEditor = PlayerKeysEditor(app)
+end
+
+-- if we're editing keys then show keys
+function ConfigState:update()
+	self.playerKeysEditor:update()
+end
 
 function ConfigState:updateGUI()
 	local app = self.app
 	self:beginFullView('Config', 6 * 32)
 
-	self:centerLuatableTooltipInputInt('Number of Next Pieces', app.cfg, 'numNextPieces')
-	self:centerLuatableTooltipSliderFloat('Drop Speed', app.cfg, 'dropSpeed', .1, 100, nil, ig.ImGuiSliderFlags_Logarithmic)
-	self:centerLuatableTooltipSliderFloat('Move Speed', app.cfg, 'movedx', .1, 100, nil, ig.ImGuiSliderFlags_Logarithmic)
-	self:centerLuatableCheckbox('Continuous Drop', app.cfg, 'continuousDrop')
-
-	self:centerLuatableTooltipSliderFloat('Per-Level Speedup Coeff', app.cfg, 'speedupCoeff', .07, .00007, '%.5f', ig.ImGuiSliderFlags_Logarithmic)
-
-	self:centerText'Board:'
-	self:centerLuatableTooltipInputInt('Board Width', app.cfg.boardSizeInBlocks, 'x')
-	self:centerLuatableTooltipInputInt('Board Height', app.cfg.boardSizeInBlocks, 'y')
-
-	if self:centerLuatableTooltipInputInt('Pixels Per Block', app.cfg, 'voxelsPerBlock') then
-		app:updateGameScale()
-	end
-	-- TODO should this be customizable?
-	self:centerText('(updates/tick: '..app.gameScale..')')
-
-	-- TODO this is only for AutomataCPU ...
-	self:centerLuatableTooltipSliderFloat('Topple Chance', app.cfg, 'toppleChance', 0, 1)
-
-	ig.luatableCombo('Sand Model', app.cfg, 'sandModel', sandModelClassNames)
+	ig.igNewLine()
+	ig.igSeparatorText'Controls'
+	ig.igNewLine()
+	
+	self.playerKeysEditor:updateGUI()
+	ig.igNewLine()
+	
+	self:centerLuatableTooltipSliderFloat('On-Screen Button Radius', app.cfg, 'screenButtonRadius', .001, 1)
 
 	if app.useAudio then
-		self:centerText'Audio:'
+		ig.igNewLine()
+		ig.igSeparatorText'Audio'
+		ig.igNewLine()
+		
 		if self:centerLuatableTooltipSliderFloat('FX Volume', app.cfg, 'effectVolume', 0, 1) then
 			--[[ if you want, update all previous audio sources...
 			for _,src in ipairs(app.audioSources) do
@@ -49,13 +49,13 @@ function ConfigState:updateGUI()
 		end
 	end
 
-	self:centerText'Controls:'
-	self:centerLuatableTooltipSliderFloat('On-Screen Button Radius', app.cfg, 'screenButtonRadius', .001, 1)
-
+	ig.igNewLine()
 	if self:centerButton'Done' then
 		app:saveConfig()
-		local MainMenuState = require 'sand-attack.menustate.main'
-		app.menustate = MainMenuState(app)
+		-- you shouldn't be able to enter the config menustate without pushMenuState being set
+		app.menustate = assert(app.pushMenuState)
+		-- likewise don't leave the config menustate without clearning the last stat
+		app.pushMenuState = nil
 	end
 	self:endFullView()
 end

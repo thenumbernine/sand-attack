@@ -54,6 +54,11 @@ function PlayingState:updateGUI()
 		if ig.igButton(app.paused and 'Resume' or 'Pause') then
 			app.paused = not app.paused
 		end
+		if ig.igButton'Config' then
+			app.pushMenuState = app.menustate
+			local ConfigState = require 'sand-attack.menustate.config'
+			app.menustate = ConfigState(app)
+		end
 		if ig.igButton'End Game' then
 			app.loseTime = nil
 			app.paused = true

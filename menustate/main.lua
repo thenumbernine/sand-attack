@@ -36,6 +36,9 @@ function MainMenuState:updateGUI()
 	end
 	-- TODO RESUME GAME here
 	if self:centerButton'Config' then
+		-- pushMenuState only used for entering config menu
+		-- if I need any more 'back' options than this then i'll turn the menustate into a stack
+		app.pushMenuState = app.menustate
 		local ConfigState = require 'sand-attack.menustate.config'
 		app.menustate = ConfigState(app)
 	end
