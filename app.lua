@@ -466,7 +466,10 @@ void main() {
 	-- needed for a few things that i'm too lazy to change
 	-- so i guess i could play a demo in the background when the game starts
 	-- like so many other games
-	self:reset()
+	self:reset{
+		-- me being lazy about restructuring
+		dontRecordOrPlay = true,
+	}
 
 	glreport'here'
 end
@@ -580,34 +583,35 @@ function App:reset(args)
 	self:saveConfig()
 	self:updateGameScale()
 
-	if args.playingDemo then
-		xpcall(function()
-			self.playingDemo = assert(fromlua(assert(path(args.playingDemo):read())))
-		end, function(err)
-			print('failed to load demo: '..tostring(err))
-			-- for getting more info
-			--print(err..'\n'..debug.traceback())
-		end)
-	end
-	if not self.playingDemo then
-		-- TODO if we're playing a demo ..
-		-- else ...
-		local randseed = 2106791791
-		self.recordingDemo = table{
-			seed = randseed,
-		}
+	self.recordingDemo = nil
+	self.playingDemo = nil
 
-		--[[ do this upon every :reset, save seed, and save it in the high score as well
-		-- hmm, I need a rng object that is reproducible
-		ffi.C.srand(ffi.C.time(nil))
-		self.seed = ffi.C.rand()
-		--]]
-		-- [[
+	if not args.dontRecordOrPlay then
+		if args.playingDemo then
+			xpcall(function()
+				self.playingDemo = setmetatable(
+					assert(fromlua(
+						assert(path(args.playingDemo):read())
+					)),
+					table
+				)
+				self.rng = RNG(self.playingDemo.seed)
+			end, function(err)
+				print('failed to load demo: '..tostring(err))
+				-- for getting more info
+				--print(err..'\n'..debug.traceback())
+			end)
+		end
+		if not self.playingDemo then
+			local randseed = os.time()
+			self.rng = RNG(randseed)
+			self.recordingDemo = table{
+				seed = randseed,
+			}
+		end
+	else
+		local randseed = os.time()
 		self.rng = RNG(randseed)
-		--]]
-		--[[
-		self.rng = RNG(os.time())
-		--]]
 	end
 
 
@@ -1045,7 +1049,7 @@ function App:updateGame()
 	if self.recordingDemo then
 		local event
 		for playerIndex,player in ipairs(self.players) do
-			for _,k in ipairs(player.keyNames) do
+			for _,k in ipairs(player.gameKeyNames) do
 				if player.keyPress[k] ~= player.keyPressLast[k] then
 					event = event or {t=self.gameTick}
 					event[playerIndex..k] = player.keyPress[k]
@@ -1060,11 +1064,13 @@ function App:updateGame()
 		else
 			event = nil
 		end
-		for playerIndex,player in ipairs(self.players) do
-			for _,k in ipairs(player.keyNames) do
-				local v = event[playerIndex..k]
-				if v ~= nil then
-					player.keyPress[k] = v
+		if event then
+			for playerIndex,player in ipairs(self.players) do
+				for _,k in ipairs(player.gameKeyNames) do
+					local v = event[playerIndex..k]
+					if v ~= nil then
+						player.keyPress[k] = v
+					end
 				end
 			end
 		end
@@ -1400,23 +1406,29 @@ function App:update(...)
 		self.loseTime = nil
 		self.paused = true
 
-		local HighScoreState = require 'sand-attack.menustate.highscore'
-		self.menustate = HighScoreState(self, true)
+		if self.playingDemo then
+			self.playingDemo = nil
+			local MainMenuState = require 'sand-attack.menustate.main'
+			self.menustate = MainMenuState(self, true)
+		else
+			local HighScoreState = require 'sand-attack.menustate.highscore'
+			self.menustate = HighScoreState(self, true)
 
-		-- while we're here, write out the last key recording
-		-- maybe in th future it'll go into the highscores data
-		-- or maybe i'll compress it further meh
-		-- Do this after opening the high-scores menu so that it has the option of doing something with this file?
-		-- or maybe highscores overall will handle it?
-		if self.recordingDemo then
-			path'last-game-demo.lua':write(tolua(self.recordingDemo, {
-				serializeForType = {
-					cdata = function(state, x, tab, path, keyRef)
-						return tostring(x)
-					end,
-				},
-			}))
-			self.recordingDemo = nil
+			-- while we're here, write out the last key recording
+			-- maybe in th future it'll go into the highscores data
+			-- or maybe i'll compress it further meh
+			-- Do this after opening the high-scores menu so that it has the option of doing something with this file?
+			-- or maybe highscores overall will handle it?
+			if self.recordingDemo then
+				path'last-game-demo.lua':write(tolua(self.recordingDemo, {
+					serializeForType = {
+						cdata = function(state, x, tab, path, keyRef)
+							return tostring(x)
+						end,
+					},
+				}))
+				self.recordingDemo = nil
+			end
 		end
 	end
 
@@ -1566,7 +1578,11 @@ function App:processButtonEvent(press, ...)
 				end
 				if match then
 					local player = self.players[playerIndex]
-					if player then
+					if player
+					and (
+						not self.playingDemo
+						or not Player.gameKeySet[buttonName]
+					) then
 						player.keyPress[buttonName] = press
 					end
 				end

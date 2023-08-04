@@ -1,4 +1,5 @@
 local ffi = require 'ffi'
+local path = require 'ext.path'
 local ig = require 'imgui'
 local MenuState = require 'sand-attack.menustate.menustate'
 
@@ -28,6 +29,15 @@ function MainMenuState:updateGUI()
 		-- TODO choose gametype and choose level
 		local NewGameState = require 'sand-attack.menustate.newgame'
 		app.menustate = NewGameState(app)
+	end
+	if path'last-game-demo.lua':exists() then
+		if self:centerButton'Replay Last Game' then
+			app:reset{
+				playingDemo = 'last-game-demo.lua',
+			}
+			local PlayingState = require 'sand-attack.menustate.playing'
+			app.menustate = PlayingState(app)	-- sets paused=false
+		end
 	end
 	if self:centerButton'New Game Co-op' then
 		local NewGameState = require 'sand-attack.menustate.newgame'

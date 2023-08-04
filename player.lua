@@ -1,16 +1,25 @@
 local class = require 'ext.class'
-local vec2i = require 'vec-ffi.vec2i'
+local table = require 'ext.table'
 local vec3f = require 'vec-ffi.vec3f'
 
 local Player = class()
 
-Player.keyNames = {
+-- keys to record
+Player.gameKeyNames = table{
 	'up',
 	'down',
 	'left',
 	'right',
+}
+
+-- all keys to capture via sdl events
+Player.keyNames = table(Player.gameKeyNames):append{
 	'pause',
 }
+
+Player.gameKeySet = Player.gameKeyNames:mapi(function(k)
+	return true, k
+end):setmetatable(nil)
 
 function Player:init(args)
 	self.index = args.index
