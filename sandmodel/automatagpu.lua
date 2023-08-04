@@ -458,8 +458,8 @@ function AutomataSandGPU:test()
 	local p = ffi.cast('uint32_t*', self.sandTex.image.buffer)
 	for j=0,h-1 do
 		for i=0,w-1 do
-			if math.random() < .5 then
-				p[0] = math.random(0, 0xffffffff)
+			if app.rng() < .5 then
+				p[0] = app.rng(0, 0xffffffff)
 			end
 			p=p+1
 		end
@@ -539,9 +539,9 @@ function AutomataSandGPU:update()
 		gl.GL_FALSE,
 		app.mvProjMat.ptr)
 
-	local rightxor = math.random(0,1)
-	local xofsxor = math.random(0,1)
-	local yofsxor = math.random(0,1)
+	local rightxor = app.rng(0,1)
+	local xofsxor = app.rng(0,1)
+	local yofsxor = app.rng(0,1)
 
 	fbo:bind()
 	gl.glViewport(0, 0, w, h)

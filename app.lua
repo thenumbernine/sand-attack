@@ -60,7 +60,7 @@ end
 -- but is only a singleton...
 local RNG = class()
 function RNG:init(seed)
-	math.randomseed(seed or os.time())
+	math.randomseed(seed)
 end
 function RNG:__call(...)
 	return math.random(...)
@@ -574,16 +574,24 @@ function App:reset()
 	self:saveConfig()
 	self:updateGameScale()
 
+
+	-- TODO if we're playing a demo ..
+	-- else ...
+	local randseed = 2106791791
+	self.recordingDemo = table{
+		seed = randseed,
+	}
+
 	--[[ do this upon every :reset, save seed, and save it in the high score as well
 	-- hmm, I need a rng object that is reproducible
 	ffi.C.srand(ffi.C.time(nil))
 	self.seed = ffi.C.rand()
 	--]]
-	--[[
-	self.rng = RNG(2106791791)
-	--]]
 	-- [[
-	self.rng = RNG()
+	self.rng = RNG(randseed)
+	--]]
+	--[[
+	self.rng = RNG(os.time())
 	--]]
 
 
@@ -605,10 +613,10 @@ function App:reset()
 		for j=0,size.y-1 do
 			for i=0,size.x-1 do
 				ptr[0] = bit.bor(
-					math.random(0,255),
-					bit.lshift(math.random(0,255), 8),
-					bit.lshift(math.random(0,255), 16),
-					bit.lshift(math.random(0,255), 24)
+					self.rng(0,255),
+					bit.lshift(self.rng(0,255), 8),
+					bit.lshift(self.rng(0,255), 16),
+					bit.lshift(self.rng(0,255), 24)
 				)
 				ptr = ptr + 1
 			end
@@ -701,6 +709,7 @@ function App:reset()
 
 	self.lastUpdateTime = getTime()
 	self.gameTime = 0
+	self.gameTick = ffi.new('uint64_t', 0)
 	self.fallTick = 0
 	self.lastLineTime = -math.huge
 	self.score = 0
@@ -1005,12 +1014,41 @@ function App:updateGame()
 	self.lastUpdateTime = self.thisTime
 	--]]
 	self.gameTime = self.gameTime + self.updateInterval
+	self.gameTick = self.gameTick + 1
 
 	local sandmodel = self.sandmodel
 	local needsCheckLine = sandmodel:update()
 
 	for _,player in ipairs(self.players) do
 		player.piecePosLast:set(player.piecePos:unpack())
+	end
+
+	-- [[ hack for testing RNG
+	-- soon this'll drive demo input :
+
+	if self.recordingDemo then
+		local event
+		for playerIndex,player in ipairs(self.players) do
+			for _,k in ipairs(player.keyNames) do
+				if player.keyPress[k] ~= player.keyPressLast[k] then
+					event = event or {t=self.gameTick}
+					event[playerIndex..k] = true
+				end
+			end
+		end
+		self.recordingDemo:insert(event)
+	elseif self.playingDemo then
+		local event = self.playingDemo[1]
+		if event and event.t == self.gameTick then 
+			self.playingDemo:remove(1)
+		else
+			event = nil
+		end
+		for playerIndex,player in ipairs(self.players) do
+			for _,k in ipairs(player.keyNames) do
+				player.keyPress[k] = event and event[playerIndex..k] or false
+			end
+		end
 	end
 
 	-- now draw the shape over the sand
@@ -1341,8 +1379,19 @@ function App:update(...)
 		-- TODO maybe go to a high score screen instead?
 		self.loseTime = nil
 		self.paused = true
+		
 		local HighScoreState = require 'sand-attack.menustate.highscore'
 		self.menustate = HighScoreState(self, true)
+	
+		-- while we're here, write out the last key recording
+		-- maybe in th future it'll go into the highscores data
+		-- or maybe i'll compress it further meh
+		-- Do this after opening the high-scores menu so that it has the option of doing something with this file?
+		-- or maybe highscores overall will handle it?
+		if self.recordingDemo then
+			path'last-game-demo.lua':write(tolua(self.recordingDemo))
+			self.recordingDemo = nil
+		end
 	end
 
 	-- update GUI

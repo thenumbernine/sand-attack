@@ -91,10 +91,10 @@ function SPHSand:update()
 				if p[-w] ~= 0 then
 					onground = true
 				end
-				if math.random() < app.cfg.toppleChance then
+				if app.rng() < app.cfg.toppleChance then
 					-- hmm symmetry? check left vs right first?
 					-- 50/50 check left then right, vs check right then left
-					if math.random(2) == 2 then
+					if app.rng(2) == 2 then
 						if x > 0 and p[-w-1] == 0 then
 							-- swap colors
 							p[0], p[-w-1] = p[-w-1], p[0]
@@ -184,7 +184,7 @@ function SPHSand:update()
 		if p[0] ~= 0 then
 			numOverlaps = numOverlaps + 1
 			-- give it a push up?
-			g.vel.y = g.vel.y + (math.random() - .5) * pushForceTimesDT
+			g.vel.y = g.vel.y + (app.rng() - .5) * pushForceTimesDT
 			g.vel.y = g.vel.y + pushForceTimesDT
 			g.pos.y = math.clamp(g.pos.y + 1, 0, h-FLT_EPSILON)
 		end
@@ -200,7 +200,7 @@ function SPHSand:mergepixel(x,y,color)
 	local app = self.app
 	local g = self.grains:emplace_back()
 	g.pos:set(x+.5, y+.5)
-	--local vel = math.random() * 150 * (vec2f(0,-1) + (vec2f(x+.5,y+.5)-vec2f(app.pieceSize:unpack())*.5) / tonumber(app.pieceSize.x))
+	--local vel = app.rng() * 150 * (vec2f(0,-1) + (vec2f(x+.5,y+.5)-vec2f(app.pieceSize:unpack())*.5) / tonumber(app.pieceSize.x))
 	local vel = vec2f(0,-1)
 	g.vel:set(vel:unpack())
 	--g.vel:set(0,0)

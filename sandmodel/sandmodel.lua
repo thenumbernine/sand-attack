@@ -92,7 +92,7 @@ function SandModel:mergePiece(player)
 		--]]
 		-- [[
 		local istart,iend,istep
-		if math.random(2) == 2 then
+		if app.rng(2) == 2 then
 			istart = 0
 			iend = app.pieceSize.x-1
 			istep = 1
@@ -405,9 +405,9 @@ function SandModel:checkClearBlobs()
 			blobs[blobindex] = nil
 		else
 			blob.debugColor = bit.bor(
-				math.random(0,255),
-				bit.lshift(math.random(0,255), 8),
-				bit.lshift(math.random(0,255), 16),
+				app.rng(0,255),
+				bit.lshift(app.rng(0,255), 8),
+				bit.lshift(app.rng(0,255), 16),
 				0xff000000
 			)
 		end
