@@ -488,15 +488,12 @@ void main() {
 				self.audioSources[i] = src
 			end
 
-			self.bgMusicFiles = table{
-				'music/Desert-City.ogg',
-				'music/Exotic-Plains.ogg',
-				'music/Ibn-Al-Noor.ogg',
-				'music/Market_Day.ogg',
-				'music/Return-of-the-Mummy.ogg',
-				'music/temple-of-endless-sands.ogg',
-				'music/wombat-noises-audio-the-legend-of-narmer.ogg',
-			}
+			self.bgMusicFiles = table()
+			for f in path'music':dir() do
+				if f:match'%.ogg$' then
+					self.bgMusicFiles:insert('music/'..f)
+				end
+			end
 			self.bgMusicFileName = self.bgMusicFiles:pickRandom()
 			if self.bgMusicFileName then
 				self.bgMusic = self:loadSound(self.bgMusicFileName)
