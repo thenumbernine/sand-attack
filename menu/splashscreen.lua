@@ -9,9 +9,10 @@ local SplashScreenMenu = Menu:subclass()
 SplashScreenMenu.duration = 3
 
 -- TODO cool sand effect or something
-function SplashScreenMenu:init(...)
-	SplashScreenMenu.super.init(self, ...)
+function SplashScreenMenu:init(app, ...)
+	SplashScreenMenu.super.init(self, app, ...)
 	self.startTime = getTime()
+	app.paused = true
 end
 
 function SplashScreenMenu:update()
@@ -43,8 +44,7 @@ function SplashScreenMenu:update()
 		:useNone()
 
 	if getTime() - self.startTime > self.duration then
-		local MainMenu = require 'sand-attack.menu.main'
-		app.menustate = MainMenu(app)
+		self:endSplashScreen()
 	end
 end
 
@@ -59,9 +59,16 @@ function SplashScreenMenu:event(e)
 	or e.type == sdl.SDL_MOUSEBUTTONDOWN
 	or e.type == sdl.SDL_FINGERDOWN
 	then
-		local MainMenu = require 'sand-attack.menu.main'
-		app.menustate = MainMenu(app)
+		self:endSplashScreen()
 	end
+end
+
+function SplashScreenMenu:endSplashScreen()
+	local app = self.app
+	local MainMenu = require 'sand-attack.menu.main'
+	-- play the demo
+	app.paused = false
+	app.menustate = MainMenu(app)
 end
 
 return SplashScreenMenu

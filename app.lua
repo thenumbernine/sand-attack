@@ -712,11 +712,6 @@ function App:reset(args)
 				self.playingDemo:readstr(1)	-- skip the \0
 --print('demo cfg randseed', self.playingDemo.config.randseed)
 
--- TODO fix the splash demo
--- remove its extra colors
--- include its numPlayers=1
-self.playingDemo.config.numPlayers = self.playingDemo.config.numPlayers or 1
-
 				-- put currently-playing cfg in playcfg
 				self.playcfg = self.playingDemo.config
 --print('self.playingDemo.index', self.playingDemo.index)
