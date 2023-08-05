@@ -61,7 +61,7 @@ function HighScoresMenu:makeNewRecord()
 	end
 	
 	-- give it a new unique id
-	record.uid = table.mapi(app.highscores, function(r) return r.uid or 0 end):sup() + 1
+	record.uid = (table.mapi(app.highscores, function(r) return r.uid or 0 end):sup() or 0) + 1
 
 	return record
 end
