@@ -142,13 +142,13 @@ function App:initGL(...)
 	-- allow keys to navigate menu
 	-- TODO how to make it so player keys choose menus, not just space bar/
 	-- or meh?
-	local io = ig.igGetIO()
-	io[0].ConfigFlags = bit.bor(
-		io[0].ConfigFlags,
+	local igio = ig.igGetIO()
+	igio[0].ConfigFlags = bit.bor(
+		igio[0].ConfigFlags,
 		ig.ImGuiConfigFlags_NavEnableKeyboard,
 		ig.ImGuiConfigFlags_NavEnableGamepad
 	)
-	io[0].FontGlobalScale = 2
+	igio[0].FontGlobalScale = 2
 
 -- [[ imgui custom font
 	--local fontfile = 'font/moenstrum.ttf'				-- no numbers
@@ -202,6 +202,10 @@ function App:initGL(...)
 
 	-- load high scores if it exists
 	self.highscores = {}
+	-- TODO WARNING
+	-- for some reason in the distributable ONLY (not in runtime setup), errors thrown in the app ctor are being hidden.
+	-- especially starting right around here ...
+	path'highscores':mkdir()
 	for f in path'highscores':dir() do
 		local fn = 'highscores/'..f
 		xpcall(function()
@@ -1875,7 +1879,7 @@ function App:updateGUI()
 end
 
 function App:exit()
-	if self.useAudio then
+	if self.useAudio and self.audio then
 		self.audio:shutdown()
 	end
 	App.super.exit(self)

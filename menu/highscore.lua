@@ -179,6 +179,7 @@ function HighScoresMenu:updateGUI()
 		ig.igSameLine()
 		if ig.igButton'Clear' then
 			app.highscores = {}
+			path'highscores':mkdir()
 			for f in path'highscores':dir() do
 				path('highscores/'..f):remove()
 			end
