@@ -27,6 +27,7 @@ local AudioBuffer = require 'audio.buffer'
 local Player = require 'sand-attack.player'
 local SandModel = require 'sand-attack.sandmodel.sandmodel'
 local sandModelClasses = require 'sand-attack.sandmodel.all'.classes
+local readDemo = require 'sand-attack.serialize'.readDemo
 
 local PlayingMenu = require 'sand-attack.menu.playing'
 local SplashScreenMenu = require 'sand-attack.menu.splashscreen'
@@ -121,20 +122,6 @@ App.lineNumFlashes = 5
 App.cfgfilename = 'config.lua'
 
 App.lastDemoFileName = 'last-game-demo.bin'
-
-local function readDemo(fn)
-	local d = assert(path(fn):read())
-	local dlen = #d
-	local len = tonumber(ffi.C.strlen(d))
-	local cfgstr = d:sub(1,len)
-	local demo  = ''
-	if dlen > len then
-		assert(d:sub(len+1,len+1):byte() == 0)
-		demo = d:sub(len+2)
-	end
-	local cfg = assert(myfromlua(cfgstr))
-	return cfg, demo
-end
 
 function App:initGL(...)
 	App.super.initGL(self, ...)
@@ -519,9 +506,10 @@ void main() {
 	self.menustate = SplashScreenMenu(self)
 
 	-- play a demo in the background when the game starts
-	local fn = 'splash-demo.bin'
+	local record, demo = readDemo'splash-demo.bin'
 	self:reset{
-		playingDemoFileName = path(fn):exists() and fn or nil,
+		playingDemoRecord = record,
+		playingDemoDemo = demo,
 	}
 
 	glreport'here'
@@ -665,13 +653,14 @@ function App:reset(args)
 	then append the demo after it.
 	--]]
 	if not args.dontRecordOrPlay then
-		if args.playingDemoFileName then
+		if args.playingDemoRecord 
+		and args.playingDemoDemo
+		then
 			xpcall(function()
-				local data = assert(path(args.playingDemoFileName):read())
+				local data = args.playingDemoDemo
 				local ptr = ffi.cast('char*', data)
 				-- TODO why reinvent the wheel.  just use fread/feof.
 				self.playingDemo = setmetatable({
-					filename = args.playingDemoFileName,
 					ptr = ptr,
 					data = data,
 					index = 0,
@@ -696,7 +685,6 @@ function App:reset(args)
 						-- return str value and advance
 						readstr = function(self, len)
 							len = len or ffi.C.strlen(self.ptr + self.index)
---print('reaing str of len '..tostring(len))
 							local s, msg = self:get(len)
 							if not s then return s, msg end
 							self.index = self.index + len
@@ -705,19 +693,12 @@ function App:reset(args)
 					},
 				})
 
-				local democfgstr = self.playingDemo:readstr()
---print('democfgstr', democfgstr)
-				self.playingDemo.config = assert((myfromlua(democfgstr)))
---print('self.playingDemo.config', self.playingDemo.config)
-				self.playingDemo:readstr(1)	-- skip the \0
---print('demo cfg randseed', self.playingDemo.config.randseed)
+				self.playingDemo.config = args.playingDemoRecord
 
 				-- put currently-playing cfg in playcfg
 				self.playcfg = self.playingDemo.config
---print('self.playingDemo.index', self.playingDemo.index)
---print('should be successfully playing the demo ...')
 			end, function(err)
-				print('failed to load demo file '..args.playingDemoFileName..'\n'
+				print('failed to load demo file\n'
 					..tostring(err)..'\n'
 					..debug.traceback())
 				self.playingDemo = nil
@@ -1578,13 +1559,9 @@ function App:update(...)
 	and self.thisTime - self.loseTime > self.loseScreenDuration
 	then
 		if self.playingDemo then
-			local fn = self.playingDemo.filename
-			self.playingDemo = nil
-			self.loseTime = nil
-			--self.menustate = MainMenu(self)
-			-- and reset
 			self:reset{
-				playingDemoFileName = fn,
+				playingDemoRecord = self.playcfg,
+				playingDemoDemo = self.playingDemo,
 			}
 			return
 		else
