@@ -37,7 +37,6 @@ function MainMenu:updateGUI()
 	if path(app.lastDemoFileName):exists() then
 		if self:centerButton'Replay Last Game' then
 			local record, demo = readDemo(app.lastDemoFileName)
-print('replay last game', record, demo)			
 			app:reset{
 				playingDemoRecord = record,
 				playingDemoDemo = demo,

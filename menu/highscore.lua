@@ -6,6 +6,7 @@ local ig = require 'imgui'
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 local mytolua = require 'sand-attack.serialize'.tolua
 local Menu = require 'sand-attack.menu.menu'
+local readDemo = require 'sand-attack.serialize'.readDemo
 
 local HighScoresMenu = Menu:subclass()
 
@@ -17,6 +18,13 @@ function HighScoresMenu:init(app, needsName, recordingDemo)
 	if needsName then assert(self.recordingDemo) end
 end
 
+-- shown fields
+HighScoresMenu.shownFields = table{
+	'name',
+	'score',
+}
+
+-- all recorded fields
 HighScoresMenu.fields = table{
 	-- from HighScoresMenu
 	'name',
@@ -109,7 +117,7 @@ function HighScoresMenu:updateGUI()
 		ig.igNewLine()
 	end
 
-	if ig.igBeginTable('High Scores', #self.fields, bit.bor(
+	if ig.igBeginTable('High Scores', #self.shownFields, bit.bor(
 		ig.ImGuiTableFlags_Resizable,
 		ig.ImGuiTableFlags_Reorderable,
 		ig.ImGuiTableFlags_Sortable,
@@ -118,7 +126,7 @@ function HighScoresMenu:updateGUI()
 		ig.ImGuiTableFlags_BordersV,
 	0), ig.ImVec2(0,0), 0) then
 
-		for i,field in ipairs(self.fields) do
+		for i,field in ipairs(self.shownFields) do
 			ig.igTableSetupColumn(tostring(field), bit.bor(
 					ig.ImGuiTableColumnFlags_DefaultSort
 				),
@@ -146,7 +154,7 @@ function HighScoresMenu:updateGUI()
 				for n=0,sortSpecs[0].SpecsCount-1 do
 					local sortSpec = sortSpecs[0].Specs[n]
 					local col = sortSpec.ColumnUserID
-					local field = self.fields[tonumber(col)]
+					local field = self.shownFields[tonumber(col)]
 					local afield = a[field]
 					local bfield = b[field]
 					local tafield = type(afield)
@@ -167,11 +175,44 @@ function HighScoresMenu:updateGUI()
 		end
 		for _,i in ipairs(self.rowindexes) do
 			local score = app.highscores[i]
+			ig.igPushID_Int(i)
 			ig.igTableNextRow(0, 0)
-			for _,field in ipairs(self.fields) do
+			for j,field in ipairs(self.shownFields) do
+				ig.igPushID_Int(j)
 				ig.igTableNextColumn()
-				ig.igText(tostring(score[field]))
+				local s = tostring(score[field])
+				if j == 1 then
+					if ig.igButton(s) then
+						local record, demo = readDemo('highscores/'..score.demofilename)
+						-- demos sandModel is stored as a string
+						-- TODO all should be
+						record.sandModel = sandModelClassNames:find(record.sandModel)
+						-- TODO I need to save these too
+						record.numNextPieces = record.numNextPieces or 3
+						record.colors = table(app.colors):setmetatable(nil)
+						while #record.colors < record.numColors do
+							table.insert(record.colors, app:getDefaultColor(#record.colors+1))
+						end
+						-- TODO TODO TODO save this in the demo file
+						record.startLevel = app.cfg.startLevel
+						record.movedx = app.cfg.movedx
+						record.dropSpeed = app.cfg.dropSpeed
+						
+						if record.sandModel then
+							app:reset{
+								playingDemoRecord = record,
+								playingDemoDemo = demo,
+							}
+							local PlayingMenu = require 'sand-attack.menu.playing'
+							app.menustate = PlayingMenu(app)	-- sets paused=false
+						end
+					end
+				else
+					ig.igText(s)
+				end
+				ig.igPopID()
 			end
+			ig.igPopID()
 		end
 		ig.igEndTable()
 	end
@@ -186,7 +227,9 @@ function HighScoresMenu:updateGUI()
 			app.highscores = {}
 			path'highscores':mkdir()
 			for f in path'highscores':dir() do
-				path('highscores/'..f):remove()
+				if f:match'%.demo$' then
+					path('highscores/'..f):remove()
+				end
 			end
 		end
 	end

@@ -194,17 +194,19 @@ function App:initGL(...)
 	-- especially starting right around here ...
 	path'highscores':mkdir()
 	for f in path'highscores':dir() do
-		local fn = 'highscores/'..f
-		xpcall(function()
-			local record, demo = readDemo(fn)
-			record.recordingDemo = demo
-			record.demofilename = f
-			table.insert(self.highscores, record)
-		end, function(err)
-			print('failed to read highscores from file '..fn..'\n'
-				..tostring(err)..'\n'
-				..debug.traceback())
-		end)
+		if f:match'%.demo$' then
+			local fn = 'highscores/'..f
+			xpcall(function()
+				local record, demo = readDemo(fn)
+				record.recordingDemo = demo
+				record.demofilename = f
+				table.insert(self.highscores, record)
+			end, function(err)
+				print('failed to read highscores from file '..fn..'\n'
+					..tostring(err)..'\n'
+					..debug.traceback())
+			end)
+		end
 	end
 
 	-- board size is 80 x 144 visible
