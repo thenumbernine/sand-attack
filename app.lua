@@ -695,25 +695,28 @@ function App:reset(args)
 						-- return str value and advance
 						readstr = function(self, len)
 							len = len or ffi.C.strlen(self.ptr + self.index)
+--print('reaing str of len '..tostring(len))
 							local s, msg = self:get(len)
 							if not s then return s, msg end
+							self.index = self.index + len
 							return ffi.string(s, len)
 						end,
 					},
 				})
 
 				local democfgstr = self.playingDemo:readstr()
-print('democfgstr', democfgstr)
+--print('democfgstr', democfgstr)
 				self.playingDemo.config = assert((fromlua(
 					democfgstr
 				)))
-print('self.playingDemo.config', self.playingDemo.config)
+--print('self.playingDemo.config', self.playingDemo.config)
 				self.playingDemo:readstr(1)	-- skip the \0
-print('demo cfg randseed', self.playingDemo.config.randseed)
+--print('demo cfg randseed', self.playingDemo.config.randseed)
 
 				-- put currently-playing cfg in playcfg
 				self.playcfg = self.playingDemo.config
-
+--print('self.playingDemo.index', self.playingDemo.index)
+--print('should be successfully playing the demo ...')		
 			end, function(err)
 				print('failed to load demo file '..args.playingDemoFileName..'\n'
 					..tostring(err)..'\n'
@@ -722,6 +725,7 @@ print('demo cfg randseed', self.playingDemo.config.randseed)
 			end)
 		end
 		if not self.playingDemo then
+--print('recording demo...')
 			-- ... then record
 			self.recordingDemoFile = path(self.lastDemoFileName):open'wb'
 
@@ -1207,7 +1211,7 @@ function App:updateGame()
 			end
 		end
 		if needwrite then
--- [[
+--[[
 io.write(('%08x'):format(ffi.cast('gameTick_t*', self.recordingEvent)[0]))
 for i=ffi.sizeof'gameTick_t',self.recordingEventSize-1 do
 	io.write((' %02x'):format(self.recordingEvent[i]))
@@ -1219,7 +1223,7 @@ print()
 	elseif self.playingDemo then
 		local event = self.playingDemo:get(self.recordingEventSize)
 		if event and ffi.cast('gameTick_t*', event)[0] == self.gameTick then
--- [[
+--[[
 io.write(('%08x'):format(ffi.cast('gameTick_t*', event)[0]))
 for i=ffi.sizeof'gameTick_t',self.recordingEventSize-1 do
 	io.write((' %02x'):format(event[i]))
