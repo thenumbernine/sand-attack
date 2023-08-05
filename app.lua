@@ -251,8 +251,20 @@ function App:initGL(...)
 
 	self.loseScreenDuration = 3
 
+	local buttonImg = Image(256, 256, 4, 'unsigned char', function(i,j)
+		-- (i,j) are in [0,255)^2
+		local x = ((i+.5)/256 - .5) * 2
+		local y = ((j+.5)/256 - .5) * 2
+		-- (x,y) are in [-1,1]^2 (plus or minus 1/n ...)
+		local r2 = x*x + y*y
+		if r2 < 1 and r2 > .9*.9 then
+			return 255,255,255,255
+		else
+			return 0,0,0,0
+		end
+	end)
 	self.buttonTex = GLTex2D{
-		image = Image'tex/button.png':flip(),
+		image = buttonImg,
 		wrap = {
 			s = gl.GL_CLAMP_TO_EDGE,
 			t = gl.GL_CLAMP_TO_EDGE,
