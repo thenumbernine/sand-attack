@@ -30,7 +30,7 @@ local Player = require 'sand-attack.player'
 local SandModel = require 'sand-attack.sandmodel.sandmodel'
 local sandModelClasses = require 'sand-attack.sandmodel.all'.classes
 
-ffi.cdef([[
+ffi.cdef[[
 // what type to use for time?
 // 60 fps ...
 // 2 bytes = 65535 ticks = 1092 seconds @ 60 fps = 18.2 minutes
@@ -38,7 +38,7 @@ ffi.cdef([[
 typedef uint32_t gameTick_t;
 
 typedef uint64_t randSeed_t;
-]])
+]]
 
 -- I'm trying to make reproducible random #s
 -- it is reproducible up to the generation of the next pieces
@@ -625,6 +625,7 @@ function App:reset(args)
 		if args.playingDemoFileName then
 			xpcall(function()
 				local data = assert(path(args.playingDemoFileName):read())
+				local ptr = ffi.cast('char*', data)
 				-- TODO why reinvent the wheel.  just use fread/feof.
 				self.playingDemo = setmetatable({
 					ptr = ptr,
