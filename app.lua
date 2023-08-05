@@ -1634,15 +1634,18 @@ function App:endGame()
 	self.loseTime = nil
 	self.paused = true
 	-- if we're not playing a demo then we should be recording one
-	local recordingDemo = assert(self.recordingDemo):concat()
+	-- I guess this might happen something something played a game, it ended, and something is replaying or something ...
+	local recordingDemo = self.recordingDemo and self.recordingDemo:concat() or nil
 	self.recordingDemo = nil
-	-- write the last demo
-	path(self.lastDemoFileName):write(
-		mytolua(self.playcfg)
-		..'\0'
-		..recordingDemo
-	)
-	self.menustate = HighScoreMenu(self, true, recordingDemo)
+	if recordingDemo then
+		-- write the last demo
+		path(self.lastDemoFileName):write(
+			mytolua(self.playcfg)
+			..'\0'
+			..recordingDemo
+		)
+		self.menustate = HighScoreMenu(self, true, recordingDemo)
+	end
 end
 
 -- called from PlayingMenu:update, PlayerKeysEditor:update
