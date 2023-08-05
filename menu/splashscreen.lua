@@ -2,19 +2,19 @@ local getTime = require 'ext.timer'.getTime
 local sdl = require 'ffi.req' 'sdl'
 local ig = require 'imgui'
 local gl = require 'gl'
-local MenuState = require 'sand-attack.menustate.menustate'
+local Menu = require 'sand-attack.menu.menu'
 
-local SplashScreenState = MenuState:subclass()
+local SplashScreenMenu = Menu:subclass()
 
-SplashScreenState.duration = 3
+SplashScreenMenu.duration = 3
 
 -- TODO cool sand effect or something
-function SplashScreenState:init(...)
-	SplashScreenState.super.init(self, ...)
+function SplashScreenMenu:init(...)
+	SplashScreenMenu.super.init(self, ...)
 	self.startTime = getTime()
 end
 
-function SplashScreenState:update()
+function SplashScreenMenu:update()
 	local app = self.app
 
 	local w, h = app.sandSize:unpack()
@@ -43,12 +43,12 @@ function SplashScreenState:update()
 		:useNone()
 
 	if getTime() - self.startTime > self.duration then
-		local MainMenuState = require 'sand-attack.menustate.main'
-		app.menustate = MainMenuState(app)
+		local MainMenu = require 'sand-attack.menu.main'
+		app.menustate = MainMenu(app)
 	end
 end
 
-function SplashScreenState:event(e)
+function SplashScreenMenu:event(e)
 	local app = self.app
 	if e.type == sdl.SDL_JOYHATMOTION
 	or e.type == sdl.SDL_JOYAXISMOTION
@@ -59,9 +59,9 @@ function SplashScreenState:event(e)
 	or e.type == sdl.SDL_MOUSEBUTTONDOWN
 	or e.type == sdl.SDL_FINGERDOWN
 	then
-		local MainMenuState = require 'sand-attack.menustate.main'
-		app.menustate = MainMenuState(app)
+		local MainMenu = require 'sand-attack.menu.main'
+		app.menustate = MainMenu(app)
 	end
 end
 
-return SplashScreenState
+return SplashScreenMenu

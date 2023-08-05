@@ -3,19 +3,20 @@ local range = require 'ext.range'
 local ops = require 'ext.op'
 local ig = require 'imgui'
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
-local MenuState = require 'sand-attack.menustate.menustate'
+local Menu = require 'sand-attack.menu.menu'
 
-local HighScoreState = MenuState:subclass()
+local HighScoresMenu = Menu:subclass()
 
-function HighScoreState:init(app, needsName)
-	HighScoreState.super.init(self, app)
+function HighScoresMenu:init(app, needsName)
+	HighScoresMenu.super.init(self, app)
 	self.needsName = needsName
 	self.name = ''
 end
 
 -- save state info pertinent to the gameplay
--- TODO save recording of all keystrokes and game rand seed?
-HighScoreState.fields = table{
+-- TODO instead of picking out fields, just serialize the whole gamecfg object
+-- and TODO separat .cfg into .gamecfg (that goes with highscores) and .usercfg (that goes with user settings)
+HighScoresMenu.fields = table{
 	'name',
 	'lines',
 	'level',
@@ -30,7 +31,7 @@ HighScoreState.fields = table{
 	'speedupCoeff',
 }
 
-function HighScoreState:makeNewRecord()
+function HighScoresMenu:makeNewRecord()
 	local app = self.app
 	local record = {}
 	for _,field in ipairs(self.fields) do
@@ -55,7 +56,7 @@ function HighScoreState:makeNewRecord()
 	return record
 end
 
-function HighScoreState:updateGUI()
+function HighScoresMenu:updateGUI()
 	local app = self.app
 	self:beginFullView'High Scores:'
 
@@ -161,8 +162,8 @@ function HighScoreState:updateGUI()
 	end
 	if ig.igButton'Done' then
 		self.needsName = false
-		local MainMenuState = require 'sand-attack.menustate.main'
-		app.menustate = MainMenuState(app)
+		local MainMenu = require 'sand-attack.menu.main'
+		app.menustate = MainMenu(app)
 	end
 	if not self.needsName then
 		ig.igSameLine()
@@ -174,4 +175,4 @@ function HighScoreState:updateGUI()
 	self:endFullView()
 end
 
-return HighScoreState
+return HighScoresMenu

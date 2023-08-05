@@ -2,16 +2,16 @@ local ffi = require 'ffi'
 local class = require 'ext.class'
 local ig = require 'imgui'
 
-local MenuState = class()
+local Menu = class()
 
-function MenuState:init(app)
+function Menu:init(app)
 	local App = require 'sand-attack.app'
 	assert(App:isa(app))
 	self.app = assert(app)
 end
 
 -- TODO change the style around
-function MenuState:beginFullView(name, estheight)
+function Menu:beginFullView(name, estheight)
 estheight = nil
 	-- TODO put in lua-imgui
 	local viewport = ig.igGetMainViewport()
@@ -37,14 +37,14 @@ estheight = nil
 	ig.igSetWindowFontScale(1)
 end
 
-function MenuState:endFullView()
+function Menu:endFullView()
 	ig.igEnd()
 	ig.igPopStyleVar(1)
 end
 
 local tmp = ffi.new'ImVec2[1]'
 
-function MenuState:centerGUI(fn, text, ...)
+function Menu:centerGUI(fn, text, ...)
 	-- TODO put in lua-imgui
 	-- TODO TODO for buttons and text this is fine, but for inputs the width can be *much wider* than the text width.
 	local textwidth
@@ -61,35 +61,35 @@ function MenuState:centerGUI(fn, text, ...)
 	return fn(text, ...)
 end
 
-function MenuState:centerText(...)
+function Menu:centerText(...)
 	return self:centerGUI(ig.igText, ...)
 end
 
-function MenuState:centerButton(...)
+function Menu:centerButton(...)
 	return self:centerGUI(ig.igButton, ...)
 end
 
-function MenuState:centerLuatableCheckbox(...)
+function Menu:centerLuatableCheckbox(...)
 	return self:centerGUI(ig.luatableCheckbox, ...)
 end
 
 -- is ugly enough i have to fix this often enough so:
 -- TODO fix somehow
-function MenuState:centerLuatableInputInt(...)
+function Menu:centerLuatableInputInt(...)
 	self.overrideTextWidth = 360
 	local result = self:centerGUI(ig.luatableInputInt, ...)
 	self.overrideTextWidth = nil
 	return result
 end
 
-function MenuState:centerLuatableTooltipInputInt(...)
+function Menu:centerLuatableTooltipInputInt(...)
 	self.overrideTextWidth = 360
 	local result = self:centerGUI(ig.luatableTooltipInputInt, ...)
 	self.overrideTextWidth = nil
 	return result
 end
 
-function MenuState:centerLuatableInputFloat(...)
+function Menu:centerLuatableInputFloat(...)
 	print"WARNING imgui gamepad nav can't change input float"
 	self.overrideTextWidth = 360
 	local result = self:centerGUI(ig.luatableInputFloat, ...)
@@ -97,7 +97,7 @@ function MenuState:centerLuatableInputFloat(...)
 	return result
 end
 
-function MenuState:centerLuatableTooltipInputFloat(...)
+function Menu:centerLuatableTooltipInputFloat(...)
 	print"WARNING imgui gamepad nav can't change input float"
 	self.overrideTextWidth = 360
 	local result = self:centerGUI(ig.luatableTooltipInputFloat, ...)
@@ -105,18 +105,18 @@ function MenuState:centerLuatableTooltipInputFloat(...)
 	return result
 end
 
-function MenuState:centerLuatableSliderFloat(...)
+function Menu:centerLuatableSliderFloat(...)
 	self.overrideTextWidth = 360
 	local result = self:centerGUI(ig.luatableSliderFloat, ...)
 	self.overrideTextWidth = nil
 	return result
 end
 
-function MenuState:centerLuatableTooltipSliderFloat(...)
+function Menu:centerLuatableTooltipSliderFloat(...)
 	self.overrideTextWidth = 360
 	local result = self:centerGUI(ig.luatableTooltipSliderFloat, ...)
 	self.overrideTextWidth = nil
 	return result
 end
 
-return MenuState
+return Menu

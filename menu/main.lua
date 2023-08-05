@@ -1,16 +1,16 @@
 local ffi = require 'ffi'
 local path = require 'ext.path'
 local ig = require 'imgui'
-local MenuState = require 'sand-attack.menustate.menustate'
+local Menu = require 'sand-attack.menu.menu'
 
-local MainMenuState = MenuState:subclass()
+local MainMenu = Menu:subclass()
 
-function MainMenuState:init(...)
-	MainMenuState.super.init(self, ...)
+function MainMenu:init(...)
+	MainMenu.super.init(self, ...)
 	self.app.paused = true
 end
 
-function MainMenuState:updateGUI()
+function MainMenu:updateGUI()
 	local app = self.app
 	self:beginFullView('Sand Attack', 6 * 32)
 
@@ -27,21 +27,21 @@ function MainMenuState:updateGUI()
 
 	if self:centerButton'New Game' then
 		-- TODO choose gametype and choose level
-		local NewGameState = require 'sand-attack.menustate.newgame'
-		app.menustate = NewGameState(app)
+		local NewGameMenu = require 'sand-attack.menu.newgame'
+		app.menustate = NewGameMenu(app)
 	end
 	if path(app.lastDemoFileName):exists() then
 		if self:centerButton'Replay Last Game' then
 			app:reset{
 				playingDemoFileName = app.lastDemoFileName,
 			}
-			local PlayingState = require 'sand-attack.menustate.playing'
-			app.menustate = PlayingState(app)	-- sets paused=false
+			local PlayingMenu = require 'sand-attack.menu.playing'
+			app.menustate = PlayingMenu(app)	-- sets paused=false
 		end
 	end
 	if self:centerButton'New Game Co-op' then
-		local NewGameState = require 'sand-attack.menustate.newgame'
-		app.menustate = NewGameState(app, true)
+		local NewGameMenu = require 'sand-attack.menu.newgame'
+		app.menustate = NewGameMenu(app, true)
 		-- TODO pick same as before except pick # of players
 	end
 	-- TODO RESUME GAME here
@@ -49,12 +49,12 @@ function MainMenuState:updateGUI()
 		-- pushMenuState only used for entering config menu
 		-- if I need any more 'back' options than this then i'll turn the menustate into a stack
 		app.pushMenuState = app.menustate
-		local ConfigState = require 'sand-attack.menustate.config'
-		app.menustate = ConfigState(app)
+		local ConfigMenu = require 'sand-attack.menu.config'
+		app.menustate = ConfigMenu(app)
 	end
 	if self:centerButton'High Scores' then
-		local HighScoreState = require 'sand-attack.menustate.highscore'
-		app.menustate = HighScoreState(app)
+		local HighScoreMenu = require 'sand-attack.menu.highscore'
+		app.menustate = HighScoreMenu(app)
 	end
 	local url = 'https://github.com/thenumbernine/sand-attack'
 	if self:centerButton'About' then
@@ -82,4 +82,4 @@ function MainMenuState:updateGUI()
 	self:endFullView()
 end
 
-return MainMenuState 
+return MainMenu 

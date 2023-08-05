@@ -2,13 +2,13 @@ local table = require 'ext.table'
 local math = require 'ext.math'
 local vec3f = require 'vec-ffi.vec3f'
 local ig = require 'imgui'
-local MenuState = require 'sand-attack.menustate.menustate'
-local PlayerKeysEditor = require 'sand-attack.menustate.playerkeys'
+local Menu = require 'sand-attack.menu.menu'
+local PlayerKeysEditor = require 'sand-attack.menu.playerkeys'
 
-local NewGameState = MenuState:subclass()
+local NewGameMenu = Menu:subclass()
 
-function NewGameState:init(app, multiplayer)
-	NewGameState.super.init(self, app)
+function NewGameMenu:init(app, multiplayer)
+	NewGameMenu.super.init(self, app)
 	self.multiplayer = multiplayer
 	if multiplayer then
 		app.numPlayers = math.max(app.numPlayers, 2)
@@ -20,14 +20,14 @@ function NewGameState:init(app, multiplayer)
 end
 
 -- if we're editing keys then show keys
-function NewGameState:update()
+function NewGameMenu:update()
 	self.playerKeysEditor:update()
 end
 
 local tmpcolor = ig.ImVec4()	-- for imgui button
 local tmpcolorv = vec3f()		-- for imgui color picker
 
-function NewGameState:updateGUI()
+function NewGameMenu:updateGUI()
 	local app = self.app
 
 	self:beginFullView(self.multiplayer and 'New Game Multiplayer' or 'New Game', 3 * 32)
@@ -36,12 +36,12 @@ function NewGameState:updateGUI()
 	if self:centerButton'Go!' then
 		app:saveConfig()
 		app:reset()
-		local PlayingState = require 'sand-attack.menustate.playing'
-		app.menustate = PlayingState(app)	-- sets paused=false
+		local PlayingMenu = require 'sand-attack.menu.playing'
+		app.menustate = PlayingMenu(app)	-- sets paused=false
 	end
 	if self:centerButton'Back' then
-		local MainMenuState = require 'sand-attack.menustate.main'
-		app.menustate = MainMenuState(app)
+		local MainMenu = require 'sand-attack.menu.main'
+		app.menustate = MainMenu(app)
 	end
 
 	if self.multiplayer then
@@ -161,4 +161,4 @@ function NewGameState:updateGUI()
 	self:endFullView()
 end
 
-return NewGameState
+return NewGameMenu

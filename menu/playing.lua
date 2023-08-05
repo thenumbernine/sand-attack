@@ -1,18 +1,18 @@
 local ig = require 'imgui'
-local MenuState = require 'sand-attack.menustate.menustate'
+local Menu = require 'sand-attack.menu.menu'
 
-local PlayingState = MenuState:subclass()
+local PlayingMenu = Menu:subclass()
 
-function PlayingState:init(app)
-	PlayingState.super.init(self, app)
+function PlayingMenu:init(app)
+	PlayingMenu.super.init(self, app)
 	app.paused = false
 end
 
-function PlayingState:update()
+function PlayingMenu:update()
 	self.app:drawTouchRegions()
 end
 
-function PlayingState:updateGUI()
+function PlayingMenu:updateGUI()
 	local app = self.app
 	ig.igSetNextWindowPos(ig.ImVec2(0, 0), 0, ig.ImVec2())
 	ig.igSetNextWindowSize(ig.ImVec2(-1, -1), 0)
@@ -56,8 +56,8 @@ function PlayingState:updateGUI()
 		end
 		if ig.igButton'Config' then
 			app.pushMenuState = app.menustate
-			local ConfigState = require 'sand-attack.menustate.config'
-			app.menustate = ConfigState(app)
+			local ConfigMenu = require 'sand-attack.menu.config'
+			app.menustate = ConfigMenu(app)
 		end
 		if ig.igButton'End Game' then
 			app:endGame()
@@ -66,4 +66,4 @@ function PlayingState:updateGUI()
 	end
 end
 
-return PlayingState
+return PlayingMenu

@@ -471,8 +471,8 @@ void main() {
 		end)
 	end
 
-	local SplashScreenState = require 'sand-attack.menustate.splashscreen'
-	self.menustate = SplashScreenState(self)
+	local SplashScreenMenu = require 'sand-attack.menu.splashscreen'
+	self.menustate = SplashScreenMenu(self)
 
 	-- initial reset
 	-- needed for a few things that i'm too lazy to change
@@ -1520,8 +1520,8 @@ function App:update(...)
 			self.playingDemo = nil
 			self.loseTime = nil
 			self.paused = true
-			local MainMenuState = require 'sand-attack.menustate.main'
-			self.menustate = MainMenuState(self, true)
+			local MainMenu = require 'sand-attack.menu.main'
+			self.menustate = MainMenu(self, true)
 		else
 			self:endGame()
 		end
@@ -1565,8 +1565,8 @@ function App:endGame()
 		self.recordingDemoFile:close()
 		self.recordingDemoFile = nil
 	end
-	local HighScoreState = require 'sand-attack.menustate.highscore'
-	self.menustate = HighScoreState(self, true)
+	local HighScoreMenu = require 'sand-attack.menu.highscore'
+	self.menustate = HighScoreMenu(self, true)
 end
 
 function App:drawTouchRegions()

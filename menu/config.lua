@@ -3,24 +3,24 @@ TODO move the game-specific config stuff into the New Game menu.
 Then the game-not-specific stuff (button size, volume, etc) allow accessible from in-game pause menu.
 --]]
 local ig = require 'imgui'
-local MenuState = require 'sand-attack.menustate.menustate'
-local PlayerKeysEditor = require 'sand-attack.menustate.playerkeys'
+local Menu = require 'sand-attack.menu.menu'
+local PlayerKeysEditor = require 'sand-attack.menu.playerkeys'
 
-local ConfigState = MenuState:subclass()
+local ConfigMenu = Menu:subclass()
 
-function ConfigState:init(app, ...)
-	ConfigState.super.init(self, app, ...)
+function ConfigMenu:init(app, ...)
+	ConfigMenu.super.init(self, app, ...)
 	self.playerKeysEditor = PlayerKeysEditor(app)
 end
 
 -- if we're editing keys then show keys
-function ConfigState:update()
+function ConfigMenu:update()
 	self.playerKeysEditor:update()
 end
 
-function ConfigState:updateGUI()
+function ConfigMenu:updateGUI()
 	local app = self.app
-	self:beginFullView('Config', 6 * 32)
+	self:beginFullView('ConfigMenu', 6 * 32)
 
 	ig.igNewLine()
 	ig.igSeparatorText'Controls'
@@ -60,4 +60,4 @@ function ConfigState:updateGUI()
 	self:endFullView()
 end
 
-return ConfigState
+return ConfigMenu
