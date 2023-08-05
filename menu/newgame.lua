@@ -143,8 +143,12 @@ function NewGameMenu:updateGUI()
 	self:centerLuatableTooltipSliderFloat('Per-Level Speedup Coeff', app.cfg, 'speedupCoeff', .07, .00007, '%.5f', ig.ImGuiSliderFlags_Logarithmic)
 
 	self:centerText'Board:'
-	self:centerLuatableTooltipInputInt('Board Width', app.cfg.boardSizeInBlocks, 'x')
-	self:centerLuatableTooltipInputInt('Board Height', app.cfg.boardSizeInBlocks, 'y')
+	if self:centerLuatableTooltipInputInt('Board Width', app.cfg, 'boardWidthInBlocks') then
+		app.cfg.boardWidthInBlocks = math.max(app.cfg.boardWidthInBlocks, 4)
+	end
+	if self:centerLuatableTooltipInputInt('Board Height', app.cfg, 'boardHeightInBlocks') then
+		app.cfg.boardHeightInBlocks = math.max(app.cfg.boardHeightInBlocks, 4)
+	end
 
 	if self:centerLuatableTooltipInputInt('Pixels Per Block', app.cfg, 'voxelsPerBlock') then
 		app:updateGameScale()

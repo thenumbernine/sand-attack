@@ -228,10 +228,20 @@ function App:initGL(...)
 			self.cfg.colors[i] = {table.unpack(color)}
 		end
 	end
-	self.cfg.boardSizeInBlocks = self.cfg.boardSizeInBlocks or {x=10 , y=18}	-- original
-	--self.cfg.boardSizeInBlocks = self.cfg.boardSizeInBlocks or {x=20, y=25}
-	--self.cfg.boardSizeInBlocks = self.cfg.boardSizeInBlocks or {x=10, y=45}
-	--self.cfg.boardSizeInBlocks = self.cfg.boardSizeInBlocks or {x=64, y=64}
+	self.cfg.boardWidthInBlocks = self.cfg.boardWidthInBlocks or 10		-- original
+	self.cfg.boardHeightInBlocks = self.cfg.boardHeightInBlocks or 18	-- original
+	--[[
+	self.cfg.boardWidthInBlocks = self.cfg.boardWidthInBlocks or 20
+	self.cfg.boardHeightInBlocks = self.cfg.boardHeightInBlocks or 25
+	--]]
+	--[[
+	self.cfg.boardWidthInBlocks = self.cfg.boardWidthInBlocks or 10
+	self.cfg.boardHeightInBlocks = self.cfg.boardHeightInBlocks or 45
+	--]]
+	--[[
+	self.cfg.boardWidthInBlocks = self.cfg.boardWidthInBlocks or 64
+	self.cfg.boardHeightInBlocks = self.cfg.boardHeightInBlocks or 64
+	--]]
 	self.cfg.numNextPieces = self.cfg.numNextPieces or 3
 
 	self.numPlayers = 1
@@ -775,8 +785,8 @@ function App:reset(args)
 
 
 	self.sandSize = vec2i(
-		self.cfg.boardSizeInBlocks.x * self.cfg.voxelsPerBlock,
-		self.cfg.boardSizeInBlocks.y * self.cfg.voxelsPerBlock)
+		self.cfg.boardWidthInBlocks * self.cfg.voxelsPerBlock,
+		self.cfg.boardHeightInBlocks * self.cfg.voxelsPerBlock)
 	local w, h = self.sandSize:unpack()
 
 	self.loseTime = nil

@@ -23,8 +23,8 @@ HighScoresMenu.fields = table{
 	'score',
 	'numColors',
 	'numPlayers',
-	'boardWidth',
-	'boardHeight',
+	'boardWidthInBlocks',
+	'boardHeightInBlocks',
 	'toppleChance',
 	'voxelsPerBlock',
 	'sandModel',
@@ -41,14 +41,12 @@ function HighScoresMenu:makeNewRecord()
 		or field == 'voxelsPerBlock'
 		or field == 'numColors'
 		or field == 'speedupCoeff'
+		or field == 'boardWidthInBlocks'
+		or field == 'boardHeightInBlocks'
 		then
 			record[field] = app.cfg[field]
 		elseif field == 'sandModel' then
 			record[field] = sandModelClassNames[app.cfg[field]]
-		elseif field == 'boardWidth' then
-			record[field] = tonumber(app.cfg.boardSizeInBlocks.x)
-		elseif field == 'boardHeight' then
-			record[field] = tonumber(app.cfg.boardSizeInBlocks.y)
 		else
 			record[field] = app[field]
 		end
