@@ -669,6 +669,7 @@ function App:reset(args)
 				local ptr = ffi.cast('char*', data)
 				-- TODO why reinvent the wheel.  just use fread/feof.
 				self.playingDemo = setmetatable({
+					filename = args.playingDemoFileName,
 					ptr = ptr,
 					data = data,
 					index = 0,
@@ -888,7 +889,6 @@ self.playingDemo.config.numPlayers = self.playingDemo.config.numPlayers or 1
 	self.level = playcfg.startLevel
 	self.scoreChain = 0
 	self:updateFallSpeed()
-	self.paused = true
 
 -- debugging:
 --self.sandmodel:test()
@@ -1589,10 +1589,15 @@ function App:update(...)
 	and self.thisTime - self.loseTime > self.loseScreenDuration
 	then
 		if self.playingDemo then
+			local fn = self.playingDemo.filename
 			self.playingDemo = nil
 			self.loseTime = nil
-			self.paused = true
-			self.menustate = MainMenu(self, true)
+			--self.menustate = MainMenu(self, true)
+			-- and reset
+			self:reset{
+				playingDemoFileName = fn,
+			}
+			return
 		else
 			self:endGame()
 		end
