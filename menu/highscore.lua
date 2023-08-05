@@ -20,8 +20,8 @@ HighScoresMenu.fields = table{
 	'lines',
 	'level',
 	'score',
-	'numPlayers',
 	-- from cfg:
+	'numPlayers',
 	'numColors',
 	'boardWidthInBlocks',
 	'boardHeightInBlocks',
@@ -39,7 +39,8 @@ function HighScoresMenu:makeNewRecord()
 	for _,field in ipairs(self.fields) do
 		if field == 'name' then
 			record[field] = self[field]
-		elseif field == 'numColors'
+		elseif field == 'numPlayers'
+		or field == 'numColors'
 		or field == 'boardWidthInBlocks'
 		or field == 'boardHeightInBlocks'
 		or field == 'toppleChance'

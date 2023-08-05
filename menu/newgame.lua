@@ -14,9 +14,9 @@ function NewGameMenu:init(app, multiplayer)
 	NewGameMenu.super.init(self, app)
 	self.multiplayer = multiplayer
 	if multiplayer then
-		app.numPlayers = math.max(app.numPlayers, 2)
+		app.cfg.numPlayers = math.max(app.cfg.numPlayers, 2)
 	else
-		app.numPlayers = 1
+		app.cfg.numPlayers = 1
 	end
 
 	self.playerKeysEditor = PlayerKeysEditor(app)
@@ -71,8 +71,8 @@ function NewGameMenu:updateGUI()
 
 	if self.multiplayer then
 		self:centerText'Number of Players:'
-		self:centerLuatableTooltipInputInt('Number of Players', app, 'numPlayers')
-		app.numPlayers = math.max(app.numPlayers, 2)
+		self:centerLuatableTooltipInputInt('Number of Players', app.cfg, 'numPlayers')
+		app.cfg.numPlayers = math.max(app.cfg.numPlayers, 2)
 	end
 
 	self.playerKeysEditor:updateGUI()

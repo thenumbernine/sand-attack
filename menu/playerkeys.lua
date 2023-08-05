@@ -50,11 +50,11 @@ end
 function PlayerKeysEditor:updateGUI()
 	local Player = require 'sand-attack.player'
 	local app = self.app
-	local multiplayer = app.numPlayers > 1	
+	local multiplayer = app.cfg.numPlayers > 1	
 	-- should player keys be here or config?
 	-- config: because it is in every other game
 	-- here: because key config is based on # players, and # players is set here.
-	for i=1,app.numPlayers do
+	for i=1,app.cfg.numPlayers do
 		if not app.cfg.playerKeys[i] then
 			app.cfg.playerKeys[i] = {}
 			local defaultsrc = defaultKeys[i]
@@ -68,7 +68,7 @@ function PlayerKeysEditor:updateGUI()
 		end
 	end
 	if self.currentPlayerIndex then
-		assert(self.currentPlayerIndex >= 1 and self.currentPlayerIndex <= app.numPlayers)
+		assert(self.currentPlayerIndex >= 1 and self.currentPlayerIndex <= app.cfg.numPlayers)
 		-- this is modal but it makes the drawn onscreen gui hard to see
 		if ig.igBeginPopupModal'Edit Keys' then
 		-- this isn't modal so you can select off this window

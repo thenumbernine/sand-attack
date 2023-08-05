@@ -257,7 +257,7 @@ function App:initGL(...)
 	-- and do allow saving it in highscores and in demos ...
 	self.cfg.randseed = self.cfg.randseed or ffi.new('randSeed_t', -1)
 
-	self.numPlayers = 1
+	self.cfg.numPlayers = 1
 
 	self.fps = 0
 	self.numSandVoxels = 0
@@ -638,8 +638,6 @@ function App:reset(args)
 
 	self:saveConfig()
 
-	self.recordingEventSize = ffi.sizeof'gameTick_t' + math.ceil(self.numPlayers * #Player.gameKeyNames / 8)
-	self.recordingEvent = ffi.new('uint8_t[?]', self.recordingEventSize)
 	self.playingDemo = nil
 	if self.recordingDemoFile then
 		self.recordingDemoFile:close()
@@ -713,10 +711,15 @@ function App:reset(args)
 				self.playingDemo:readstr(1)	-- skip the \0
 --print('demo cfg randseed', self.playingDemo.config.randseed)
 
+-- TODO fix the splash demo
+-- remove its extra colors
+-- include its numPlayers=1
+self.playingDemo.config.numPlayers = self.playingDemo.config.numPlayers or 1
+
 				-- put currently-playing cfg in playcfg
 				self.playcfg = self.playingDemo.config
 --print('self.playingDemo.index', self.playingDemo.index)
---print('should be successfully playing the demo ...')		
+--print('should be successfully playing the demo ...')
 			end, function(err)
 				print('failed to load demo file '..args.playingDemoFileName..'\n'
 					..tostring(err)..'\n'
@@ -743,6 +746,11 @@ function App:reset(args)
 	end
 
 	local playcfg = self.playcfg
+
+	-- used only for writing demo file
+	self.recordingEventSize = ffi.sizeof'gameTick_t' + math.ceil(playcfg.numPlayers * #Player.gameKeyNames / 8)
+	-- used for reading and writing
+	self.recordingEvent = ffi.new('uint8_t[?]', self.recordingEventSize)
 
 	-- what happens if the replay config is bad?
 	-- should we lose the old config?
@@ -857,7 +865,7 @@ function App:reset(args)
 	self.gameColors = table.sub(playcfg.colors, 1, playcfg.numColors):mapi(function(c) return vec3f(c) end)		-- colors used now
 	assert(#self.gameColors == playcfg.numColors)	-- menu system should handle this
 
-	self.players = range(self.numPlayers):mapi(function(i)
+	self.players = range(playcfg.numPlayers):mapi(function(i)
 		return Player{index=i, app=self}
 	end)
 
@@ -1456,7 +1464,7 @@ function App:update(...)
 		-- draw the current piece
 		for _,player in ipairs(self.players) do
 			-- draw outline for multiplayer
-			if self.numPlayers > 1 then
+			if self.playcfg.numPlayers > 1 then
 				self.mvMat:setTranslate(
 						((math.floor(player.piecePos.x) - self.pieceOutlineRadius) / w - .5) * s,
 						(math.floor(player.piecePos.y) - self.pieceOutlineRadius) / h - .5
@@ -1631,6 +1639,8 @@ function App:endGame()
 	self.menustate = HighScoreMenu(self, true)
 end
 
+-- called from PlayingMenu:update, PlayerKeysEditor:update
+-- because it's a ui / input feature I'll use app.cfg instead of app.playcfg
 function App:drawTouchRegions()
 	local buttonRadius = self.width * self.cfg.screenButtonRadius
 
@@ -1644,7 +1654,7 @@ function App:drawTouchRegions()
 	gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 0)
 	self.buttonTex:bind()
 	self.projMat:setOrtho(0,self.width,self.height,0,-1,1)
-	for i=1,self.numPlayers do
+	for i=1,self.cfg.numPlayers do
 		for _,keyname in ipairs(Player.keyNames) do
 			local e = self.cfg.playerKeys[i][keyname]
 			if e	-- might not exist for new players >2 ...
@@ -1705,6 +1715,7 @@ function App:getEventName(sdlEventID, a,b,c)
 	})
 end
 
+-- this is used for player input, not for demo playback, so it'll use .cfg instead of .playcfg
 function App:processButtonEvent(press, ...)
 	local buttonRadius = self.width * self.cfg.screenButtonRadius
 
