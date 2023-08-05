@@ -1,8 +1,10 @@
 local table = require 'ext.table'
+local path = require 'ext.path'
 local range = require 'ext.range'
 local ops = require 'ext.op'
 local ig = require 'imgui'
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
+local mytolua = require 'sand-attack.serialize'.tolua
 local Menu = require 'sand-attack.menu.menu'
 
 local HighScoresMenu = Menu:subclass()
@@ -68,6 +70,7 @@ end
 function HighScoresMenu:saveHighScore(record, recordingDemo)
 	assert(record.uid, "every record needs a uid")
 	local fn = 'highscores/'..assert(record.uid)..'.demo'
+print('writing highscore', fn)	
 	assert(not path(fn):exists(), "tried to write but it's already there")
 	
 	-- write new unique name?
@@ -76,7 +79,7 @@ function HighScoresMenu:saveHighScore(record, recordingDemo)
 	-- give unique id?
 	-- but unique ids are only locally unique ...
 	path(fn):write(
-		mytolua(entry)
+		mytolua(record)
 		..'\0'
 		..recordingDemo
 	)

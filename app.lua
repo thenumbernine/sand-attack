@@ -80,23 +80,8 @@ function RNG:__call(...)
 end
 --]]
 
-
-local tolua = require 'ext.tolua'
-local function mytolua(x)
-	return tolua(x, {
-		serializeForType = {
-			cdata = function(state, x, ...)
-				return tostring(x)
-			end,
-		}
-	})
-end
-
-local fromlua = require 'ext.fromlua'
-local function myfromlua(x)
-	-- empty env ... sandboxed?
-	return fromlua(x, nil, nil, {})
-end
+local mytolua = require 'sand-attack.serialize'.tolua
+local myfromlua = require 'sand-attack.serialize'.fromlua
 
 local App = class(ImGuiApp)
 
@@ -147,7 +132,8 @@ local function readDemo(fn)
 		assert(d:sub(len+1,len+1):byte() == 0)
 		demo = d:sub(len+2)
 	end
-	return assert(myfromlua(cfgstr)), demo
+	local cfg = assert(myfromlua(cfgstr))
+	return cfg, demo
 end
 
 function App:initGL(...)
@@ -1593,7 +1579,7 @@ function App:update(...)
 			local fn = self.playingDemo.filename
 			self.playingDemo = nil
 			self.loseTime = nil
-			--self.menustate = MainMenu(self, true)
+			--self.menustate = MainMenu(self)
 			-- and reset
 			self:reset{
 				playingDemoFileName = fn,
@@ -1631,6 +1617,14 @@ App.fpsSampleCount = 0
 
 -- called from menu upon early end
 function App:endGame()
+	if self.playingDemo then
+		-- :endGame called from PlayingMenu
+		-- when you push esc while playing back a menu
+		-- TODO menu/demos is all a mess
+		self.menustate = MainMenu(self)
+		return
+	end
+
 	-- while we're here, write out the last key recording
 	-- maybe in th future it'll go into the highscores data
 	-- or maybe i'll compress it further meh
@@ -1638,15 +1632,16 @@ function App:endGame()
 	-- or maybe highscores overall will handle it?
 	self.loseTime = nil
 	self.paused = true
-	if self.recordingDemo then
-		path(self.lastDemoFileName):write(
-			mytolua(self.playcfg)
-			..'\0'
-			..self.recordingDemo:concat()
-		)
-		self.recordingDemo = nil
-	end
-	self.menustate = HighScoreMenu(self, true)
+	-- if we're not playing a demo then we should be recording one
+	local recordingDemo = assert(self.recordingDemo):concat()
+	self.recordingDemo = nil
+	-- write the last demo
+	path(self.lastDemoFileName):write(
+		mytolua(self.playcfg)
+		..'\0'
+		..recordingDemo
+	)
+	self.menustate = HighScoreMenu(self, true, recordingDemo)
 end
 
 -- called from PlayingMenu:update, PlayerKeysEditor:update
