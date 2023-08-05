@@ -6,8 +6,6 @@ local class = require 'ext.class'
 local math = require 'ext.math'
 local string = require 'ext.string'
 local range = require 'ext.range'
-local fromlua = require 'ext.fromlua'
-local tolua = require 'ext.tolua'
 local template = require 'template'
 local matrix = require 'matrix.ffi'
 local Image = require 'image'
@@ -83,7 +81,8 @@ end
 --]]
 
 
-local function toluawcdata(x)
+local tolua = require 'ext.tolua'
+local function mytolua(x)
 	return tolua(x, {
 		serializeForType = {
 			cdata = function(state, x, ...)
@@ -93,6 +92,11 @@ local function toluawcdata(x)
 	})
 end
 
+local fromlua = require 'ext.fromlua'
+local function myfromlua(x)
+	-- empty env ... sandboxed?
+	return fromlua(x, nil, nil, {})
+end
 
 local App = class(ImGuiApp)
 
@@ -130,9 +134,21 @@ App.lineFlashDuration = 1
 App.lineNumFlashes = 5
 
 App.cfgfilename = 'config.lua'
-App.highScoresFilename = 'highscores.lua'
 
 App.lastDemoFileName = 'last-game-demo.bin'
+
+local function readDemo(fn)
+	local d = assert(path(fn):read())
+	local dlen = #d
+	local len = tonumber(ffi.C.strlen(d))
+	local cfgstr = d:sub(1,len)
+	local demo  = ''
+	if dlen > len then
+		assert(d:sub(len+1,len+1):byte() == 0)
+		demo = d:sub(len+2)
+	end
+	return assert(myfromlua(cfgstr)), demo
+end
 
 function App:initGL(...)
 	App.super.initGL(self, ...)
@@ -190,7 +206,7 @@ function App:initGL(...)
 
 	-- load config if it exists
 	xpcall(function()
-		self.cfg = fromlua(assert(path(self.cfgfilename):read()))
+		self.cfg = myfromlua(assert(path(self.cfgfilename):read()))
 	end, function(err)
 		print('failed to read lua from file '..self.cfgfilename..'\n'
 			..tostring(err)..'\n'
@@ -199,14 +215,19 @@ function App:initGL(...)
 	self.cfg = self.cfg or {}
 
 	-- load high scores if it exists
-	xpcall(function()
-		self.highscores = fromlua(assert(path(self.highScoresFilename):read()))
-	end, function(err)
-		print('failed to read lua from file '..self.highScoresFilename..'\n'
-			..tostring(err)..'\n'
-			..debug.traceback())
-	end)
-	self.highscores = self.highscores or {}
+	self.highscores = {}
+	for f in path'highscores':dir() do
+		local fn = 'highscores/'..f
+		xpcall(function()
+			local record, demo = readDemo(fn)
+			record.recordingDemo = demo
+			table.insert(self.highscores, record)
+		end, function(err)
+			print('failed to read highscores from file '..fn..'\n'
+				..tostring(err)..'\n'
+				..debug.traceback())
+		end)
+	end
 
 	-- board size is 80 x 144 visible
 	-- piece is 4 blocks arranged
@@ -618,11 +639,7 @@ function App:playSound(name, volume, pitch)
 end
 
 function App:saveConfig()
-	path(self.cfgfilename):write(toluawcdata(self.cfg))
-end
-
-function App:saveHighScores()
-	path(self.highScoresFilename):write(toluawcdata(self.highscores))
+	path(self.cfgfilename):write(mytolua(self.cfg))
 end
 
 -- called by App:reset
@@ -639,10 +656,7 @@ function App:reset(args)
 	self:saveConfig()
 
 	self.playingDemo = nil
-	if self.recordingDemoFile then
-		self.recordingDemoFile:close()
-		self.recordingDemoFile = nil
-	end
+	self.recordingDemo = nil
 
 	--[[
 	recording file format:
@@ -705,9 +719,7 @@ function App:reset(args)
 
 				local democfgstr = self.playingDemo:readstr()
 --print('democfgstr', democfgstr)
-				self.playingDemo.config = assert((fromlua(
-					democfgstr
-				)))
+				self.playingDemo.config = assert((myfromlua(democfgstr)))
 --print('self.playingDemo.config', self.playingDemo.config)
 				self.playingDemo:readstr(1)	-- skip the \0
 --print('demo cfg randseed', self.playingDemo.config.randseed)
@@ -726,13 +738,7 @@ function App:reset(args)
 		if not self.playingDemo then
 --print('recording demo...')
 			-- ... then record
-			self.recordingDemoFile = path(self.lastDemoFileName):open'wb'
-
-			--[[
-			TODO here write the lua table of the config here ... and merge the rand seed into it.
-			--]]
-
-			self.recordingDemoFile:write(toluawcdata(self.cfg)..'\0')
+			self.recordingDemo = table()
 
 			-- NOTICE THIS IS A SHALLOW COPY
 			-- that means subtables (player keys, custom colors) won't be copied
@@ -1191,7 +1197,7 @@ function App:updateGame()
 		player.piecePosLast:set(player.piecePos:unpack())
 	end
 
-	if self.recordingDemoFile then
+	if self.recordingDemo then
 		ffi.fill(self.recordingEvent, self.recordingEventSize)
 		ffi.cast('gameTick_t*', self.recordingEvent)[0] = self.gameTick
 		local buttonsPtr = ffi.cast('uint8_t*', self.recordingEvent) + ffi.sizeof'gameTick_t'
@@ -1221,7 +1227,7 @@ for i=ffi.sizeof'gameTick_t',self.recordingEventSize-1 do
 end
 print()
 --]]
-			self.recordingDemoFile:write(ffi.string(self.recordingEvent, self.recordingEventSize))
+			self.recordingDemo:insert(ffi.string(self.recordingEvent, self.recordingEventSize))
 		end
 	elseif self.playingDemo then
 		local event = self.playingDemo:get(self.recordingEventSize)
@@ -1632,9 +1638,13 @@ function App:endGame()
 	-- or maybe highscores overall will handle it?
 	self.loseTime = nil
 	self.paused = true
-	if self.recordingDemoFile then
-		self.recordingDemoFile:close()
-		self.recordingDemoFile = nil
+	if self.recordingDemo then
+		path(self.lastDemoFileName):write(
+			mytolua(self.playcfg)
+			..'\0'
+			..self.recordingDemo:concat()
+		)
+		self.recordingDemo = nil
 	end
 	self.menustate = HighScoreMenu(self, true)
 end

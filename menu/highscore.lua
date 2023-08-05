@@ -7,10 +7,12 @@ local Menu = require 'sand-attack.menu.menu'
 
 local HighScoresMenu = Menu:subclass()
 
-function HighScoresMenu:init(app, needsName)
+function HighScoresMenu:init(app, needsName, recordingDemo)
 	HighScoresMenu.super.init(self, app)
 	self.needsName = needsName
 	self.name = ''
+	self.recordingDemo = recordingDemo
+	if needsName then assert(self.recordingDemo) end
 end
 
 HighScoresMenu.fields = table{
@@ -55,7 +57,29 @@ function HighScoresMenu:makeNewRecord()
 			record[field] = app[field]
 		end
 	end
+	
+	-- give it a new unique id
+	record.uid = table.mapi(app.highscores, function(r) return r.uid or 0 end):sup() + 1
+
 	return record
+end
+
+-- TODO mkdir and save one file per entry
+function HighScoresMenu:saveHighScore(record, recordingDemo)
+	assert(record.uid, "every record needs a uid")
+	local fn = 'highscores/'..assert(record.uid)..'.demo'
+	assert(not path(fn):exists(), "tried to write but it's already there")
+	
+	-- write new unique name?
+	-- what happens if i write twice?  duplicate entries?
+	-- how to fix this?
+	-- give unique id?
+	-- but unique ids are only locally unique ...
+	path(fn):write(
+		mytolua(entry)
+		..'\0'
+		..recordingDemo
+	)
 end
 
 function HighScoresMenu:updateGUI()
@@ -64,16 +88,15 @@ function HighScoresMenu:updateGUI()
 
 	-- TODO separate state for this?
 	if self.needsName then
+		assert(self.recordingDemo)
 		ig.igText'Your Name:'
 		ig.luatableTooltipInputText('Your Name', self, 'name')
 		if ig.igButton'Ok' then
 			self.needsName = false
 			local record = self:makeNewRecord()
 			table.insert(app.highscores, record)
-			table.sort(app.highscores, function(a,b)
-				return a.score > b.score
-			end)
-			app:saveHighScores()
+			table.sort(app.highscores, function(a,b) return a.score > b.score end)
+			self:saveHighScore(record, self.recordingDemo)
 		end
 		ig.igNewLine()
 	end
@@ -153,7 +176,9 @@ function HighScoresMenu:updateGUI()
 		ig.igSameLine()
 		if ig.igButton'Clear' then
 			app.highscores = {}
-			app:saveHighScores()
+			for f in path'highscores':dir() do
+				path('highscores/'..f):remove()
+			end
 		end
 	end
 	self:endFullView()
