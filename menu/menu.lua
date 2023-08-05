@@ -119,4 +119,12 @@ function Menu:centerLuatableTooltipSliderFloat(...)
 	return result
 end
 
+-- TODO just write one wrapper instead of all this ...
+function Menu:centerInputText(...)
+	self.overrideTextWidth = 360
+	local result = self:centerGUI(ig.igInputText, ...)
+	self.overrideTextWidth = nil
+	return result
+end
+
 return Menu

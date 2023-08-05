@@ -17,18 +17,23 @@ end
 -- TODO instead of picking out fields, just serialize the whole gamecfg object
 -- and TODO separat .cfg into .gamecfg (that goes with highscores) and .usercfg (that goes with user settings)
 HighScoresMenu.fields = table{
+	-- from HighScoresMenu
 	'name',
+	-- from app:
 	'lines',
 	'level',
 	'score',
-	'numColors',
 	'numPlayers',
+	-- from cfg:
+	'numColors',
 	'boardWidthInBlocks',
 	'boardHeightInBlocks',
 	'toppleChance',
 	'voxelsPerBlock',
-	'sandModel',
 	'speedupCoeff',
+	'randseed',
+	-- from cfg but needs to be mapped
+	'sandModel',
 }
 
 function HighScoresMenu:makeNewRecord()
@@ -37,12 +42,13 @@ function HighScoresMenu:makeNewRecord()
 	for _,field in ipairs(self.fields) do
 		if field == 'name' then
 			record[field] = self[field]
-		elseif field == 'toppleChance'
-		or field == 'voxelsPerBlock'
-		or field == 'numColors'
-		or field == 'speedupCoeff'
+		elseif field == 'numColors'
 		or field == 'boardWidthInBlocks'
 		or field == 'boardHeightInBlocks'
+		or field == 'toppleChance'
+		or field == 'voxelsPerBlock'
+		or field == 'speedupCoeff'
+		or field == 'randseed'
 		then
 			record[field] = app.cfg[field]
 		elseif field == 'sandModel' then
@@ -75,30 +81,12 @@ function HighScoresMenu:updateGUI()
 	end
 
 	if ig.igBeginTable('High Scores', #self.fields, bit.bor(
-		--[[
-		ig.ImGuiTableFlags_SizingFixedFit,
-		ig.ImGuiTableFlags_ScrollX,
-		ig.ImGuiTableFlags_ScrollY,
-		ig.ImGuiTableFlags_RowBg,
-		ig.ImGuiTableFlags_BordersOuter,
-		ig.ImGuiTableFlags_BordersV,
 		ig.ImGuiTableFlags_Resizable,
 		ig.ImGuiTableFlags_Reorderable,
-		ig.ImGuiTableFlags_Hideable,
-		ig.ImGuiTableFlags_Sortable
-		--]]
-		-- [[
-		ig.ImGuiTableFlags_Resizable,
-		ig.ImGuiTableFlags_Reorderable,
-		--ig.ImGuiTableFlags_Hideable,
 		ig.ImGuiTableFlags_Sortable,
 		ig.ImGuiTableFlags_SortMulti,
-		--ig.ImGuiTableFlags_RowBg,
 		ig.ImGuiTableFlags_BordersOuter,
 		ig.ImGuiTableFlags_BordersV,
-		--ig.ImGuiTableFlags_NoBordersInBody,
-		--ig.ImGuiTableFlags_ScrollY,
-		--]]
 	0), ig.ImVec2(0,0), 0) then
 
 		for i,field in ipairs(self.fields) do

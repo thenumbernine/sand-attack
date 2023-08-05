@@ -1,6 +1,8 @@
+local ffi = require 'ffi'
 local table = require 'ext.table'
 local math = require 'ext.math'
 local vec3f = require 'vec-ffi.vec3f'
+require 'ffi.req' 'c.stdlib'	-- strtoll
 local ig = require 'imgui'
 local Menu = require 'sand-attack.menu.menu'
 local PlayerKeysEditor = require 'sand-attack.menu.playerkeys'
@@ -17,6 +19,14 @@ function NewGameMenu:init(app, multiplayer)
 	end
 
 	self.playerKeysEditor = PlayerKeysEditor(app)
+
+	-- the newgame menu is init'd upon clicking 'single player' or 'multi player' in the main menu
+	-- every time
+	-- so re-randomize the game seed here
+	app.cfg.randseed = ffi.cast('randSeed_t', bit.bxor(
+		ffi.cast('randSeed_t', bit.bxor(os.time(), app.rng(0xffffffff))),
+		bit.lshift(ffi.cast('randSeed_t', bit.bxor(os.time(), app.rng(0xffffffff))), 32)
+	))
 end
 
 -- if we're editing keys then show keys
@@ -27,10 +37,10 @@ end
 local tmpcolor = ig.ImVec4()	-- for imgui button
 local tmpcolorv = vec3f()		-- for imgui color picker
 
-function NewGameMenu:updateGUI()
+function NewGameMenu:goOrBack(bleh)
 	local app = self.app
 
-	self:beginFullView(self.multiplayer and 'New Game Multiplayer' or 'New Game', 3 * 32)
+	ig.igPushID_Int(bleh)
 
 	--ig.igSameLine() -- how to work with centered multiple widgets...
 	if self:centerButton'Go!' then
@@ -43,6 +53,18 @@ function NewGameMenu:updateGUI()
 		local MainMenu = require 'sand-attack.menu.main'
 		app.menustate = MainMenu(app)
 	end
+
+	ig.igPopID()
+end
+
+local tmpbuf = ffi.new('char[256]')
+
+function NewGameMenu:updateGUI()
+	local app = self.app
+
+	self:beginFullView(self.multiplayer and 'New Game Multiplayer' or 'New Game', 3 * 32)
+
+	self:goOrBack(1)
 
 	if self.multiplayer then
 		self:centerText'Number of Players:'
@@ -161,6 +183,18 @@ function NewGameMenu:updateGUI()
 
 	local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 	ig.luatableCombo('Sand Model', app.cfg, 'sandModel', sandModelClassNames)
+
+	-- looks like the standard printf is in the macro PRIx64 ... which I've gotta now make sure is in the ported header ...
+	ffi.C.snprintf(tmpbuf, ffi.sizeof(tmpbuf), '%llx', app.cfg.randseed)
+	if self:centerInputText('seed', tmpbuf, ffi.sizeof(tmpbuf)) then
+		print('updating seed', ffi.string(tmpbuf))
+		-- strtoll is long-long should be int64_t ... I could sizeof assert that but meh
+		app.cfg.randseed = ffi.C.strtoll(tmpbuf, nil, 16),
+		print('updated randseed to', app.cfg.randseed)
+	end
+
+	ig.igNewLine()
+	self:goOrBack(2)
 
 	self:endFullView()
 end

@@ -78,6 +78,16 @@ end
 --]]
 
 
+local function toluawcdata(x)
+	return tolua(x, {
+		serializeForType = {
+			cdata = function(state, x, ...)
+				return tostring(x)
+			end,
+		}
+	})
+end
+
 
 local App = class(ImGuiApp)
 
@@ -187,7 +197,9 @@ function App:initGL(...)
 	xpcall(function()
 		self.cfg = fromlua(assert(path(self.cfgfilename):read()))
 	end, function(err)
-		print("failed to read config file: "..tostring(err))
+		print('failed to read lua from file '..self.cfgfilename..'\n'
+			..tostring(err)..'\n'
+			..debug.traceback())
 	end)
 	self.cfg = self.cfg or {}
 
@@ -195,7 +207,9 @@ function App:initGL(...)
 	xpcall(function()
 		self.highscores = fromlua(assert(path(self.highScoresFilename):read()))
 	end, function(err)
-		print("failed to read config file: "..tostring(err))
+		print('failed to read lua from file '..self.highScoresFilename..'\n'
+			..tostring(err)..'\n'
+			..debug.traceback())
 	end)
 	self.highscores = self.highscores or {}
 
@@ -243,6 +257,10 @@ function App:initGL(...)
 	self.cfg.boardHeightInBlocks = self.cfg.boardHeightInBlocks or 64
 	--]]
 	self.cfg.numNextPieces = self.cfg.numNextPieces or 3
+	-- hmm ... don't save this ... instead generate it new every game ... unless specified ... hmmm ....
+	-- but do allow editing it in the config screen ... hmm ....
+	-- and do allow saving it in highscores and in demos ...
+	self.cfg.randseed = self.cfg.randseed or ffi.new('randSeed_t', -1)
 
 	self.numPlayers = 1
 
@@ -597,11 +615,11 @@ function App:playSound(name, volume, pitch)
 end
 
 function App:saveConfig()
-	path(self.cfgfilename):write(tolua(self.cfg))
+	path(self.cfgfilename):write(toluawcdata(self.cfg))
 end
 
 function App:saveHighScores()
-	path(self.highScoresFilename):write(tolua(self.highscores))
+	path(self.highScoresFilename):write(toluawcdata(self.highscores))
 end
 
 function App:updateGameScale()
@@ -679,15 +697,15 @@ function App:reset(args)
 						end,
 					},
 				})
-				
+
 				--[[
-				self.playingDemo.config = assert((tolua(
+				self.playingDemo.config = assert((toluawcdata(
 					self.playingDemo:readstr(
 						ffi.C.strlen(self.playingDemo.ptr)
 					)
 				)))
 				self.playingDemo:read(1)	-- skip the \0
-				--]]	
+				--]]
 
 				-- TODO move the rng seed into the lua record
 				-- then TODO upon reading the config now we have to cnoigure the board based on the lua record
@@ -695,31 +713,30 @@ function App:reset(args)
 				-- should we lose the old config?
 				-- or what if it's good?
 				-- should we allow the demo config to overwrite the previous config?
-				-- ....   
+				-- ....
 				self.rng = RNG(assert(self.playingDemo:read'randSeed_t'))
-			
+
 			end, function(err)
-				print('failed to load demo: '..tostring(err))
-				-- for more info
-				--print(err..'\n'..debug.traceback())
+				print('failed to load demo file '..args.playingDemoFileName..'\n'
+					..tostring(err)..'\n'
+					..debug.traceback())
 				self.playingDemo = nil
 			end)
 		end
 		if not self.playingDemo then
 			-- ... then record
-			local randseed = ffi.new('randSeed_t[1]', tonumber(os.time()))
-			self.rng = RNG(randseed[0])
+			self.rng = RNG(self.cfg.randseed)
 			self.recordingDemoFile = path(self.lastDemoFileName):open'wb'
-			
+
 			--[[
 			TODO here write the lua table of the config here ... and merge the rand seed into it.
 			--]]
 
-			self.recordingDemoFile:write(ffi.string(randseed, ffi.sizeof'randSeed_t'))
+			local tmp = ffi.new('randSeed_t[1]', self.cfg.randseed)
+			self.recordingDemoFile:write(ffi.string(tmp, ffi.sizeof(tmp)))
 		end
 	else
-		local randseed = ffi.new('randSeed_t', tonumber(os.time()))
-		self.rng = RNG(randseed)
+		self.rng = RNG(self.cfg.randseed)
 	end
 
 
