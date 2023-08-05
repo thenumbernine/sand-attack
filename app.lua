@@ -203,7 +203,7 @@ function App:initGL(...)
 	-- load high scores if it exists
 	self.highscores = {}
 	-- TODO WARNING
-	-- for some reason in the distributable ONLY (not in runtime setup), errors thrown in the app ctor are being hidden.
+	-- for some reason in the Windows version, distributable ONLY (not in runtime setup), errors thrown in the app ctor are being hidden.
 	-- especially starting right around here ...
 	path'highscores':mkdir()
 	for f in path'highscores':dir() do
@@ -211,6 +211,7 @@ function App:initGL(...)
 		xpcall(function()
 			local record, demo = readDemo(fn)
 			record.recordingDemo = demo
+			record.demofilename = f
 			table.insert(self.highscores, record)
 		end, function(err)
 			print('failed to read highscores from file '..fn..'\n'

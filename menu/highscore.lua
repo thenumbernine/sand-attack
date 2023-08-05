@@ -61,16 +61,21 @@ function HighScoresMenu:makeNewRecord()
 	end
 	
 	-- give it a new unique id
-	record.uid = (table.mapi(app.highscores, function(r) return r.uid or 0 end):sup() or 0) + 1
+	record.demofilename = (
+		-- use the next integer available
+		(table.mapi(app.highscores, function(r)
+			return tonumber((r.demofilename:match'^(%d+)%.demo$')) or 0
+		end):sup() or 0) + 1
+	)..'.demo'
 
 	return record
 end
 
 -- TODO mkdir and save one file per entry
 function HighScoresMenu:saveHighScore(record, recordingDemo)
-	assert(record.uid, "every record needs a uid")
-	local fn = 'highscores/'..assert(record.uid)..'.demo'
-print('writing highscore', fn)	
+	assert(record.demofilename, "every record needs a demofilename")
+	local fn = 'highscores/'..assert(record.demofilename)
+print('writing highscore', fn)
 	assert(not path(fn):exists(), "tried to write but it's already there")
 	
 	-- write new unique name?
