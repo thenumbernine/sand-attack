@@ -59,7 +59,7 @@ function CFDSand:update()
 					v[0] = v[0] + grav * dt
 					needsCheckLine = true
 				-- hmm symmetry? check left vs right first?
-				elseif app.rng() < app.cfg.toppleChance then
+				elseif app.rng() < app.playcfg.toppleChance then
 					-- 50/50 check left then right, vs check right then left
 					if app.rng(2) == 2 then
 						if i > 0 and p[-w-1] == 0 then

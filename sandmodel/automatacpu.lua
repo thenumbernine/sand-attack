@@ -29,7 +29,7 @@ function AutomataCPU:update()
 						p[0], p[-w] = p[-w], p[0]
 						needsCheckLine = true
 					-- hmm symmetry? check left vs right first?
-					elseif app.rng() < app.cfg.toppleChance then
+					elseif app.rng() < app.playcfg.toppleChance then
 						-- 50/50 check left then right, vs check right then left
 						if app.rng(2) == 2 then
 							if i > 0 and p[-w-1] == 0 then

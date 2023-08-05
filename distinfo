@@ -3,6 +3,7 @@ luaDistVer = 'luajit'	-- luajit-openresty-2.1.0
 luaArgs = {'run.lua'}
 
 files = {
+	-- IO files go here
 	['.'] = {
 		'run.lua',
 		'README.md',
@@ -10,7 +11,9 @@ files = {
 		'music',
 		'sfx',
 		'font',
+		'splash-demo.bin',
 	},
+	-- require script files go here
 	['..'] = table{
 		-- hmm better way to do this?
 		-- scripts (other than run.lua) are relative to parent dir

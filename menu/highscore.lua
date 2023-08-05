@@ -13,9 +13,6 @@ function HighScoresMenu:init(app, needsName)
 	self.name = ''
 end
 
--- save state info pertinent to the gameplay
--- TODO instead of picking out fields, just serialize the whole gamecfg object
--- and TODO separat .cfg into .gamecfg (that goes with highscores) and .usercfg (that goes with user settings)
 HighScoresMenu.fields = table{
 	-- from HighScoresMenu
 	'name',
@@ -50,9 +47,9 @@ function HighScoresMenu:makeNewRecord()
 		or field == 'speedupCoeff'
 		or field == 'randseed'
 		then
-			record[field] = app.cfg[field]
+			record[field] = app.playcfg[field]
 		elseif field == 'sandModel' then
-			record[field] = sandModelClassNames[app.cfg[field]]
+			record[field] = sandModelClassNames[app.playcfg[field]]
 		else
 			record[field] = app[field]
 		end

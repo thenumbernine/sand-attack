@@ -30,6 +30,11 @@ local Player = require 'sand-attack.player'
 local SandModel = require 'sand-attack.sandmodel.sandmodel'
 local sandModelClasses = require 'sand-attack.sandmodel.all'.classes
 
+local PlayingMenu = require 'sand-attack.menu.playing'
+local SplashScreenMenu = require 'sand-attack.menu.splashscreen'
+local MainMenu = require 'sand-attack.menu.main'
+local HighScoreMenu = require 'sand-attack.menu.highscore'
+
 ffi.cdef[[
 // what type to use for time?
 // 60 fps ...
@@ -115,6 +120,8 @@ App.defaultColors = table{
 	{0,1,1},
 	{1,1,1},
 }
+-- assumes we have full 8 bits of resolution in th alpha channel (not always the case .... ?)
+App.maxColors = 255
 
 App.maxAudioDist = 10
 
@@ -129,18 +136,6 @@ App.lastDemoFileName = 'last-game-demo.bin'
 
 function App:initGL(...)
 	App.super.initGL(self, ...)
-
-	-- populate # colors
-	-- don't worry about rng?  or should i seed this by some default value?
-	-- I am saving them anyways for the case of color customization, so if you remove a few color and re-add them it remembers
-	-- TODO maybe only generate/save colors that have been used so far?
-	while #self.defaultColors < 255 do
-		self.defaultColors:insert{vec3f():map(function()
-			return math.random()
-		end):normalize():unpack()}
-	end
-	-- ... but not all 8 bit alpha channels are really 8 bits ...
-
 
 	-- allow keys to navigate menu
 	-- TODO how to make it so player keys choose menus, not just space bar/
@@ -231,16 +226,16 @@ function App:initGL(...)
 	self.cfg.speedupCoeff = self.cfg.speedupCoeff or .007
 	self.cfg.toppleChance = self.cfg.toppleChance or 1
 	self.cfg.playerKeys = self.cfg.playerKeys or {}
-	self.cfg.numColors = self.cfg.numColors or 4
 	self.cfg.screenButtonRadius = self.cfg.screenButtonRadius or .05
 	if self.cfg.continuousDrop == nil then
 		self.cfg.continuousDrop = true
 	end
 	if not self.cfg.colors then
 		self.cfg.colors = {}
-		for i,color in ipairs(self.defaultColors) do
-			self.cfg.colors[i] = {table.unpack(color)}
-		end
+	end
+	self.cfg.numColors = self.cfg.numColors or 4
+	for i=1,self.cfg.numColors do
+		self.cfg.colors[i] = self.cfg.colors[i] or self:getDefaultColor(i)
 	end
 	self.cfg.boardWidthInBlocks = self.cfg.boardWidthInBlocks or 10		-- original
 	self.cfg.boardHeightInBlocks = self.cfg.boardHeightInBlocks or 18	-- original
@@ -501,6 +496,7 @@ void main() {
 				self.bgAudioSource = AudioSource()
 				self.bgAudioSource:setBuffer(self.bgMusic)
 				self.bgAudioSource:setLooping(true)
+				-- self.usercfg
 				self.bgAudioSource:setGain(self.cfg.backgroundVolume)
 				self.bgAudioSource:play()
 			end
@@ -511,16 +507,25 @@ void main() {
 		end)
 	end
 
-	local SplashScreenMenu = require 'sand-attack.menu.splashscreen'
 	self.menustate = SplashScreenMenu(self)
 
 	-- play a demo in the background when the game starts
+	local fn = 'splash-demo.bin'
 	self:reset{
-		playingDemoFileName = 'splash-demo.bin',
+		playingDemoFileName = path(fn):exists() and fn or nil,
 	}
 
 	glreport'here'
 end
+
+function App:getDefaultColor(i)
+	if i <= #self.defaultColors then
+		return {table.unpack(self.defaultColors[i])}
+	else
+		return {vec3f():map(function() return math.random() end):normalize():unpack()}
+	end
+end
+
 
 function App:makeTexFromImage(img)
 	local tex = GLTex2D{
@@ -549,17 +554,19 @@ function App:makeTexWithBlankImage(size)
 	return self:makeTexFromImage(img)
 end
 
+-- called from App:reset()
 function App:makePieceImage(s)
 	s = string.split(s, '\n')
 	local img = Image(self.pieceSize.x, self.pieceSize.y, 4, 'unsigned char')
 	local ptr = ffi.cast('uint32_t*', img.buffer)
 	ffi.fill(ptr, 4 * img.width * img.height)
+	local vpb = self.playcfg.voxelsPerBlock
 	for j=0,self.pieceSizeInBlocks.y-1 do
 		for i=0,self.pieceSizeInBlocks.x-1 do
 			if s[j+1]:sub(i+1,i+1) == '#' then
-				for u=0,self.cfg.voxelsPerBlock-1 do
-					for v=0,self.cfg.voxelsPerBlock-1 do
-						ptr[(u + self.cfg.voxelsPerBlock * i) + img.width * (v + self.cfg.voxelsPerBlock * j)] = 0xffffffff
+				for u=0,vpb-1 do
+					for v=0,vpb-1 do
+						ptr[(u + vpb * i) + img.width * (v + vpb * j)] = 0xffffffff
 					end
 				end
 			end
@@ -618,9 +625,10 @@ function App:saveHighScores()
 	path(self.highScoresFilename):write(toluawcdata(self.highscores))
 end
 
+-- called by App:reset
+-- would be called by NewGameMenu:updateGUI once I sort out .cfg vs .playcfg
 function App:updateGameScale()
-	self.cfg.voxelsPerBlock = math.max(1, self.cfg.voxelsPerBlock)
-	self.gameScaleFloat = self.cfg.voxelsPerBlock / 8
+	self.gameScaleFloat = self.playcfg.voxelsPerBlock / 8
 	self.gameScale = math.ceil(self.gameScaleFloat)
 	self.updatesPerFrame = self.gameScale
 end
@@ -629,7 +637,6 @@ function App:reset(args)
 	args = args or {}
 
 	self:saveConfig()
-	self:updateGameScale()
 
 	self.recordingEventSize = ffi.sizeof'gameTick_t' + math.ceil(self.numPlayers * #Player.gameKeyNames / 8)
 	self.recordingEvent = ffi.new('uint8_t[?]', self.recordingEventSize)
@@ -677,7 +684,7 @@ function App:reset(args)
 							end
 							return self.ptr + self.index
 						end,
-						-- return value and advance
+						-- return cdata value and advance
 						read = function(self, ctype)
 							local resultsize = ffi.sizeof(ctype)
 							local result = self:get(resultsize)
@@ -687,6 +694,7 @@ function App:reset(args)
 						end,
 						-- return str value and advance
 						readstr = function(self, len)
+							len = len or ffi.C.strlen(self.ptr + self.index)
 							local s, msg = self:get(len)
 							if not s then return s, msg end
 							return ffi.string(s, len)
@@ -694,23 +702,17 @@ function App:reset(args)
 					},
 				})
 
-				--[[
-				self.playingDemo.config = assert((toluawcdata(
-					self.playingDemo:readstr(
-						ffi.C.strlen(self.playingDemo.ptr)
-					)
+				local democfgstr = self.playingDemo:readstr()
+print('democfgstr', democfgstr)
+				self.playingDemo.config = assert((fromlua(
+					democfgstr
 				)))
-				self.playingDemo:read(1)	-- skip the \0
-				--]]
+print('self.playingDemo.config', self.playingDemo.config)
+				self.playingDemo:readstr(1)	-- skip the \0
+print('demo cfg randseed', self.playingDemo.config.randseed)
 
-				-- TODO move the rng seed into the lua record
-				-- then TODO upon reading the config now we have to cnoigure the board based on the lua record
-				-- but what happens if the replay config is bad?
-				-- should we lose the old config?
-				-- or what if it's good?
-				-- should we allow the demo config to overwrite the previous config?
-				-- ....
-				self.rng = RNG(assert(self.playingDemo:read'randSeed_t'))
+				-- put currently-playing cfg in playcfg
+				self.playcfg = self.playingDemo.config
 
 			end, function(err)
 				print('failed to load demo file '..args.playingDemoFileName..'\n'
@@ -721,24 +723,37 @@ function App:reset(args)
 		end
 		if not self.playingDemo then
 			-- ... then record
-			self.rng = RNG(self.cfg.randseed)
 			self.recordingDemoFile = path(self.lastDemoFileName):open'wb'
 
 			--[[
 			TODO here write the lua table of the config here ... and merge the rand seed into it.
 			--]]
 
-			local tmp = ffi.new('randSeed_t[1]', self.cfg.randseed)
-			self.recordingDemoFile:write(ffi.string(tmp, ffi.sizeof(tmp)))
+			self.recordingDemoFile:write(toluawcdata(self.cfg)..'\0')
+
+			-- NOTICE THIS IS A SHALLOW COPY
+			-- that means subtables (player keys, custom colors) won't be copied
+			-- not sure if i should bother since neither of those things are used by playcfg but ....
+			self.playcfg = table(self.cfg):setmetatable(nil)
 		end
-	else
-		self.rng = RNG(self.cfg.randseed)
 	end
 
+	local playcfg = self.playcfg
+
+	-- what happens if the replay config is bad?
+	-- should we lose the old config?
+	-- or what if it's good?
+	-- should we allow the demo config to overwrite the previous config?
+	-- ....
+	-- thinking more about it, mayb the whoel of :reset() should be wrapped in that xpcall
+	-- in case the base config.lua file itself was corrupted
+	self.rng = RNG(playcfg.randseed)
+
+	self:updateGameScale()
 
 	-- init pieces
 
-	self.pieceSize = self.pieceSizeInBlocks * self.cfg.voxelsPerBlock
+	self.pieceSize = self.pieceSizeInBlocks * playcfg.voxelsPerBlock
 
 	self.pieceFBO = GLFBO{width=self.pieceSize.x, height=self.pieceSize.y}
 		:unbind()
@@ -767,56 +782,57 @@ function App:reset(args)
 
 
 	self.pieceSourceTexs = table{
-		self:makePieceImage[[
+		[[
  #
  #
  #
  #
 ]],
-		self:makePieceImage[[
+		[[
  #
  #
  ##
 ]],
-		self:makePieceImage[[
+		[[
    #
    #
   ##
 ]],
-		self:makePieceImage[[
+		[[
 
  ##
  ##
 ]],
-		self:makePieceImage[[
+		[[
 
  #
 ###
 ]],
-		self:makePieceImage[[
+		[[
  #
  ##
   #
 ]],
-		self:makePieceImage[[
+		[[
   #
  ##
  #
 ]],
-	}
-
+	}:mapi(function(s)
+		return self:makePieceImage(s)
+	end)
 
 	-- init board
 
 
 	self.sandSize = vec2i(
-		self.cfg.boardWidthInBlocks * self.cfg.voxelsPerBlock,
-		self.cfg.boardHeightInBlocks * self.cfg.voxelsPerBlock)
+		playcfg.boardWidthInBlocks * playcfg.voxelsPerBlock,
+		playcfg.boardHeightInBlocks * playcfg.voxelsPerBlock)
 	local w, h = self.sandSize:unpack()
 
 	self.loseTime = nil
 
-	local sandModelClass = assert(sandModelClasses[self.cfg.sandModel])
+	local sandModelClass = assert(sandModelClasses[playcfg.sandModel])
 	self.sandmodel = sandModelClass(self)
 
 	-- I only really need to recreate the sand & flash texs if the board size changes ...
@@ -824,7 +840,7 @@ function App:reset(args)
 
 	-- and I only really need to recreate these if the piece size changes ...
 	self.rotPieceTex = self:makeTexWithBlankImage(self.pieceSize)
-	self.nextPieces = range(self.cfg.numNextPieces):mapi(function(i)
+	self.nextPieces = range(playcfg.numNextPieces):mapi(function(i)
 		local tex = self:makeTexWithBlankImage(self.pieceSize)
 		return {tex=tex}
 	end)
@@ -832,8 +848,10 @@ function App:reset(args)
 
 	self.sandmodel:reset()
 
-	self.gameColors = table.sub(self.cfg.colors, 1, self.cfg.numColors):mapi(function(c) return vec3f(c) end)		-- colors used now
-	assert(#self.gameColors == self.cfg.numColors)	-- menu system should handle this
+	-- TODO don't store the custom colors in the config file unless they've been defined
+	-- especially now that it's a model file
+	self.gameColors = table.sub(playcfg.colors, 1, playcfg.numColors):mapi(function(c) return vec3f(c) end)		-- colors used now
+	assert(#self.gameColors == playcfg.numColors)	-- menu system should handle this
 
 	self.players = range(self.numPlayers):mapi(function(i)
 		return Player{index=i, app=self}
@@ -855,27 +873,29 @@ function App:reset(args)
 	self.lastLineTime = -math.huge
 	self.score = 0
 	self.lines = 0
-	self.level = self.cfg.startLevel
+	self.level = playcfg.startLevel
 	self.scoreChain = 0
-	self:upateFallSpeed()
+	self:updateFallSpeed()
 	self.paused = true
 
 -- debugging:
 --self.sandmodel:test()
 end
 
-function App:upateFallSpeed()
+-- called in App:reset() and App:updateGame() upon level up
+function App:updateFallSpeed()
 	-- https://harddrop.com/wiki/Tetris_Worlds
 	local maxSpeedLevel = 13 -- fastest level .. no faster is permitted
 	local effectiveLevel = math.min(self.level, maxSpeedLevel)
 	-- TODO make this curve customizable
-	local secondsPerRow = (.8 - ((effectiveLevel-1.)*self.cfg.speedupCoeff))^(effectiveLevel-1.)
-	local secondsPerLine = secondsPerRow / self.cfg.voxelsPerBlock
+	local secondsPerRow = (.8 - ((effectiveLevel-1.)*self.playcfg.speedupCoeff))^(effectiveLevel-1.)
+	local secondsPerLine = secondsPerRow / self.playcfg.voxelsPerBlock
 	-- how many ticks to wait before dropping a piece
 	self.ticksToFall = secondsPerLine / self.updateInterval
 --print('effectiveLevel', effectiveLevel, 'secondsPerRow', secondsPerRow, 'scondsPerLin', secondsPerLine, 'ticksToFall', self.ticksToFall)
 end
 
+-- called by App:newPiece()
 -- fill in a new piece texture
 -- generate it based on the piece template
 function App:populatePiece(args)
@@ -909,7 +929,7 @@ function App:populatePiece(args)
 	gl.glUniform3f(shader.uniforms.pieceSize.loc,
 		self.pieceSize.x,
 		self.pieceSize.y,
-		self.cfg.voxelsPerBlock)
+		self.playcfg.voxelsPerBlock)
 
 	srctex:bind(0)
 	self.pieceRandomColorTex:bind(1)
@@ -1187,7 +1207,7 @@ function App:updateGame()
 			end
 		end
 		if needwrite then
---[[
+-- [[
 io.write(('%08x'):format(ffi.cast('gameTick_t*', self.recordingEvent)[0]))
 for i=ffi.sizeof'gameTick_t',self.recordingEventSize-1 do
 	io.write((' %02x'):format(self.recordingEvent[i]))
@@ -1199,7 +1219,7 @@ print()
 	elseif self.playingDemo then
 		local event = self.playingDemo:get(self.recordingEventSize)
 		if event and ffi.cast('gameTick_t*', event)[0] == self.gameTick then
---[[
+-- [[
 io.write(('%08x'):format(ffi.cast('gameTick_t*', event)[0]))
 for i=ffi.sizeof'gameTick_t',self.recordingEventSize-1 do
 	io.write((' %02x'):format(event[i]))
@@ -1235,15 +1255,9 @@ print()
 		-- TODO tap to move vs hold to move ... just like with dropping?  nah cuz that is still hold-to-go-full-speed
 		-- maybe something more like original tetris, push to go one block, hold past a delay to go full speed
 		local dx = 0
-		if player.keyPress.left then
-			dx = dx - 1
-		end
-		if player.keyPress.right then
-			dx = dx + 1
-		end
-		-- same as with dropSpeed...
-		--player.piecePos.x = player.piecePos.x + dx * self.cfg.movedx * self.gameScale
-		player.piecePos.x = player.piecePos.x + dx * self.cfg.movedx * self.gameScaleFloat
+		if player.keyPress.left then dx = dx - 1 end
+		if player.keyPress.right then dx = dx + 1 end
+		player.piecePos.x = player.piecePos.x + dx * self.playcfg.movedx * self.gameScaleFloat
 		self:constrainPiecePos(player)
 
 		-- don't allow holding down through multiple drops ... ?
@@ -1256,10 +1270,7 @@ print()
 			player.droppingPiece = false
 		end
 		if player.droppingPiece then
-			-- gameScale seems like a nice var at first, but it is integer based on pixels-per-block/8, so it's 1 for pixels-per-block ranging [1,8]
-			--player.piecePos.y = player.piecePos.y - self.cfg.dropSpeed * self.gameScale
-			-- so I want smaller resolution here...
-			player.piecePos.y = player.piecePos.y - self.cfg.dropSpeed * self.gameScaleFloat
+			player.piecePos.y = player.piecePos.y - self.playcfg.dropSpeed * self.gameScaleFloat
 		end
 		if player.keyPress.up and not player.keyPressLast.up then
 			self:rotatePiece(player)
@@ -1267,9 +1278,9 @@ print()
 		if player.keyPress.pause
 		and not player.keyPressLast.pause
 		then
-			local PlayingMenu = require 'sand-attack.menu.playing'
-			if PlayingMenu:isa(self.menustate)
-			then
+			-- only allow esc <-> pause/menu in th playing-state screen
+			-- hmmmmm pause is exceptional for player keys ...
+			if PlayingMenu:isa(self.menustate) then
 				self.paused = true
 			end
 		end
@@ -1305,7 +1316,11 @@ print()
 		end
 		if merge then
 			self:playSound'sfx/place.wav'
-			if not self.cfg.continuousDrop then
+			-- TODO should this be a game variable or a user variable?
+			-- game variable.
+			-- since it influences key press/release resolution
+			-- and that's what drives the demo.
+			if not self.playcfg.continuousDrop then
 				player.droppingPiece = false	-- stop dropping piece
 			end
 
@@ -1348,7 +1363,7 @@ print()
 				if self.lines % 10 == 0 then
 					self.level = self.level + 1
 					self:playSound'sfx/levelup.wav'
-					self:upateFallSpeed()
+					self:updateFallSpeed()
 				end
 
 				self:playSound'sfx/line.wav'
@@ -1563,7 +1578,6 @@ function App:update(...)
 			self.playingDemo = nil
 			self.loseTime = nil
 			self.paused = true
-			local MainMenu = require 'sand-attack.menu.main'
 			self.menustate = MainMenu(self, true)
 		else
 			self:endGame()
@@ -1608,7 +1622,6 @@ function App:endGame()
 		self.recordingDemoFile:close()
 		self.recordingDemoFile = nil
 	end
-	local HighScoreMenu = require 'sand-attack.menu.highscore'
 	self.menustate = HighScoreMenu(self, true)
 end
 
@@ -1692,6 +1705,7 @@ function App:processButtonEvent(press, ...)
 	-- TODO put the callback somewhere, not a global
 	-- it's used by the New Game menu
 	if self.waitingForEvent then
+		-- this callback system is only used for editing keyboard binding
 		if press then
 			local ev = {...}
 			ev.name = self:getEventName(...)
@@ -1699,6 +1713,10 @@ function App:processButtonEvent(press, ...)
 			self.waitingForEvent = nil
 		end
 	else
+		-- this branch is only used in gameplay
+		-- for that reason, if we're not in the gameplay menu-state then bail
+		--if not PlayingMenu:isa(self.menustate) then return end
+
 		local etype, ex, ey = ...
 		local descLen = select('#', ...)
 		for playerIndex, playerConfig in ipairs(self.cfg.playerKeys) do

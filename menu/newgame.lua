@@ -1,5 +1,6 @@
 local ffi = require 'ffi'
 local table = require 'ext.table'
+local range = require 'ext.range'
 local math = require 'ext.math'
 local vec3f = require 'vec-ffi.vec3f'
 require 'ffi.req' 'c.stdlib'	-- strtoll
@@ -50,6 +51,8 @@ function NewGameMenu:goOrBack(bleh)
 		app.menustate = PlayingMenu(app)	-- sets paused=false
 	end
 	if self:centerButton'Back' then
+		-- save config upon 'back' ?
+		app:saveConfig()
 		local MainMenu = require 'sand-attack.menu.main'
 		app.menustate = MainMenu(app)
 	end
@@ -92,12 +95,17 @@ function NewGameMenu:updateGUI()
 	ig.igSeparatorText'Colors'
 	ig.igNewLine()
 
-	if ig.igButton'+' then
+	if app.cfg.numColors < app.maxColors and ig.igButton'+' then
 		app.cfg.numColors = app.cfg.numColors + 1
+		while #app.cfg.colors < app.cfg.numColors do
+			table.insert(app.cfg.colors, app:getDefaultColor(#app.cfg.colors+1))
+		end
 	end
 	ig.igSameLine()
 	if app.cfg.numColors > 1 and ig.igButton'-' then
 		app.cfg.numColors = app.cfg.numColors - 1
+		-- don't remove colors that have previously been added (except via "delete" below)
+		-- because then a subsequent + will re-add the old color
 	end
 	ig.igSameLine()
 
@@ -121,7 +129,7 @@ function NewGameMenu:updateGUI()
 
 	if self.currentColorIndex then
 		assert(self.currentColorIndex >= 1 and self.currentColorIndex <= app.cfg.numColors)
-		assert(app.cfg.numColors >= 1 and app.cfg.numColors <= #app.defaultColors)
+		assert(app.cfg.numColors >= 1 and app.cfg.numColors <= app.maxColors)
 		if ig.igBeginPopupModal('Edit Color', nil, 0) then
 			if ig.igColorPicker3('Color', tmpcolorv.s, 0) then
 				local c = app.cfg.colors[self.currentColorIndex]
@@ -130,7 +138,6 @@ function NewGameMenu:updateGUI()
 			if app.cfg.numColors > 1 then
 				if ig.igButton'Delete Color' then
 					table.remove(app.cfg.colors, self.currentColorIndex)
-					table.insert(app.cfg.colors, {table.unpack(app.defaultColors:last())})
 					app.cfg.numColors = app.cfg.numColors - 1
 					self.currentColorIndex = nil
 				end
@@ -144,12 +151,9 @@ function NewGameMenu:updateGUI()
 		end
 	end
 	if self:centerButton'Reset Colors' then
-		for i,dstc in ipairs(app.cfg.colors) do
-			local srcc = app.defaultColors[i]
-			for j=1,3 do
-				dstc[j] = srcc[j]
-			end
-		end
+		app.cfg.colors = range(app.cfg.numColors):mapi(function(i)
+			return app:getDefaultColor(i)
+		end):setmetatable(nil)
 	end
 	--]]
 
@@ -173,10 +177,15 @@ function NewGameMenu:updateGUI()
 	end
 
 	if self:centerLuatableTooltipInputInt('Pixels Per Block', app.cfg, 'voxelsPerBlock') then
-		app:updateGameScale()
+		app.cfg.voxelsPerBlock = math.max(1, app.cfg.voxelsPerBlock)
+		--app:updateGameScale()
 	end
 	-- TODO should this be customizable?
-	self:centerText('(updates/tick: '..app.gameScale..')')
+	-- TODO since it's derived from voxelsPerBlock, it'll show the current-game game-scale
+	-- not the same as the app.cfg editing configuration game-scale
+	-- I gotta sort out updateGameScale and the split of .cfg (user) vs .playcfg (game)
+	-- until then ...
+	--self:centerText('(updates/tick: '..app.gameScale..')')
 
 	-- TODO this is only for AutomataCPU ...
 	self:centerLuatableTooltipSliderFloat('Topple Chance', app.cfg, 'toppleChance', 0, 1)
