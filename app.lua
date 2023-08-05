@@ -1283,9 +1283,11 @@ print()
 		and not player.keyPressLast.pause
 		then
 			-- only allow esc <-> pause/menu in th playing-state screen
+			-- and also only when it's not yet paused
 			-- hmmmmm pause is exceptional for player keys ...
+			-- I'd like to make this always toggle the main menu or be the 'back' key (like Doom menu)
 			if PlayingMenu:isa(self.menustate) then
-				self.paused = true
+				self.paused = not self.paused
 			end
 		end
 	end
