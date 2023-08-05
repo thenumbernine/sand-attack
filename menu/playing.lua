@@ -47,6 +47,7 @@ function PlayingMenu:updateGUI()
 
 	ig.igEnd()
 
+	-- if esc / pause-key was pushed ...
 	if app.paused then
         local size = ig.igGetMainViewport().WorkSize
         ig.igSetNextWindowPos(ig.ImVec2(size.x/2, size.y/2), ig.ImGuiCond_Appearing, ig.ImVec2(.5, .5));

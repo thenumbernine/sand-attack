@@ -5,9 +5,11 @@ local Menu = require 'sand-attack.menu.menu'
 
 local MainMenu = Menu:subclass()
 
-function MainMenu:init(...)
-	MainMenu.super.init(self, ...)
-	self.app.paused = true
+function MainMenu:init(app, ...)
+	MainMenu.super.init(self, app, ...)
+	app.paused = false
+	-- play a demo in the background ...
+	-- and merge in splash-screen with the first demo's game start
 end
 
 function MainMenu:updateGUI()

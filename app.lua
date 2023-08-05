@@ -514,13 +514,9 @@ void main() {
 	local SplashScreenMenu = require 'sand-attack.menu.splashscreen'
 	self.menustate = SplashScreenMenu(self)
 
-	-- initial reset
-	-- needed for a few things that i'm too lazy to change
-	-- so i guess i could play a demo in the background when the game starts
-	-- like so many other games
+	-- play a demo in the background when the game starts
 	self:reset{
-		-- me being lazy about restructuring
-		dontRecordOrPlay = true,
+		playingDemoFileName = 'splash-demo.bin',
 	}
 
 	glreport'here'
@@ -1268,8 +1264,14 @@ print()
 		if player.keyPress.up and not player.keyPressLast.up then
 			self:rotatePiece(player)
 		end
-		if player.keyPress.pause and not player.keyPressLast.pause then
-			self.paused = true
+		if player.keyPress.pause
+		and not player.keyPressLast.pause
+		then
+			local PlayingMenu = require 'sand-attack.menu.playing'
+			if PlayingMenu:isa(self.menustate)
+			then
+				self.paused = true
+			end
 		end
 	end
 
@@ -1554,7 +1556,9 @@ function App:update(...)
 			:useNone()
 	end
 
-	if self.loseTime and self.thisTime - self.loseTime > self.loseScreenDuration then
+	if self.loseTime
+	and self.thisTime - self.loseTime > self.loseScreenDuration
+	then
 		if self.playingDemo then
 			self.playingDemo = nil
 			self.loseTime = nil
