@@ -31,7 +31,9 @@ local function readDemo(fn)
 		demo = d:sub(len+2)
 	end
 	local cfg = assert(myfromlua(cfgstr))
-	return cfg, demo
+	cfg.demoFileName = fn
+	cfg.demoPlayback = demo
+	return cfg
 end
 
 return {

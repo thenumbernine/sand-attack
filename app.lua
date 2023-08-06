@@ -197,9 +197,7 @@ function App:initGL(...)
 		if f:match'%.demo$' then
 			local fn = 'highscores/'..f
 			xpcall(function()
-				local record, demo = readDemo(fn)
-				record.demoPlayback = demo
-				record.demofilename = f
+				local record = readDemo(fn)
 				
 				-- demos sandModel is stored as a string
 				-- translate back from string to int
@@ -517,9 +515,7 @@ void main() {
 
 	-- play a demo in the background when the game starts
 	local fn = 'splash-demo.bin'
-	local record, demo = readDemo(fn)
-	record.demoPlayback = demo
-	record.demofilename = fn
+	local record = readDemo(fn)
 	self:reset{
 		playingDemoRecord = record,
 		playingDemoPlayback = record.demoPlayback,

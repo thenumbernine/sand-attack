@@ -6,7 +6,6 @@ local ig = require 'imgui'
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 local mytolua = require 'sand-attack.serialize'.tolua
 local Menu = require 'sand-attack.menu.menu'
-local readDemo = require 'sand-attack.serialize'.readDemo
 
 local HighScoresMenu = Menu:subclass()
 
@@ -40,10 +39,10 @@ function HighScoresMenu:makeNewRecord()
 	record.sandModel = sandModelClassNames[app.playcfg.sandModel]
 	
 	-- give it a new unique filename for saving
-	record.demofilename = (
+	record.demoFileName = (
 		-- use the next integer available
 		(table.mapi(app.highscores, function(r)
-			return tonumber((r.demofilename:match'^(%d+)%.demo$')) or 0
+			return tonumber((r.demoFileName:match'^(%d+)%.demo$')) or 0
 		end):sup() or 0) + 1
 	)..'.demo'
 
@@ -52,8 +51,8 @@ end
 
 -- TODO mkdir and save one file per entry
 function HighScoresMenu:saveHighScore(record, demoPlayback)
-	assert(record.demofilename, "every record needs a demofilename")
-	local fn = 'highscores/'..assert(record.demofilename)
+	assert(record.demoFileName, "every record needs a demoFileName")
+	local fn = 'highscores/'..assert(record.demoFileName)
 print('writing highscore', fn)
 	assert(not path(fn):exists(), "tried to write but it's already there")
 	
@@ -172,7 +171,7 @@ function HighScoresMenu:updateGUI()
 							local PlayingMenu = require 'sand-attack.menu.playing'
 							app.menustate = PlayingMenu(app)	-- sets paused=false
 						end, function(err)
-							print('failed to play demo file '..tostring(record.demofilename)..'\n'
+							print('failed to play demo file '..tostring(record.demoFileName)..'\n'
 								..tostring(err)..'\n'
 								..debug.traceback())
 						end)

@@ -36,9 +36,7 @@ function MainMenu:updateGUI()
 	end
 	if path(app.lastDemoFileName):exists() then
 		if self:centerButton'Replay Last Game' then
-			local record, demo = readDemo(app.lastDemoFileName)
-			record.demofilename = app.lastDemoFileName
-			record.demoPlayback = demo
+			local record = readDemo(app.lastDemoFileName)
 			app:reset{
 				playingDemoRecord = record,
 				playingDemoPlayback = record.demoPlayback,
