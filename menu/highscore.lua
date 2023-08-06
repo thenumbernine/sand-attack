@@ -33,10 +33,6 @@ function HighScoresMenu:makeNewRecord()
 	record.lines = app.lines
 	record.level = app.levle
 	record.score = app.score
-
-	-- translate this one
-	-- TODO go by name in app.playcfg too
-	record.sandModel = sandModelClassNames[app.playcfg.sandModel]
 	
 	-- give it a new unique filename for saving
 	record.demoFileName = (

@@ -7,8 +7,10 @@ local classes = table{
 	require 'sand-attack.sandmodel.cfd',
 }
 local classNames = classes:mapi(function(cl) return cl.name end)
+local classForName = classes:mapi(function(cl) return cl, cl.name end):setmetatable(nil)
 
 return {
 	classes = classes,
 	classNames = classNames,
+	classForName = classForName,
 }

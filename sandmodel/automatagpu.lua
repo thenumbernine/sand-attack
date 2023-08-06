@@ -3,9 +3,8 @@ local vec2i = require 'vec-ffi.vec2i'
 local Image = require 'image'
 local SandModel = require 'sand-attack.sandmodel.sandmodel'
 
--- proof-of-concept for gpu updates
--- I'm not moving all operations (in app.lua) to the gpu just yet
--- esp since cfd and sph sand use cpu operations
+-- gpu implementation of automata sand
+-- TODO add toppleChance
 
 local gl = require 'gl'
 local GLPingPong = require 'gl.pingpong'

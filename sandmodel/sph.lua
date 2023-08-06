@@ -91,7 +91,7 @@ function SPHSand:update()
 				if p[-w] ~= 0 then
 					onground = true
 				end
-				if app.rng() < app.playcfg.toppleChance then
+				if app.rng() < app.cfg.toppleChance then
 					-- hmm symmetry? check left vs right first?
 					-- 50/50 check left then right, vs check right then left
 					if app.rng(2) == 2 then

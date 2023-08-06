@@ -35,6 +35,7 @@ local HighScoreMenu = require 'sand-attack.menu.highscore'
 local readDemo = require 'sand-attack.serialize'.readDemo
 local sandModelClasses = require 'sand-attack.sandmodel.all'.classes
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
+local sandModelClassForName = require 'sand-attack.sandmodel.all'.classForName
 
 ffi.cdef[[
 // what type to use for time?
@@ -199,14 +200,7 @@ function App:initGL(...)
 		if f:match'%.demo$' then
 			local fn = 'highscores/'..f
 			xpcall(function()
-				local record = readDemo(fn)
-				
-				-- demos sandModel is stored as a string
-				-- translate back from string to int
-				-- TODO just store as string within app
-				record.sandModel = sandModelClassNames:find(record.sandModel)
-
-				table.insert(self.highscores, record)
+				table.insert(self.highscores, readDemo(fn))
 			end, function(err)
 				print('failed to read highscores from file '..fn..'\n'
 					..tostring(err)..'\n'
@@ -229,7 +223,7 @@ function App:initGL(...)
 	self.cfg.startLevel = self.cfg.startLevel or 1
 	self.cfg.movedx = self.cfg.movedx or 1				-- TODO configurable
 	self.cfg.dropSpeed = self.cfg.dropSpeed or 5
-	self.cfg.sandModel = self.cfg.sandModel or 1
+	self.cfg.sandModel = self.cfg.sandModel or sandModelClassNames[1]
 	self.cfg.speedupCoeff = self.cfg.speedupCoeff or .007
 	self.cfg.toppleChance = self.cfg.toppleChance or 1
 	self.cfg.playerKeys = self.cfg.playerKeys or {}
@@ -731,7 +725,7 @@ function App:reset(args)
 	-- used for reading and writing
 	self.recordingEvent = ffi.new('uint8_t[?]', self.recordingEventSize)
 
-	-- [[ print all events
+	--[[ print event list
 	if self.playingDemo then
 		print('all upcoming events:')
 		for i=0,#self.playingDemo.data-1,self.recordingEventSize do
@@ -837,7 +831,7 @@ function App:reset(args)
 
 	self.loseTime = nil
 
-	local sandModelClass = assert(sandModelClasses[playcfg.sandModel])
+	local sandModelClass = assert(sandModelClassForName[playcfg.sandModel])
 	self.sandmodel = sandModelClass(self)
 
 	-- I only really need to recreate the sand & flash texs if the board size changes ...
@@ -1211,7 +1205,7 @@ function App:updateGame()
 			end
 		end
 		if needwrite then
-			-- [[ print event
+			--[[ print event
 			io.write(('%08x'):format(ffi.cast('gameTick_t*', self.recordingEvent)[0]))
 			for i=ffi.sizeof'gameTick_t',self.recordingEventSize-1 do
 				io.write((' %02x'):format(self.recordingEvent[i]))
@@ -1223,7 +1217,7 @@ function App:updateGame()
 	elseif self.playingDemo then
 		local event = self.playingDemo:get(self.recordingEventSize)
 		if event and ffi.cast('gameTick_t*', event)[0] == self.gameTick then
-			-- [[ print event
+			--[[ print event
 			io.write(('%08x'):format(ffi.cast('gameTick_t*', event)[0]))
 			for i=ffi.sizeof'gameTick_t',self.recordingEventSize-1 do
 				io.write((' %02x'):format(event[i]))

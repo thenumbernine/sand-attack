@@ -191,7 +191,10 @@ function NewGameMenu:updateGUI()
 	self:centerLuatableTooltipSliderFloat('Topple Chance', app.cfg, 'toppleChance', 0, 1)
 
 	local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
-	ig.luatableCombo('Sand Model', app.cfg, 'sandModel', sandModelClassNames)
+	local tmp = {i = sandModelClassNames:find(app.cfg.sandModel) or 1}
+	if ig.luatableCombo('Sand Model', tmp, 'i', sandModelClassNames) then
+		app.cfg.sandModel = sandModelClassNames[tmp.i]
+	end
 
 	-- looks like the standard printf is in the macro PRIx64 ... which I've gotta now make sure is in the ported header ...
 	ffi.C.snprintf(tmpbuf, ffi.sizeof(tmpbuf), '%llx', app.cfg.randseed)

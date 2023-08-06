@@ -33,6 +33,15 @@ local function readDemo(fn)
 	local cfg = assert(myfromlua(cfgstr))
 	cfg.demoFileName = fn
 	cfg.demoPlayback = demo
+	
+	-- fix old files
+	-- TODO rename to 'sandModelName'
+	if type(cfg.sandModel) == 'number' then
+		local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
+		cfg.sandModel = sandModelClassNames[cfg.sandModel]
+			or error("failed to find sandModel index "..tostring(cfg.sandModel))
+	end
+
 	return cfg
 end
 
