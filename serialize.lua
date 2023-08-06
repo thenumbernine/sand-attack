@@ -20,22 +20,33 @@ local function myfromlua(x)
 	return fromlua(x, nil, nil, {})
 end
 
-local function readDemo(fn)
-	local d = assert(path(fn):read())
-	local dlen = #d
-	local len = tonumber(ffi.C.strlen(d))
-	local cfgstr = d:sub(1,len)
-	local demo
-	if dlen > len then
-		assert(d:sub(len+1,len+1):byte() == 0)
-		demo = d:sub(len+2)
+local function hextostr(h)
+	if bit.band(#h, 1) == 1
+	or h:find'[^0-9a-fA-F]'
+	then
+		return nil, "string is not hex"
 	end
+	return h:gsub('..', function(d)
+		return string.char(assert(tonumber(d, 16)))
+	end)
+end
+
+local function strtohex(s)
+	return s:gsub('.', function(c)
+		return ('%02x'):format(c:byte())
+	end)
+end
+
+local function readDemo(fn)
+	local cfgstr = assert(path(fn):read())
 	local cfg = assert(myfromlua(cfgstr))
 	cfg.demoFileName = fn
-	cfg.demoPlayback = demo
-	
+	if cfg.demoPlayback then
+		cfg.demoPlayback = hextostr(cfg.demoPlayback)
+	end
+
 	-- fix old files
-	-- TODO rename to 'sandModelName'
+	-- TODO rename to 'sandModelName' so it doesn't get mixed up with app.sandModel which is the instanciated object
 	if type(cfg.sandModel) == 'number' then
 		local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 		cfg.sandModel = sandModelClassNames[cfg.sandModel]
@@ -60,4 +71,6 @@ return {
 	fromlua = myfromlua,
 	readDemo = readDemo,
 	safeWrite = safeWrite,
+	strtohex = strtohex,
+	hextostr = hextostr,
 }

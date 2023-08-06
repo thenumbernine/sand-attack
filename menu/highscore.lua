@@ -6,6 +6,8 @@ local ig = require 'imgui'
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 local mytolua = require 'sand-attack.serialize'.tolua
 local safeWrite = require 'sand-attack.serialize'.safeWrite
+local strtohex = require 'sand-attack.serialize'.strtohex
+local hextostr = require 'sand-attack.serialize'.hextostr
 local Menu = require 'sand-attack.menu.menu'
 
 local HighScoresMenu = Menu:subclass()
@@ -48,25 +50,20 @@ function HighScoresMenu:makeNewRecord()
 	return record
 end
 
--- TODO mkdir and save one file per entry
-function HighScoresMenu:saveHighScore(record, demoPlayback)
+-- called only by HighScoresMenu:updateGUI
+-- mkdirs and saves one file per entry
+function HighScoresMenu:saveHighScore(record)
 	assert(record.demoFileName, "every record needs a demoFileName")
-	-- TODO just bite the bullet and put the binary blob in the config file
-	assert(not record.demoPlayback, "tried to write highscore with binary blob intact") 
+	
 	local fn = assert(record.demoFileName)
 	assert(not path(fn):exists(), "tried to write but it's already there")
 	
-	-- write new unique name?
-	-- what happens if i write twice?  duplicate entries?
-	-- how to fix this?
-	-- give unique id?
-	-- but unique ids are only locally unique ...
-	safeWrite(
-		fn,
-		mytolua(record)
-			..'\0'
-			..demoPlayback
-	)
+	-- TODO move the hex stuff into safeWrite
+	-- before write: convert to hex
+	assert(record.demoPlayback, "high scores lost its demoPlayback somehow") 
+	record.demoPlayback = strtohex(record.demoPlayback)
+	safeWrite(fn, mytolua(record))
+	record.demoPlayback = hextostr(record.demoPlayback)
 end
 
 function HighScoresMenu:updateGUI()
@@ -80,12 +77,13 @@ function HighScoresMenu:updateGUI()
 		ig.luatableTooltipInputText('Your Name', self, 'name')
 		if ig.igButton'Ok' then
 			local record = self:makeNewRecord()
+			record.demoPlayback = self.demoPlayback
+			
 			table.insert(app.highscores, record)
 			table.sort(app.highscores, function(a,b) return a.score > b.score end)
-			self:saveHighScore(record, self.demoPlayback)
-			-- NOTICE - ONLY AFTER SAVING do I append .demoPlayback
-			-- TODO maybe I should just put it as a Lua string ...
-			record.demoPlayback = self.demoPlayback
+			
+			self:saveHighScore(record)
+			
 			self.needsName = false
 			self.demoPlayback = nil
 		end

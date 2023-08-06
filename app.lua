@@ -34,7 +34,8 @@ local HighScoreMenu = require 'sand-attack.menu.highscore'
 
 local readDemo = require 'sand-attack.serialize'.readDemo
 local safeWrite = require 'sand-attack.serialize'.safeWrite
-local sandModelClasses = require 'sand-attack.sandmodel.all'.classes
+local strtohex = require 'sand-attack.serialize'.strtohex
+local hextostr = require 'sand-attack.serialize'.hextostr
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 local sandModelClassForName = require 'sand-attack.sandmodel.all'.classForName
 
@@ -512,9 +513,15 @@ void main() {
 	self.menustate = SplashScreenMenu(self)
 
 	-- play a demo in the background when the game starts
-	self:reset{
-		playingDemoRecord = readDemo'splash.demo',
-	}
+	xpcall(function()
+		self:reset{
+			playingDemoRecord = readDemo'splash.demo',
+		}
+	end, function(err)
+		print('failed to read splash.demo\n'
+			..tostring(err)..'\n'
+			..debug.traceback())
+	end)
 
 	glreport'here'
 end
@@ -619,7 +626,15 @@ function App:playSound(name, volume, pitch)
 end
 
 function App:saveConfig()
-	safeWrite(self.cfgfilename, mytolua(self.cfg))
+	local cfg = self.cfg
+	-- TODO now we can merge the lastgame.demo into config.lua ...
+	if cfg.demoPlayback then
+		cfg.demoPlayback = strtohex(cfg.demoPlayback)
+	end
+	safeWrite(self.cfgfilename, mytolua(cfg))
+	if cfg.demoPlayback then
+		cfg.demoPlayback = hextostr(cfg.demoPlayback)
+	end
 end
 
 -- called by App:reset
@@ -639,22 +654,12 @@ function App:reset(args)
 	self.recordingDemo = nil
 
 	--[[
-	recording file format:
+	demoPlayback blob format:
 	struct {
-		char recordInLua[untilNullTerm];
-		struct {
-			randSeed_t randSeed;
-			struct {
-				gameTick_t gameTick;
-				uint8_t buttonFlags[ceil(numPlayers * #gameKeyNames / 8)];
-			} events[untilEndOfFile];
-		} recordEvents;
-	} recordedDemoFile;
-	... with all structs packed
-
-	TODO later maybe I'll merge this with the highscore record entries and just combine them all into one file.
-	put the record as a pascal-string at the beginning of the file.
-	then append the demo after it.
+		gameTick_t gameTick;
+		uint8_t buttonFlags[ceil(numPlayers * #gameKeyNames / 8)];
+	} events[];
+	... packed
 	--]]
 	if not args.dontRecordOrPlay then
 		if args.playingDemoRecord then
@@ -1633,13 +1638,16 @@ function App:endGame()
 	local demoPlayback = self.recordingDemo and self.recordingDemo:concat() or nil
 	self.recordingDemo = nil
 	if demoPlayback then
+		local cfg = self.playcfg
+		cfg.demoPlayback = demoPlayback
+		
 		-- write the last demo
-		safeWrite(
-			self.lastDemoFileName,
-			mytolua(self.playcfg)
-				..'\0'
-				..demoPlayback
-		)
+		cfg.demoPlayback = strtohex(cfg.demoPlayback)
+		safeWrite(self.lastDemoFileName, mytolua(cfg))
+		cfg.demoPlayback = hextostr(cfg.demoPlayback)
+		-- TODO I could also put this in config ...
+		-- but what about desync between app.cfg and app.playcfg ?
+		-- at this point it should still be matching (except for any changes in volume / user cfg ... )
 		self.menustate = HighScoreMenu(self, true, demoPlayback)
 	end
 end
