@@ -520,7 +520,6 @@ void main() {
 	local record = readDemo(fn)
 	self:reset{
 		playingDemoRecord = record,
-		playingDemoPlayback = record.demoPlayback,
 	}
 
 	glreport'here'
@@ -664,11 +663,9 @@ function App:reset(args)
 	then append the demo after it.
 	--]]
 	if not args.dontRecordOrPlay then
-		if args.playingDemoRecord 
-		and args.playingDemoPlayback
-		then
+		if args.playingDemoRecord then
 			xpcall(function()
-				local data = args.playingDemoPlayback
+				local data = assert(args.playingDemoRecord.demoPlayback)
 				local ptr = ffi.cast('char*', data)
 				-- TODO why reinvent the wheel.  just use fread/feof.
 				-- TODO rename this also to something else, idk what
@@ -1588,7 +1585,6 @@ function App:update(...)
 		if self.playingDemo then
 			self:reset{
 				playingDemoRecord = self.playcfg,
-				playingDemoPlayback = self.playingDemo.data,
 			}
 			return
 		else

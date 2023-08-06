@@ -164,9 +164,6 @@ function HighScoresMenu:updateGUI()
 							app:reset{
 								-- "demoConfig"?
 								playingDemoRecord = record,
-								-- "demoPlayback"?
-								-- or always keep it as a field .demoPlayback?
-								playingDemoPlayback = record.demoPlayback,
 							}
 							local PlayingMenu = require 'sand-attack.menu.playing'
 							app.menustate = PlayingMenu(app)	-- sets paused=false

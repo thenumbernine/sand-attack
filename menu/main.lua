@@ -39,7 +39,6 @@ function MainMenu:updateGUI()
 			local record = readDemo(app.lastDemoFileName)
 			app:reset{
 				playingDemoRecord = record,
-				playingDemoPlayback = record.demoPlayback,
 			}
 			local PlayingMenu = require 'sand-attack.menu.playing'
 			app.menustate = PlayingMenu(app)	-- sets paused=false
