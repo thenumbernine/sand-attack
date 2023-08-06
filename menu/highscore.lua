@@ -10,12 +10,12 @@ local readDemo = require 'sand-attack.serialize'.readDemo
 
 local HighScoresMenu = Menu:subclass()
 
-function HighScoresMenu:init(app, needsName, recordingDemo)
+function HighScoresMenu:init(app, needsName, demoPlayback)
 	HighScoresMenu.super.init(self, app)
 	self.needsName = needsName
 	self.name = ''
-	self.recordingDemo = recordingDemo
-	if needsName then assert(self.recordingDemo) end
+	self.demoPlayback = demoPlayback
+	if needsName then assert(self.demoPlayback) end
 end
 
 -- shown fields
@@ -24,51 +24,22 @@ HighScoresMenu.shownFields = table{
 	'score',
 }
 
--- all recorded fields
-HighScoresMenu.fields = table{
-	-- from HighScoresMenu
-	'name',
-	-- from app:
-	'lines',
-	'level',
-	'score',
-	-- from cfg:
-	'numPlayers',
-	'numColors',
-	'boardWidthInBlocks',
-	'boardHeightInBlocks',
-	'toppleChance',
-	'voxelsPerBlock',
-	'speedupCoeff',
-	'randseed',
-	-- from cfg but needs to be mapped
-	'sandModel',
-}
-
 function HighScoresMenu:makeNewRecord()
 	local app = self.app
-	local record = {}
-	for _,field in ipairs(self.fields) do
-		if field == 'name' then
-			record[field] = self[field]
-		elseif field == 'numPlayers'
-		or field == 'numColors'
-		or field == 'boardWidthInBlocks'
-		or field == 'boardHeightInBlocks'
-		or field == 'toppleChance'
-		or field == 'voxelsPerBlock'
-		or field == 'speedupCoeff'
-		or field == 'randseed'
-		then
-			record[field] = app.playcfg[field]
-		elseif field == 'sandModel' then
-			record[field] = sandModelClassNames[app.playcfg[field]]
-		else
-			record[field] = app[field]
-		end
-	end
+	local record = table(app.playcfg):setmetatable(nil)
 	
-	-- give it a new unique id
+	-- copy from self:
+	record.name = self.name
+	-- copy from app:
+	record.lines = app.lines
+	record.level = app.levle
+	record.score = app.score
+
+	-- translate this one
+	-- TODO go by name in app.playcfg too
+	record.sandModel = sandModelClassNames[app.playcfg.sandModel]
+	
+	-- give it a new unique filename for saving
 	record.demofilename = (
 		-- use the next integer available
 		(table.mapi(app.highscores, function(r)
@@ -80,7 +51,7 @@ function HighScoresMenu:makeNewRecord()
 end
 
 -- TODO mkdir and save one file per entry
-function HighScoresMenu:saveHighScore(record, recordingDemo)
+function HighScoresMenu:saveHighScore(record, demoPlayback)
 	assert(record.demofilename, "every record needs a demofilename")
 	local fn = 'highscores/'..assert(record.demofilename)
 print('writing highscore', fn)
@@ -94,7 +65,7 @@ print('writing highscore', fn)
 	path(fn):write(
 		mytolua(record)
 		..'\0'
-		..recordingDemo
+		..demoPlayback
 	)
 end
 
@@ -104,7 +75,7 @@ function HighScoresMenu:updateGUI()
 
 	-- TODO separate state for this?
 	if self.needsName then
-		assert(self.recordingDemo)
+		assert(self.demoPlayback)
 		ig.igText'Your Name:'
 		ig.luatableTooltipInputText('Your Name', self, 'name')
 		if ig.igButton'Ok' then
@@ -112,7 +83,7 @@ function HighScoresMenu:updateGUI()
 			local record = self:makeNewRecord()
 			table.insert(app.highscores, record)
 			table.sort(app.highscores, function(a,b) return a.score > b.score end)
-			self:saveHighScore(record, self.recordingDemo)
+			self:saveHighScore(record, self.demoPlayback)
 		end
 		ig.igNewLine()
 	end
@@ -174,38 +145,37 @@ function HighScoresMenu:updateGUI()
 			sortSpecs[0].SpecsDirty = false
 		end
 		for _,i in ipairs(self.rowindexes) do
-			local score = app.highscores[i]
+			local record = app.highscores[i]
 			ig.igPushID_Int(i)
 			ig.igTableNextRow(0, 0)
 			for j,field in ipairs(self.shownFields) do
 				ig.igPushID_Int(j)
 				ig.igTableNextColumn()
-				local s = tostring(score[field])
+				local s = tostring(record[field])
+				local isbutton = j == 1 and record.demoPlayback
 				if j == 1 then
 					if ig.igButton(s) then
-						local record, demo = readDemo('highscores/'..score.demofilename)
-						-- demos sandModel is stored as a string
-						-- TODO all should be
-						record.sandModel = sandModelClassNames:find(record.sandModel)
-						-- TODO I need to save these too
-						record.numNextPieces = record.numNextPieces or 3
-						record.colors = table(app.colors):setmetatable(nil)
-						while #record.colors < record.numColors do
-							table.insert(record.colors, app:getDefaultColor(#record.colors+1))
-						end
-						-- TODO TODO TODO save this in the demo file
-						record.startLevel = app.cfg.startLevel
-						record.movedx = app.cfg.movedx
-						record.dropSpeed = app.cfg.dropSpeed
-						
-						if record.sandModel then
+						xpcall(function()
+							-- use the current configured colors...
+							record.colors = table(app.colors):setmetatable(nil)
+							while #record.colors < record.numColors do
+								table.insert(record.colors, app:getDefaultColor(#record.colors+1))
+							end
+							
 							app:reset{
+								-- "demoConfig"?
 								playingDemoRecord = record,
-								playingDemoDemo = demo,
+								-- "demoPlayback"?
+								-- or always keep it as a field .demoPlayback?
+								playingDemoPlayback = record.demoPlayback,
 							}
 							local PlayingMenu = require 'sand-attack.menu.playing'
 							app.menustate = PlayingMenu(app)	-- sets paused=false
-						end
+						end, function(err)
+							print('failed to play demo file '..tostring(record.demofilename)..'\n'
+								..tostring(err)..'\n'
+								..debug.traceback())
+						end)
 					end
 				else
 					ig.igText(s)

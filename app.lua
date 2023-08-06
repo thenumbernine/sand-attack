@@ -181,7 +181,7 @@ function App:initGL(...)
 	xpcall(function()
 		self.cfg = myfromlua(assert(path(self.cfgfilename):read()))
 	end, function(err)
-		print('failed to read lua from file '..self.cfgfilename..'\n'
+		print('failed to read lua from file '..tostring(self.cfgfilename)..'\n'
 			..tostring(err)..'\n'
 			..debug.traceback())
 	end)
@@ -198,8 +198,14 @@ function App:initGL(...)
 			local fn = 'highscores/'..f
 			xpcall(function()
 				local record, demo = readDemo(fn)
-				record.recordingDemo = demo
+				record.demoPlayback = demo
 				record.demofilename = f
+				
+				-- demos sandModel is stored as a string
+				-- translate back from string to int
+				-- TODO just store as string within app
+				record.sandModel = sandModelClassNames:find(record.sandModel)
+
 				table.insert(self.highscores, record)
 			end, function(err)
 				print('failed to read highscores from file '..fn..'\n'
@@ -499,7 +505,9 @@ void main() {
 				self.bgAudioSource:play()
 			end
 		end, function(err)
-			print(err..'\n'..debug.traceback())
+			print('failed to init audio'
+				..tostring(err)..'\n'
+				..debug.traceback())
 			self.audio = nil
 			self.useAudio = false	-- or just test audio's existence?
 		end)
@@ -508,10 +516,13 @@ void main() {
 	self.menustate = SplashScreenMenu(self)
 
 	-- play a demo in the background when the game starts
-	local record, demo = readDemo'splash-demo.bin'
+	local fn = 'splash-demo.bin'
+	local record, demo = readDemo(fn)
+	record.demoPlayback = demo
+	record.demofilename = fn
 	self:reset{
 		playingDemoRecord = record,
-		playingDemoDemo = demo,
+		playingDemoPlayback = record.demoPlayback,
 	}
 
 	glreport'here'
@@ -656,10 +667,10 @@ function App:reset(args)
 	--]]
 	if not args.dontRecordOrPlay then
 		if args.playingDemoRecord 
-		and args.playingDemoDemo
+		and args.playingDemoPlayback
 		then
 			xpcall(function()
-				local data = args.playingDemoDemo
+				local data = args.playingDemoPlayback
 				local ptr = ffi.cast('char*', data)
 				-- TODO why reinvent the wheel.  just use fread/feof.
 				self.playingDemo = setmetatable({
@@ -700,7 +711,7 @@ function App:reset(args)
 				-- put currently-playing cfg in playcfg
 				self.playcfg = self.playingDemo.config
 			end, function(err)
-				print('failed to load demo file\n'
+				print('failed to load demo\n'
 					..tostring(err)..'\n'
 					..debug.traceback())
 				self.playingDemo = nil
@@ -1563,7 +1574,7 @@ function App:update(...)
 		if self.playingDemo then
 			self:reset{
 				playingDemoRecord = self.playcfg,
-				playingDemoDemo = self.playingDemo,
+				playingDemoPlayback = self.playingDemo,
 			}
 			return
 		else
@@ -1615,16 +1626,16 @@ function App:endGame()
 	self.paused = true
 	-- if we're not playing a demo then we should be recording one
 	-- I guess this might happen something something played a game, it ended, and something is replaying or something ...
-	local recordingDemo = self.recordingDemo and self.recordingDemo:concat() or nil
+	local demoPlayback = self.recordingDemo and self.recordingDemo:concat() or nil
 	self.recordingDemo = nil
-	if recordingDemo then
+	if demoPlayback then
 		-- write the last demo
 		path(self.lastDemoFileName):write(
 			mytolua(self.playcfg)
 			..'\0'
-			..recordingDemo
+			..demoPlayback
 		)
-		self.menustate = HighScoreMenu(self, true, recordingDemo)
+		self.menustate = HighScoreMenu(self, true, demoPlayback)
 	end
 end
 

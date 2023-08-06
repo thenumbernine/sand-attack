@@ -26,8 +26,13 @@ function Player:init(args)
 	local app = assert(args.app)
 	self.app = app
 	self.color = vec3f(app.cfg.colors[self.index])
+	
 	self.keyPress = {}
 	self.keyPressLast = {}
+	for _,k in ipairs(self.keyNames) do
+		self.keyPress[k] = false
+		self.keyPressLast[k] = false
+	end
 
 	self.pieceTex = app:makeTexWithBlankImage(app.pieceSize)
 	--[[ don't need to hold onto image
