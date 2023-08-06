@@ -26,13 +26,15 @@ local AudioSource = require 'audio.source'
 local AudioBuffer = require 'audio.buffer'
 local Player = require 'sand-attack.player'
 local SandModel = require 'sand-attack.sandmodel.sandmodel'
-local sandModelClasses = require 'sand-attack.sandmodel.all'.classes
-local readDemo = require 'sand-attack.serialize'.readDemo
 
 local PlayingMenu = require 'sand-attack.menu.playing'
 local SplashScreenMenu = require 'sand-attack.menu.splashscreen'
 local MainMenu = require 'sand-attack.menu.main'
 local HighScoreMenu = require 'sand-attack.menu.highscore'
+
+local readDemo = require 'sand-attack.serialize'.readDemo
+local sandModelClasses = require 'sand-attack.sandmodel.all'.classes
+local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 
 ffi.cdef[[
 // what type to use for time?
@@ -1586,7 +1588,7 @@ function App:update(...)
 		if self.playingDemo then
 			self:reset{
 				playingDemoRecord = self.playcfg,
-				playingDemoPlayback = self.playingDemo,
+				playingDemoPlayback = self.playingDemo.data,
 			}
 			return
 		else
