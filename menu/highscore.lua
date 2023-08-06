@@ -36,12 +36,11 @@ function HighScoresMenu:makeNewRecord()
 	record.score = app.score
 
 	-- give it a new unique filename for saving
-	local i = 1
+	local base = app.highScorePath..'/'..os.date'%Y-%m-%d-%H-%M-%S'
 	local fn
-	while true do
-		fn = app.highScorePath..'/'..i..'.demo'
+	for i=0,math.huge do
+		fn = base..(i == 0 and '' or ('-'..i))..'.demo'
 		if not path(fn):exists() then break end
-		i = i + 1
 	end
 	record.demoFileName = fn
 
