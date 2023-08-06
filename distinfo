@@ -11,7 +11,7 @@ files = {
 		'music',
 		'sfx',
 		'font',
-		'splash-demo.bin',
+		'splash.demo',
 	},
 	-- require script files go here
 	['..'] = table{

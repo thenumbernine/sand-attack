@@ -35,12 +35,14 @@ function HighScoresMenu:makeNewRecord()
 	record.score = app.score
 	
 	-- give it a new unique filename for saving
-	record.demoFileName = (
-		-- use the next integer available
-		(table.mapi(app.highscores, function(r)
-			return tonumber((r.demoFileName:match'^(%d+)%.demo$')) or 0
-		end):sup() or 0) + 1
-	)..'.demo'
+	local i = 1
+	local fn
+	while true do
+		fn = 'highscores/'..i..'.demo'
+		if not path(fn):exists() then break end
+		i = i + 1
+	end
+	record.demoFileName = fn
 
 	return record
 end

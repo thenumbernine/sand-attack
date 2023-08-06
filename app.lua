@@ -124,7 +124,7 @@ App.lineNumFlashes = 5
 
 App.cfgfilename = 'config.lua'
 
-App.lastDemoFileName = 'last-game-demo.bin'
+App.lastDemoFileName = 'lastgame.demo'
 
 function App:initGL(...)
 	App.super.initGL(self, ...)
@@ -511,7 +511,7 @@ void main() {
 
 	-- play a demo in the background when the game starts
 	self:reset{
-		playingDemoRecord = readDemo'splash-demo.bin',
+		playingDemoRecord = readDemo'splash.demo',
 	}
 
 	glreport'here'
