@@ -92,8 +92,8 @@ App.sdlInitFlags = bit.bor(
 	sdl.SDL_INIT_JOYSTICK
 )
 
-App.useAudio = true	-- set to false to disable audio altogether
-App.showFPS = true -- show fps in gui / console
+App.useAudio = true		-- set to false to disable audio altogether
+App.showFPS = false		-- show fps in gui / console
 App.showDebug = false	-- show some more debug stuff
 local dontCheckForLinesEver = false	-- means don't ever ever check for lines.  used for fps testing the sand topple simulation.
 
@@ -669,6 +669,7 @@ function App:reset(args)
 				local data = args.playingDemoPlayback
 				local ptr = ffi.cast('char*', data)
 				-- TODO why reinvent the wheel.  just use fread/feof.
+				-- TODO rename this also to something else, idk what
 				self.playingDemo = setmetatable({
 					ptr = ptr,
 					data = data,
@@ -706,6 +707,7 @@ function App:reset(args)
 
 				-- put currently-playing cfg in playcfg
 				self.playcfg = self.playingDemo.config
+		
 			end, function(err)
 				print('failed to load demo\n'
 					..tostring(err)..'\n'
@@ -731,6 +733,20 @@ function App:reset(args)
 	self.recordingEventSize = ffi.sizeof'gameTick_t' + math.ceil(playcfg.numPlayers * #Player.gameKeyNames / 8)
 	-- used for reading and writing
 	self.recordingEvent = ffi.new('uint8_t[?]', self.recordingEventSize)
+
+	-- [[ print all events
+	if self.playingDemo then
+		print('all upcoming events:')
+		for i=0,#self.playingDemo.data-1,self.recordingEventSize do
+			local event = self.playingDemo.ptr + i
+			io.write(('... %08x'):format(ffi.cast('gameTick_t*', event)[0]))
+			for i=ffi.sizeof'gameTick_t',self.recordingEventSize-1 do
+				io.write((' %02x'):format(event[i]))
+			end
+		end
+		print()
+	end
+	--]]
 
 	-- what happens if the replay config is bad?
 	-- should we lose the old config?
@@ -1198,25 +1214,25 @@ function App:updateGame()
 			end
 		end
 		if needwrite then
---[[
-io.write(('%08x'):format(ffi.cast('gameTick_t*', self.recordingEvent)[0]))
-for i=ffi.sizeof'gameTick_t',self.recordingEventSize-1 do
-	io.write((' %02x'):format(self.recordingEvent[i]))
-end
-print()
---]]
+			-- [[ print event
+			io.write(('%08x'):format(ffi.cast('gameTick_t*', self.recordingEvent)[0]))
+			for i=ffi.sizeof'gameTick_t',self.recordingEventSize-1 do
+				io.write((' %02x'):format(self.recordingEvent[i]))
+			end
+			print()
+			--]]
 			self.recordingDemo:insert(ffi.string(self.recordingEvent, self.recordingEventSize))
 		end
 	elseif self.playingDemo then
 		local event = self.playingDemo:get(self.recordingEventSize)
 		if event and ffi.cast('gameTick_t*', event)[0] == self.gameTick then
---[[
-io.write(('%08x'):format(ffi.cast('gameTick_t*', event)[0]))
-for i=ffi.sizeof'gameTick_t',self.recordingEventSize-1 do
-	io.write((' %02x'):format(event[i]))
-end
-print()
---]]
+			-- [[ print event
+			io.write(('%08x'):format(ffi.cast('gameTick_t*', event)[0]))
+			for i=ffi.sizeof'gameTick_t',self.recordingEventSize-1 do
+				io.write((' %02x'):format(event[i]))
+			end
+			print()
+			--]]
 			self.playingDemo.index = self.playingDemo.index + self.recordingEventSize
 		else
 			event = nil
