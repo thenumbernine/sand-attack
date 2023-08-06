@@ -33,6 +33,7 @@ local MainMenu = require 'sand-attack.menu.main'
 local HighScoreMenu = require 'sand-attack.menu.highscore'
 
 local readDemo = require 'sand-attack.serialize'.readDemo
+local safeWrite = require 'sand-attack.serialize'.safeWrite
 local sandModelClasses = require 'sand-attack.sandmodel.all'.classes
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 local sandModelClassForName = require 'sand-attack.sandmodel.all'.classForName
@@ -125,6 +126,7 @@ App.lineNumFlashes = 5
 App.cfgfilename = 'config.lua'
 
 App.lastDemoFileName = 'lastgame.demo'
+App.highScorePath = 'highscores'
 
 function App:initGL(...)
 	App.super.initGL(self, ...)
@@ -195,14 +197,14 @@ function App:initGL(...)
 	-- TODO WARNING
 	-- for some reason in the Windows version, distributable ONLY (not in runtime setup), errors thrown in the app ctor are being hidden.
 	-- especially starting right around here ...
-	path'highscores':mkdir()
-	for f in path'highscores':dir() do
+	path(self.highScorePath):mkdir()
+	for f in path(self.highScorePath):dir() do
 		if f:match'%.demo$' then
-			local fn = 'highscores/'..f
+			local fn = self.highScorePath..'/'..f
 			xpcall(function()
 				table.insert(self.highscores, readDemo(fn))
 			end, function(err)
-				print('failed to read highscores from file '..fn..'\n'
+				print('failed to read high scores from file '..fn..'\n'
 					..tostring(err)..'\n'
 					..debug.traceback())
 			end)
@@ -617,13 +619,7 @@ function App:playSound(name, volume, pitch)
 end
 
 function App:saveConfig()
-	xpcall(function()
-		assert(path(self.cfgfilename):write(mytolua(self.cfg)))
-	end, function(err)
-		print('failed to write config file '..tostring(self.cfgfilename)..'\n'
-			..tostring(err)..'\n'
-			..debug.traceback())
-	end)
+	safeWrite(self.cfgfilename, mytolua(self.cfg))
 end
 
 -- called by App:reset
@@ -1638,17 +1634,12 @@ function App:endGame()
 	self.recordingDemo = nil
 	if demoPlayback then
 		-- write the last demo
-		xpcall(function()
-			assert(path(self.lastDemoFileName):write(
-				mytolua(self.playcfg)
+		safeWrite(
+			self.lastDemoFileName,
+			mytolua(self.playcfg)
 				..'\0'
 				..demoPlayback
-			))
-		end, function(err)
-			print("failed to write last demo "..tostring(self.lastDemoFileName)..'\n'
-				..tostring(err)..'\n'
-				..debug.traceback())
-		end)
+		)
 		self.menustate = HighScoreMenu(self, true, demoPlayback)
 	end
 end

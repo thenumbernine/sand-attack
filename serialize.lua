@@ -45,8 +45,19 @@ local function readDemo(fn)
 	return cfg
 end
 
+local function safeWrite(fn, data)
+	xpcall(function()
+		assert(path(fn):write(data))
+	end, function(err)
+		print('failed to write file '..tostring(fn)..'\n'
+			..tostring(err)..'\n'
+			..debug.traceback())
+	end)
+end
+
 return {
 	tolua = mytolua,
 	fromlua = myfromlua,
 	readDemo = readDemo,
+	safeWrite = safeWrite,
 }

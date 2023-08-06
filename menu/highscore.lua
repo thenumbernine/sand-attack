@@ -5,6 +5,7 @@ local ops = require 'ext.op'
 local ig = require 'imgui'
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 local mytolua = require 'sand-attack.serialize'.tolua
+local safeWrite = require 'sand-attack.serialize'.safeWrite
 local Menu = require 'sand-attack.menu.menu'
 
 local HighScoresMenu = Menu:subclass()
@@ -38,7 +39,7 @@ function HighScoresMenu:makeNewRecord()
 	local i = 1
 	local fn
 	while true do
-		fn = 'highscores/'..i..'.demo'
+		fn = app.highScorePath..'/'..i..'.demo'
 		if not path(fn):exists() then break end
 		i = i + 1
 	end
@@ -50,8 +51,9 @@ end
 -- TODO mkdir and save one file per entry
 function HighScoresMenu:saveHighScore(record, demoPlayback)
 	assert(record.demoFileName, "every record needs a demoFileName")
+	-- TODO just bite the bullet and put the binary blob in the config file
+	assert(not record.demoPlayback, "tried to write highscore with binary blob intact") 
 	local fn = assert(record.demoFileName)
-print('writing highscore', fn)
 	assert(not path(fn):exists(), "tried to write but it's already there")
 	
 	-- write new unique name?
@@ -59,17 +61,12 @@ print('writing highscore', fn)
 	-- how to fix this?
 	-- give unique id?
 	-- but unique ids are only locally unique ...
-	xpcall(function()
-		assert(path(fn):write(
-			mytolua(record)
+	safeWrite(
+		fn,
+		mytolua(record)
 			..'\0'
 			..demoPlayback
-		))
-	end, function(err)
-		print("failed to write high score "..tostring(fn)..'\n'
-			..tostring(err)..'\n'
-			..debug.traceback())
-	end)
+	)
 end
 
 function HighScoresMenu:updateGUI()
@@ -199,10 +196,10 @@ function HighScoresMenu:updateGUI()
 		ig.igSameLine()
 		if ig.igButton'Clear' then
 			app.highscores = {}
-			path'highscores':mkdir()
-			for f in path'highscores':dir() do
+			path(app.highScorePath):mkdir()
+			for f in path(app.highScorePath):dir() do
 				if f:match'%.demo$' then
-					path('highscores/'..f):remove()
+					path(app.highScorePath..'/'..f):remove()
 				end
 			end
 		end
