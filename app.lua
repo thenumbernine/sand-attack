@@ -33,9 +33,7 @@ local MainMenu = require 'sand-attack.menu.main'
 local HighScoreMenu = require 'sand-attack.menu.highscore'
 
 local readDemo = require 'sand-attack.serialize'.readDemo
-local safeWrite = require 'sand-attack.serialize'.safeWrite
-local strtohex = require 'sand-attack.serialize'.strtohex
-local hextostr = require 'sand-attack.serialize'.hextostr
+local writeDemo = require 'sand-attack.serialize'.writeDemo
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 local sandModelClassForName = require 'sand-attack.sandmodel.all'.classForName
 
@@ -201,14 +199,10 @@ function App:initGL(...)
 	path(self.highScorePath):mkdir()
 	for f in path(self.highScorePath):dir() do
 		if f:match'%.demo$' then
-			local fn = self.highScorePath..'/'..f
-			xpcall(function()
-				table.insert(self.highscores, readDemo(fn))
-			end, function(err)
-				print('failed to read high scores from file '..fn..'\n'
-					..tostring(err)..'\n'
-					..debug.traceback())
-			end)
+			table.insert(
+				self.highscores,
+				readDemo(self.highScorePath..'/'..f)
+			)
 		end
 	end
 
@@ -513,15 +507,9 @@ void main() {
 	self.menustate = SplashScreenMenu(self)
 
 	-- play a demo in the background when the game starts
-	xpcall(function()
-		self:reset{
-			playingDemoRecord = readDemo'splash.demo',
-		}
-	end, function(err)
-		print('failed to read splash.demo\n'
-			..tostring(err)..'\n'
-			..debug.traceback())
-	end)
+	self:reset{
+		playingDemoRecord = readDemo'splash.demo',
+	}
 
 	glreport'here'
 end
@@ -626,15 +614,7 @@ function App:playSound(name, volume, pitch)
 end
 
 function App:saveConfig()
-	local cfg = self.cfg
-	-- TODO now we can merge the lastgame.demo into config.lua ...
-	if cfg.demoPlayback then
-		cfg.demoPlayback = strtohex(cfg.demoPlayback)
-	end
-	safeWrite(self.cfgfilename, mytolua(cfg))
-	if cfg.demoPlayback then
-		cfg.demoPlayback = hextostr(cfg.demoPlayback)
-	end
+	writeDemo(self.cfgfilename, self.cfg)
 end
 
 -- called by App:reset
@@ -705,7 +685,7 @@ function App:reset(args)
 
 				-- put currently-playing cfg in playcfg
 				self.playcfg = self.playingDemo.config
-		
+
 			end, function(err)
 				print('failed to load demo\n'
 					..tostring(err)..'\n'
@@ -1640,14 +1620,13 @@ function App:endGame()
 	if demoPlayback then
 		local cfg = self.playcfg
 		cfg.demoPlayback = demoPlayback
-		
+
 		-- write the last demo
-		cfg.demoPlayback = strtohex(cfg.demoPlayback)
-		safeWrite(self.lastDemoFileName, mytolua(cfg))
-		cfg.demoPlayback = hextostr(cfg.demoPlayback)
-		-- TODO I could also put this in config ...
+		-- TODO I could merge lastDemo in config ...
 		-- but what about desync between app.cfg and app.playcfg ?
 		-- at this point it should still be matching (except for any changes in volume / user cfg ... )
+		writeDemo(self.lastDemoFileName, cfg)
+
 		self.menustate = HighScoreMenu(self, true, demoPlayback)
 	end
 end

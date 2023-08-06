@@ -1,4 +1,5 @@
 local ffi = require 'ffi'
+local table = require 'ext.table'
 local path = require 'ext.path'
 local tolua = require 'ext.tolua'
 local fromlua = require 'ext.fromlua'
@@ -32,33 +33,47 @@ local function hextostr(h)
 end
 
 local function strtohex(s)
-	return s:gsub('.', function(c)
+	return (s:gsub('.', function(c)
 		return ('%02x'):format(c:byte())
-	end)
+	end))
 end
 
 local function readDemo(fn)
-	local cfgstr = assert(path(fn):read())
-	local cfg = assert(myfromlua(cfgstr))
-	cfg.demoFileName = fn
-	if cfg.demoPlayback then
-		cfg.demoPlayback = hextostr(cfg.demoPlayback)
-	end
+	local cfg
+	xpcall(function()
+		local cfgstr = assert(path(fn):read())
+		cfg = assert(myfromlua(cfgstr))
+		cfg.demoFileName = fn
 
-	-- fix old files
-	-- TODO rename to 'sandModelName' so it doesn't get mixed up with app.sandModel which is the instanciated object
-	if type(cfg.sandModel) == 'number' then
-		local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
-		cfg.sandModel = sandModelClassNames[cfg.sandModel]
-			or error("failed to find sandModel index "..tostring(cfg.sandModel))
-	end
+		if cfg.demoPlayback then
+			cfg.demoPlayback = assert(hextostr(cfg.demoPlayback))
+		end
 
+		-- fix old files
+		-- TODO rename to 'sandModelName' so it doesn't get mixed up with app.sandModel which is the instanciated object
+		if type(cfg.sandModel) == 'number' then
+			local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
+			cfg.sandModel = sandModelClassNames[cfg.sandModel]
+				or error("failed to find sandModel index "..tostring(cfg.sandModel))
+		end
+	end, function(err)
+		print('failed to read file '..tostring(fn)..'\n'
+			..tostring(err)..'\n'
+			..debug.traceback())
+	end)
 	return cfg
 end
 
-local function safeWrite(fn, data)
+local function writeDemo(fn, cfg)
 	xpcall(function()
-		assert(path(fn):write(data))
+		-- shallow copy so I can convert the demoPlayback to a hex string upon writing without modifying the input table
+		cfg = table(cfg):setmetatable(nil)
+		if cfg.demoPlayback then
+			cfg.demoPlayback = strtohex(cfg.demoPlayback)
+		end
+		assert(path(fn):write(
+			assert(mytolua(cfg))
+		))
 	end, function(err)
 		print('failed to write file '..tostring(fn)..'\n'
 			..tostring(err)..'\n'
@@ -70,7 +85,7 @@ return {
 	tolua = mytolua,
 	fromlua = myfromlua,
 	readDemo = readDemo,
-	safeWrite = safeWrite,
+	writeDemo = writeDemo,
 	strtohex = strtohex,
 	hextostr = hextostr,
 }

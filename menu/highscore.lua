@@ -5,9 +5,7 @@ local ops = require 'ext.op'
 local ig = require 'imgui'
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 local mytolua = require 'sand-attack.serialize'.tolua
-local safeWrite = require 'sand-attack.serialize'.safeWrite
-local strtohex = require 'sand-attack.serialize'.strtohex
-local hextostr = require 'sand-attack.serialize'.hextostr
+local writeDemo = require 'sand-attack.serialize'.writeDemo
 local Menu = require 'sand-attack.menu.menu'
 
 local HighScoresMenu = Menu:subclass()
@@ -29,14 +27,14 @@ HighScoresMenu.shownFields = table{
 function HighScoresMenu:makeNewRecord()
 	local app = self.app
 	local record = table(app.playcfg):setmetatable(nil)
-	
+
 	-- copy from self:
 	record.name = self.name
 	-- copy from app:
 	record.lines = app.lines
 	record.level = app.levle
 	record.score = app.score
-	
+
 	-- give it a new unique filename for saving
 	local i = 1
 	local fn
@@ -54,16 +52,12 @@ end
 -- mkdirs and saves one file per entry
 function HighScoresMenu:saveHighScore(record)
 	assert(record.demoFileName, "every record needs a demoFileName")
-	
+	assert(record.demoPlayback, "every record needs a demoPlayback")
+
 	local fn = assert(record.demoFileName)
 	assert(not path(fn):exists(), "tried to write but it's already there")
-	
-	-- TODO move the hex stuff into safeWrite
-	-- before write: convert to hex
-	assert(record.demoPlayback, "high scores lost its demoPlayback somehow") 
-	record.demoPlayback = strtohex(record.demoPlayback)
-	safeWrite(fn, mytolua(record))
-	record.demoPlayback = hextostr(record.demoPlayback)
+
+	writeDemo(fn, record)
 end
 
 function HighScoresMenu:updateGUI()
@@ -78,12 +72,12 @@ function HighScoresMenu:updateGUI()
 		if ig.igButton'Ok' then
 			local record = self:makeNewRecord()
 			record.demoPlayback = self.demoPlayback
-			
+
 			table.insert(app.highscores, record)
 			table.sort(app.highscores, function(a,b) return a.score > b.score end)
-			
+
 			self:saveHighScore(record)
-			
+
 			self.needsName = false
 			self.demoPlayback = nil
 		end
@@ -163,7 +157,7 @@ function HighScoresMenu:updateGUI()
 							while #record.colors < record.numColors do
 								table.insert(record.colors, app:getDefaultColor(#record.colors+1))
 							end
-							
+
 							app:reset{
 								-- "demoConfig"?
 								playingDemoRecord = record,

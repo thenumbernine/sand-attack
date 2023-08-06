@@ -20,6 +20,7 @@ files = {
 		-- resources and run.lua are relative to sand-attack/
 		-- option #1: put all individual script files here:
 		'sand-attack/app.lua',
+		'sand-attack/convertdemo_bintohex.lua',
 		'sand-attack/player.lua',
 		'sand-attack/serialize.lua',
 		'sand-attack/sandmodel',
