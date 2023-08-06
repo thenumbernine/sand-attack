@@ -36,9 +36,8 @@ function MainMenu:updateGUI()
 	end
 	if path(app.lastDemoFileName):exists() then
 		if self:centerButton'Replay Last Game' then
-			local record = readDemo(app.lastDemoFileName)
 			app:reset{
-				playingDemoRecord = record,
+				playingDemoRecord = readDemo(app.lastDemoFileName),
 			}
 			local PlayingMenu = require 'sand-attack.menu.playing'
 			app.menustate = PlayingMenu(app)	-- sets paused=false

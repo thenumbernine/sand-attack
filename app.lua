@@ -516,10 +516,8 @@ void main() {
 	self.menustate = SplashScreenMenu(self)
 
 	-- play a demo in the background when the game starts
-	local fn = 'splash-demo.bin'
-	local record = readDemo(fn)
 	self:reset{
-		playingDemoRecord = record,
+		playingDemoRecord = readDemo'splash-demo.bin',
 	}
 
 	glreport'here'
