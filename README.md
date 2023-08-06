@@ -36,9 +36,6 @@ external libraries required:
 
 # TODO:
 
-- you can't chang the volume mid-game
-- need a separate config-experience (game-independent) .. audio & ui button size config
-	- and config-gameplay
 -	gameplay
 	-	multiplayer-versus where you can drop sand on your opponent
 		-	and a color that they have to clear-touching to reveal to other random colors

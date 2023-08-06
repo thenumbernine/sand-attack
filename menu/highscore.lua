@@ -50,7 +50,7 @@ end
 -- TODO mkdir and save one file per entry
 function HighScoresMenu:saveHighScore(record, demoPlayback)
 	assert(record.demoFileName, "every record needs a demoFileName")
-	local fn = 'highscores/'..assert(record.demoFileName)
+	local fn = assert(record.demoFileName)
 print('writing highscore', fn)
 	assert(not path(fn):exists(), "tried to write but it's already there")
 	
@@ -59,11 +59,17 @@ print('writing highscore', fn)
 	-- how to fix this?
 	-- give unique id?
 	-- but unique ids are only locally unique ...
-	path(fn):write(
-		mytolua(record)
-		..'\0'
-		..demoPlayback
-	)
+	xpcall(function()
+		assert(path(fn):write(
+			mytolua(record)
+			..'\0'
+			..demoPlayback
+		))
+	end, function(err)
+		print("failed to write high score "..tostring(fn)..'\n'
+			..tostring(err)..'\n'
+			..debug.traceback())
+	end)
 end
 
 function HighScoresMenu:updateGUI()
@@ -76,11 +82,15 @@ function HighScoresMenu:updateGUI()
 		ig.igText'Your Name:'
 		ig.luatableTooltipInputText('Your Name', self, 'name')
 		if ig.igButton'Ok' then
-			self.needsName = false
 			local record = self:makeNewRecord()
 			table.insert(app.highscores, record)
 			table.sort(app.highscores, function(a,b) return a.score > b.score end)
 			self:saveHighScore(record, self.demoPlayback)
+			-- NOTICE - ONLY AFTER SAVING do I append .demoPlayback
+			-- TODO maybe I should just put it as a Lua string ...
+			record.demoPlayback = self.demoPlayback
+			self.needsName = false
+			self.demoPlayback = nil
 		end
 		ig.igNewLine()
 	end

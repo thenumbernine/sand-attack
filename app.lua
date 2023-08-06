@@ -617,7 +617,13 @@ function App:playSound(name, volume, pitch)
 end
 
 function App:saveConfig()
-	path(self.cfgfilename):write(mytolua(self.cfg))
+	xpcall(function()
+		assert(path(self.cfgfilename):write(mytolua(self.cfg)))
+	end, function(err)
+		print('failed to write config file '..tostring(self.cfgfilename)..'\n'
+			..tostring(err)..'\n'
+			..debug.traceback())
+	end)
 end
 
 -- called by App:reset
@@ -1632,11 +1638,17 @@ function App:endGame()
 	self.recordingDemo = nil
 	if demoPlayback then
 		-- write the last demo
-		path(self.lastDemoFileName):write(
-			mytolua(self.playcfg)
-			..'\0'
-			..demoPlayback
-		)
+		xpcall(function()
+			assert(path(self.lastDemoFileName):write(
+				mytolua(self.playcfg)
+				..'\0'
+				..demoPlayback
+			))
+		end, function(err)
+			print("failed to write last demo "..tostring(self.lastDemoFileName)..'\n'
+				..tostring(err)..'\n'
+				..debug.traceback())
+		end)
 		self.menustate = HighScoreMenu(self, true, demoPlayback)
 	end
 end
