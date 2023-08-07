@@ -147,7 +147,7 @@ function NewGameMenu:updateGUI()
 				self.currentColorIndex = nil
 				app:saveConfig()
 			end
-			ig.igEnd()
+			ig.igEndPopup()
 		end
 	end
 	if self:centerButton'Reset Colors' then

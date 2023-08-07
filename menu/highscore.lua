@@ -1,6 +1,7 @@
 local table = require 'ext.table'
 local path = require 'ext.path'
 local range = require 'ext.range'
+local string = require 'ext.string'
 local ops = require 'ext.op'
 local ig = require 'imgui'
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
@@ -169,6 +170,50 @@ function HighScoresMenu:updateGUI()
 								..debug.traceback())
 						end)
 					end
+					ig.igSameLine()
+					if ig.igButton'Submit' then
+						xpcall(function()
+							-- matches the test-submit-demo.lua
+							local URL = require 'socket.url'
+							local reqbody = 'data='..URL.escape(mytolua(record))
+							local respbody = table()
+							print('response:')
+							local http = require 'socket.http'
+							local ltn12 = require 'ltn12'
+							print(mytolua{http.request{
+								method = 'POST',
+								url = 'http://ihavenoparachute.com/sand-attack/submit.js.lua',
+								source = ltn12.source.string(reqbody),
+								sink = ltn12.sink.table(respbody),
+								headers = {
+									['Accept'] = '/*',
+									['Accept-Encoding'] = 'gzip, deflate',
+									['Accept-Language'] = 'en-us',
+									['Content-Type'] = 'application/x-www-form-urlencoded',
+									['Content-Length'] = #reqbody,
+								},
+							}})
+							print('response body:')
+							local response = string.trim(respbody:concat())
+							print(response)
+
+							if response == '{"result":"win"}' then
+								self.submitResponse = 'Success!'
+							else
+								self.submitResponse = 'Server Problems...'
+							end
+
+						end, function(err)
+							print('failed to submit highscore '..mytolua(s)..'\n'
+								..tostring(err)..'\n'
+								..debug.traceback())
+							self.submitResponse = 'Something Broke...'
+						end)
+						if self.submitResponse then
+							--ig.igOpenPopup_Str('Response', 0)	-- doesn't work.  I think pushid is mixing with openpopup when that's a horrible implementation idea.
+							ig.igOpenPopup_ID(12345, 0)			-- works
+						end
+					end
 				else
 					ig.igText(s)
 				end
@@ -178,6 +223,31 @@ function HighScoresMenu:updateGUI()
 		end
 		ig.igEndTable()
 	end
+
+	-- Do popups always need to be run from root /newframe scope of imgui?
+	-- If so then why does my color picker popup work?
+	-- Does pushid affect openpopup?  i would think no.
+	-- Does it affect beginpopup?  I would think yes.
+	-- Hmm seems openpopup_id / beginpopupex (using id) works, but using strings (with pushid around the openpopup) fails ...
+	--- would be better if imgui didn't have pushed IDs affect the open popup 
+	--  because ... if you want to open a more-global-scoped ID ... you can't.  because the pushed IDs will always be appended to you.
+	-- I mean thats just a guess, but here's the real world case where pushid / openpopup fails (but openpopup alone works in newgamme color editor)
+	--  and pushid/ openpopup (via id)/ beginpopupex(via id) works.
+	if self.submitResponse then
+		--if ig.igBeginPopupModal('Response', nil, 0) then
+		--if ig.igBeginPopup('Response', 0) then
+		if ig.igBeginPopupEx(12345, 0) then
+			ig.igPushID_Str'SubmitResponse'
+			ig.igText(self.submitResponse)
+			if ig.igButton'Close' then
+				ig.igCloseCurrentPopup()
+				self.submitResponse = nil
+			end
+			ig.igPopID()
+			ig.igEndPopup()
+		end
+	end
+
 	if ig.igButton'Done' then
 		self.needsName = false
 		local MainMenu = require 'sand-attack.menu.main'
