@@ -36,8 +36,6 @@ external libraries required:
 
 # TODO:
 
-- immediate replaying of demo messes up / reset messes up.
-- colors for playback demos use default colors, not curent customized colors.
 -	gameplay
 	-	multiplayer-versus where you can drop sand on your opponent
 		-	and a color that they have to clear-touching to reveal to other random colors
