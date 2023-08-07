@@ -34,6 +34,11 @@ function MainMenu:updateGUI()
 		local NewGameMenu = require 'sand-attack.menu.newgame'
 		app.menustate = NewGameMenu(app)
 	end
+	if self:centerButton'New Game Co-op' then
+		local NewGameMenu = require 'sand-attack.menu.newgame'
+		app.menustate = NewGameMenu(app, true)
+		-- TODO pick same as before except pick # of players
+	end
 	if path(app.lastDemoFileName):exists() then
 		if self:centerButton'Replay Last Game' then
 			app:reset{
@@ -42,11 +47,6 @@ function MainMenu:updateGUI()
 			local PlayingMenu = require 'sand-attack.menu.playing'
 			app.menustate = PlayingMenu(app)	-- sets paused=false
 		end
-	end
-	if self:centerButton'New Game Co-op' then
-		local NewGameMenu = require 'sand-attack.menu.newgame'
-		app.menustate = NewGameMenu(app, true)
-		-- TODO pick same as before except pick # of players
 	end
 	-- TODO RESUME GAME here
 	if self:centerButton'Config' then

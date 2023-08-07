@@ -17,6 +17,7 @@ estheight = nil
 	local viewport = ig.igGetMainViewport()
 	ig.igSetNextWindowPos(viewport.WorkPos, 0, ig.ImVec2())
 	ig.igSetNextWindowSize(viewport.WorkSize, 0)
+	ig.igSetNextWindowBgAlpha(.3)
 	ig.igPushStyleVar_Float(ig.ImGuiStyleVar_WindowRounding, 0)
 	ig.igBegin(name, nil, bit.bor(
 		ig.ImGuiWindowFlags_NoMove,
