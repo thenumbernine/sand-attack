@@ -32,7 +32,7 @@ function HighScoresMenu:makeNewRecord()
 	record.name = self.name
 	-- copy from app:
 	record.lines = app.lines
-	record.level = app.levle
+	record.level = app.level
 	record.score = app.score
 
 	-- give it a new unique filename for saving
