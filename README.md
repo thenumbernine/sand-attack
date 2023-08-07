@@ -4,6 +4,7 @@
 [![Donate via Bitcoin](https://img.shields.io/badge/Donate-Bitcoin-green.svg)](bitcoin:37fsp7qQKU8XoHZGRQvVzQVP8FrEJ73cSJ)<br>
 
 # [Download](https://github.com/thenumbernine/sand-attack/releases/tag/1.0)
+# [Leaderboard](https://ihavenoparachute.com/sand-attack/)
 
 Connect Lines From Falling Blocks of Sand
 

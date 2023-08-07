@@ -18,17 +18,6 @@ function MainMenu:updateGUI()
 	local app = self.app
 	self:beginFullView('Sand Attack', 6 * 32)
 
-	--[[ how to get default focus... smh imgui ...
-	-- i remember when this was called 'tabstop' and 'tabindex' and it is incrediblly easy to configure in windows...
-	--https://github.com/ocornut/imgui/issues/455
-	if ig.igIsWindowFocused(ig.ImGuiFocusedFlags_RootAndChildWindows)
-	and not ig.igIsAnyItemActive()
-	and not ig.igIsMouseClicked(0, false)
-	then
-		ig.igSetKeyboardFocusHere(0)
-	end
-	--]]
-
 	if self:centerButton'New Game' then
 		-- TODO choose gametype and choose level
 		local NewGameMenu = require 'sand-attack.menu.newgame'
