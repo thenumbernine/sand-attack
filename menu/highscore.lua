@@ -7,50 +7,30 @@ local ig = require 'imgui'
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 local mytolua = require 'sand-attack.serialize'.tolua
 local writeDemo = require 'sand-attack.serialize'.writeDemo
+local strtohex = require 'sand-attack.serialize'.strtohex
 local Menu = require 'sand-attack.menu.menu'
 
-local HighScoresMenu = Menu:subclass()
+local HighScoreMenu = Menu:subclass()
 
-function HighScoresMenu:init(app, needsName, demoPlayback)
-	HighScoresMenu.super.init(self, app)
-	self.needsName = needsName
-	self.name = ''
-	self.demoPlayback = demoPlayback
-	if needsName then assert(self.demoPlayback) end
+function HighScoreMenu:init(app, newRecord)
+	HighScoreMenu.super.init(self, app)
+	self.newRecord = newRecord
+	if newRecord then
+		newRecord.name = ''
+	end
 end
 
 -- shown fields
-HighScoresMenu.shownFields = table{
+HighScoreMenu.shownFields = table{
 	'name',
 	'score',
+	'level',
+	'lines',
 }
 
-function HighScoresMenu:makeNewRecord()
-	local app = self.app
-	local record = table(app.playcfg):setmetatable(nil)
-
-	-- copy from self:
-	record.name = self.name
-	-- copy from app:
-	record.lines = app.lines
-	record.level = app.level
-	record.score = app.score
-
-	-- give it a new unique filename for saving
-	local base = app.highScorePath..'/'..os.date'%Y-%m-%d-%H-%M-%S'
-	local fn
-	for i=0,math.huge do
-		fn = base..(i == 0 and '' or ('-'..i))..'.demo'
-		if not path(fn):exists() then break end
-	end
-	record.demoFileName = fn
-
-	return record
-end
-
--- called only by HighScoresMenu:updateGUI
+-- called only by HighScoreMenu:updateGUI
 -- mkdirs and saves one file per entry
-function HighScoresMenu:saveHighScore(record)
+function HighScoreMenu:saveHighScore(record)
 	assert(record.demoFileName, "every record needs a demoFileName")
 	assert(record.demoPlayback, "every record needs a demoPlayback")
 
@@ -60,26 +40,33 @@ function HighScoresMenu:saveHighScore(record)
 	writeDemo(fn, record)
 end
 
-function HighScoresMenu:updateGUI()
+function HighScoreMenu:updateGUI()
 	local app = self.app
 	self:beginFullView'High Scores:'
 
 	-- TODO separate state for this?
-	if self.needsName then
-		assert(self.demoPlayback)
+	if self.newRecord then
 		ig.igText'Your Name:'
-		ig.luatableTooltipInputText('Your Name', self, 'name')
+		ig.luatableTooltipInputText('Your Name', self.newRecord, 'name')
 		if ig.igButton'Ok' then
-			local record = self:makeNewRecord()
-			record.demoPlayback = self.demoPlayback
+			-- assigns demoFileName
+			local record = self.newRecord
+			self.newRecord = nil
+
+			-- give it a new unique filename for saving
+			local base = app.highScorePath..'/'..os.date'%Y-%m-%d-%H-%M-%S'
+			local fn
+			for i=0,math.huge do
+				fn = base..(i == 0 and '' or ('-'..i))..'.demo'
+				if not path(fn):exists() then break end
+			end
+			record.demoFileName = fn
 
 			table.insert(app.highscores, record)
 			table.sort(app.highscores, function(a,b) return a.score > b.score end)
 
 			self:saveHighScore(record)
 
-			self.needsName = false
-			self.demoPlayback = nil
 		end
 		ig.igNewLine()
 	end
@@ -173,6 +160,11 @@ function HighScoresMenu:updateGUI()
 					ig.igSameLine()
 					if ig.igButton'Submit' then
 						xpcall(function()
+							local record = table(record)
+							-- encode as hex string (for serialization's sake) (just like in writeDemo)
+							if record.demoPlayback then
+								record.demoPlayback = strtohex(record.demoPlayback)
+							end
 							-- matches the test-submit-demo.lua
 							local URL = require 'socket.url'
 							local reqbody = 'data='..URL.escape(mytolua(record))
@@ -236,6 +228,7 @@ function HighScoresMenu:updateGUI()
 	if self.submitResponse then
 		--if ig.igBeginPopupModal('Response', nil, 0) then
 		--if ig.igBeginPopup('Response', 0) then
+		-- TODO now to just find how to give it a title...
 		if ig.igBeginPopupEx(12345, 0) then
 			ig.igPushID_Str'SubmitResponse'
 			ig.igText(self.submitResponse)
@@ -249,11 +242,11 @@ function HighScoresMenu:updateGUI()
 	end
 
 	if ig.igButton'Done' then
-		self.needsName = false
+		self.newRecord = nil
 		local MainMenu = require 'sand-attack.menu.main'
 		app.menustate = MainMenu(app)
 	end
-	if not self.needsName then
+	if not self.newRecord then
 		ig.igSameLine()
 		if ig.igButton'Clear' then
 			app.highscores = {}
@@ -268,4 +261,4 @@ function HighScoresMenu:updateGUI()
 	self:endFullView()
 end
 
-return HighScoresMenu
+return HighScoreMenu

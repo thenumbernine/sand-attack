@@ -1627,7 +1627,12 @@ function App:endGame()
 		-- at this point it should still be matching (except for any changes in volume / user cfg ... )
 		writeDemo(self.lastDemoFileName, cfg)
 
-		self.menustate = HighScoreMenu(self, true, demoPlayback)
+		self.menustate = HighScoreMenu(self, table(self.playcfg, {
+			level = self.level,
+			lines = self.lines,
+			score = self.score,
+			demoPlayback = demoPlayback,
+		}))
 	end
 end
 

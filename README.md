@@ -32,7 +32,7 @@ external libraries required:
 - libvorbis
 - libvorbisfile
 - OpenAL-Soft
-
+- luasocket (optional, only if you want to submit your highscores)
 
 # TODO:
 

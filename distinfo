@@ -42,9 +42,7 @@ files = {
 		'imgui',
 		'imguiapp',
 		'audio',
-	}:append(
-		ffi.os == 'Android' and {'gles2'} or {'gl'}
-	),
+	},
 }
 
 -- luarocks ...
@@ -61,9 +59,17 @@ if ffi.os == 'Linux' then
 	files['/usr/local/lib/lua/luajit-2.1.0-beta3/'] = {
 		'socket',
 		'mime',
-		'ssl',
-		'ssl.lua',
-		'ssl.so',
+	}
+elseif ffi.os == 'Windows' then
+	files['${USERPROFILE}\\luarocks\\share'] = {
+		'socket.lua',
+		'ltn12.lua',
+		'mime.lua',
+		'socket',
+	}
+	files['${USERPROFILE}\\luarocks\\lib'] = {
+		'socket',
+		'mime',
 	}
 end
 
