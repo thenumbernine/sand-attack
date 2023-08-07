@@ -20,12 +20,14 @@ files = {
 		-- resources and run.lua are relative to sand-attack/
 		-- option #1: put all individual script files here:
 		'sand-attack/app.lua',
-		'sand-attack/convertdemo_bintohex.lua',
-		'sand-attack/test-submit-demo.lua',
 		'sand-attack/player.lua',
 		'sand-attack/serialize.lua',
 		'sand-attack/sandmodel',
 		'sand-attack/menu',
+		-- extra util scripts
+		'sand-attack/convertdemo_bintohex.lua',
+		'sand-attack/test-submit-demo.lua',
+		'sand-attack/verify-demo.lua',
 
 		-- option #2: copy this dir and reference all resources from 'sand-attack/'
 		-- (this'll require a 'cd ..' every time you playtest it from within its cwd ...)
