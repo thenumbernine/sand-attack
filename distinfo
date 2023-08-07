@@ -21,6 +21,7 @@ files = {
 		-- option #1: put all individual script files here:
 		'sand-attack/app.lua',
 		'sand-attack/convertdemo_bintohex.lua',
+		'sand-attack/test-submit-demo.lua',
 		'sand-attack/player.lua',
 		'sand-attack/serialize.lua',
 		'sand-attack/sandmodel',
