@@ -135,12 +135,12 @@ function HighScoreMenu:updateGUI()
 				ig.igPushID_Int(j)
 				ig.igTableNextColumn()
 				local s = tostring(record[field])
-				local isbutton = j == 1 and record.demoPlayback
-				if j == 1 then
+				local isbutton = j == 1 and record.demoPlayback and not self.newRecord
+				if isbutton then
 					if ig.igButton(s) then
 						xpcall(function()
 							-- use the current configured colors...
-							record.colors = table(app.colors):setmetatable(nil)
+							record.colors = table(app.cfg.colors):setmetatable(nil)
 							while #record.colors < record.numColors do
 								table.insert(record.colors, app:getDefaultColor(#record.colors+1))
 							end

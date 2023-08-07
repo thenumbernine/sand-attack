@@ -27,11 +27,6 @@ local AudioBuffer = require 'audio.buffer'
 local Player = require 'sand-attack.player'
 local SandModel = require 'sand-attack.sandmodel.sandmodel'
 
-local PlayingMenu = require 'sand-attack.menu.playing'
-local SplashScreenMenu = require 'sand-attack.menu.splashscreen'
-local MainMenu = require 'sand-attack.menu.main'
-local HighScoreMenu = require 'sand-attack.menu.highscore'
-
 local readDemo = require 'sand-attack.serialize'.readDemo
 local writeDemo = require 'sand-attack.serialize'.writeDemo
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
@@ -504,6 +499,7 @@ void main() {
 		end)
 	end
 
+	local SplashScreenMenu = require 'sand-attack.menu.splashscreen'
 	self.menustate = SplashScreenMenu(self)
 
 	-- play a demo in the background when the game starts
@@ -1267,6 +1263,7 @@ function App:updateGame()
 			-- and also only when it's not yet paused
 			-- hmmmmm pause is exceptional for player keys ...
 			-- I'd like to make this always toggle the main menu or be the 'back' key (like Doom menu)
+			local PlayingMenu = require 'sand-attack.menu.playing'
 			if PlayingMenu:isa(self.menustate) then
 				self.paused = not self.paused
 			end
@@ -1597,11 +1594,13 @@ App.lastFrameTime = 0
 App.fpsSampleCount = 0
 
 -- called from menu upon early end
+-- or from App loseTime is finished
 function App:endGame()
 	if self.playingDemo then
 		-- :endGame called from PlayingMenu
 		-- when you push esc while playing back a menu
 		-- TODO menu/demos is all a mess
+		local MainMenu = require 'sand-attack.menu.main'
 		self.menustate = MainMenu(self)
 		return
 	end
@@ -1627,12 +1626,18 @@ function App:endGame()
 		-- at this point it should still be matching (except for any changes in volume / user cfg ... )
 		writeDemo(self.lastDemoFileName, cfg)
 
+		local HighScoreMenu = require 'sand-attack.menu.highscore'
 		self.menustate = HighScoreMenu(self, table(self.playcfg, {
 			level = self.level,
 			lines = self.lines,
 			score = self.score,
 			demoPlayback = demoPlayback,
 		}))
+
+		-- and reset and play demo again
+		self:reset{
+			playingDemoRecord = readDemo'splash.demo',
+		}
 	end
 end
 
