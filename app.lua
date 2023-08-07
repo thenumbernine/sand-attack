@@ -1404,17 +1404,36 @@ function App:update(...)
 
 		-- draw
 
+		local shader = self.displayShader
+
 		local aspectRatio = self.width / self.height
 		local s = w / h
 
-		local shader = self.displayShader
-
-		self.projMat:setOrtho(-.5 * aspectRatio, .5 * aspectRatio, -.5, .5, -1, 1)
+		if s < aspectRatio then
+			-- if s < aspectRatio then we are vert-constrained, and we scale by [aspectRatio, 1]
+			self.projMat:setOrtho(
+				-.5 * aspectRatio / s,
+				.5 * aspectRatio / s,
+				-.5,
+				.5,
+				-1,
+				1)
+		else
+			-- if s > aspectRatio then we are horz-constrained, and we scale by [1, 1/aspectRatio]
+			--self.projMat:setOrtho(-.5, .5, -.5 / aspectRatio, .5 / aspectRatio, -1, 1)
+			self.projMat:setOrtho(
+				-.5,
+				.5,
+				-.5 * s / aspectRatio,
+				.5 * s / aspectRatio,
+				-1,
+				1)
+			-- TODO also translate so it lines up with the bottom of the screen ....
+		end
 		shader:use()
 			:enableAttrs()
 
-		self.mvMat:setTranslate(-.5 * s, -.5)
-			:applyScale(s, 1)
+		self.mvMat:setTranslate(-.5, -.5)
 		self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 		gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
@@ -1436,12 +1455,13 @@ function App:update(...)
 			-- draw outline for multiplayer
 			if self.playcfg.numPlayers > 1 then
 				self.mvMat:setTranslate(
-						((math.floor(player.piecePos.x) - self.pieceOutlineRadius) / w - .5) * s,
+						(math.floor(player.piecePos.x) - self.pieceOutlineRadius) / w - .5,
 						(math.floor(player.piecePos.y) - self.pieceOutlineRadius) / h - .5
 					)
 					:applyScale(
-						(self.pieceSize.x + 2 * self.pieceOutlineRadius) / w * s,
-						(self.pieceSize.y + 2 * self.pieceOutlineRadius) / h)
+						(self.pieceSize.x + 2 * self.pieceOutlineRadius) / w,
+						(self.pieceSize.y + 2 * self.pieceOutlineRadius) / h
+					)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
@@ -1457,10 +1477,13 @@ function App:update(...)
 			-- draw piece
 
 			self.mvMat:setTranslate(
-					(math.floor(player.piecePos.x) / w - .5) * s,
+					math.floor(player.piecePos.x) / w - .5,
 					math.floor(player.piecePos.y) / h - .5
 				)
-				:applyScale(self.pieceSize.x / w * s, self.pieceSize.y / h)
+				:applyScale(
+					self.pieceSize.x / w,
+					self.pieceSize.y / h
+				)
 			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 			gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
@@ -1479,8 +1502,7 @@ function App:update(...)
 			local flashInt = bit.band(math.floor(flashDt * self.lineNumFlashes * 2), 1) == 0
 			if flashInt then
 				self.mvMat
-					:setTranslate(-.5 * s, -.5)
-					:applyScale(s, 1)
+					:setTranslate(-.5, -.5)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
@@ -1521,8 +1543,7 @@ function App:update(...)
 			local loseDuration = self.thisTime - self.loseTime
 			if math.floor(loseDuration * 2) % 2 == 0 then
 				self.mvMat
-					:setTranslate(-.5 * s, -.5)
-					:applyScale(s, 1)
+					:setTranslate(-.5, -.5)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
 
@@ -1532,6 +1553,14 @@ function App:update(...)
 				gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 0)
 			end
 		end
+
+		self.projMat:setOrtho(
+			-.5 * aspectRatio,
+			.5 * aspectRatio,
+			-.5,
+			.5,
+			-1,
+			1)
 
 		local nextPieceSize = .1
 		for i=#self.nextPieces,1,-1 do
@@ -1655,7 +1684,7 @@ function App:drawTouchRegions()
 		:enableAttrs()
 	gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 0)
 	self.buttonTex:bind()
-	self.projMat:setOrtho(0,self.width,self.height,0,-1,1)
+	self.projMat:setOrtho(0, self.width, self.height, 0, -1, 1)
 	for i=1,self.cfg.numPlayers do
 		for _,keyname in ipairs(Player.keyNames) do
 			local e = self.cfg.playerKeys[i][keyname]
