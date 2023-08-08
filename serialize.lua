@@ -18,7 +18,7 @@ end
 
 local function myfromlua(x)
 	-- empty env ... sandboxed?
-	return fromlua(x, nil, nil, {})
+	return fromlua(x, nil, 't', {})
 end
 
 local function hextostr(h)

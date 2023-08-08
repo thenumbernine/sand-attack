@@ -20,4 +20,8 @@ end
 require 'gl.setup'(glfn)
 --]]
 
+if not pcall(require, 'socket') then
+	print("WARNING: can't find luasocket -- you won't be able to submit highscores")
+end
+
 return require 'sand-attack.app'():run()

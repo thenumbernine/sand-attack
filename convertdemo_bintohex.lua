@@ -8,7 +8,8 @@ assert(infn and outfn, "expected <in> <out>")
 local d = assert(path(infn):read())
 local n = tonumber(ffi.C.strlen(d))	-- TODO same as just d:find'\0' ? ... with endline?
 local cfgstr = d:sub(1,n)
-local cfg = assert(fromlua(cfgstr))
+local myfromlua = require 'sand-attack'.fromlua
+local cfg = assert(myfromlua(cfgstr))
 assert(d:byte(n+1) == 0)
 local demoPlayback = d:sub(n+2)
 
