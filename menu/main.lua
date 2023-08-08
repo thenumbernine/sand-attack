@@ -3,7 +3,6 @@ local path = require 'ext.path'
 local ig = require 'imgui'
 local Menu = require 'sand-attack.menu.menu'
 
-local readDemo = require 'sand-attack.serialize'.readDemo
 
 local MainMenu = Menu:subclass()
 
@@ -27,15 +26,6 @@ function MainMenu:updateGUI()
 		local NewGameMenu = require 'sand-attack.menu.newgame'
 		app.menustate = NewGameMenu(app, true)
 		-- TODO pick same as before except pick # of players
-	end
-	if path(app.lastDemoFileName):exists() then
-		if self:centerButton'Replay Last Game' then
-			app:reset{
-				playingDemoRecord = readDemo(app.lastDemoFileName),
-			}
-			local PlayingMenu = require 'sand-attack.menu.playing'
-			app.menustate = PlayingMenu(app)	-- sets paused=false
-		end
 	end
 	-- TODO RESUME GAME here
 	if self:centerButton'Config' then

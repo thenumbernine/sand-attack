@@ -119,7 +119,6 @@ App.lineNumFlashes = 5
 
 App.cfgfilename = 'config.lua'
 
-App.lastDemoFileName = 'lastgame.demo'
 App.highScorePath = 'highscores'
 
 function App:initGL(...)
@@ -1646,15 +1645,6 @@ function App:endGame()
 	local demoPlayback = self.recordingDemo and self.recordingDemo:concat() or nil
 	self.recordingDemo = nil
 	if demoPlayback then
-		local cfg = self.playcfg
-		cfg.demoPlayback = demoPlayback
-
-		-- write the last demo
-		-- TODO I could merge lastDemo in config ...
-		-- but what about desync between app.cfg and app.playcfg ?
-		-- at this point it should still be matching (except for any changes in volume / user cfg ... )
-		writeDemo(self.lastDemoFileName, cfg)
-
 		local HighScoreMenu = require 'sand-attack.menu.highscore'
 		self.menustate = HighScoreMenu(self, table(self.playcfg, {
 			level = self.level,
