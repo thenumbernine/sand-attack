@@ -1875,6 +1875,7 @@ function App:event(e, ...)
 	end
 
 	-- TODO how to incorporate this into the gameplay ...
+	--[[ don't do it for now, it'll mess with the demo recording
 	if e.type == sdl.SDL_KEYDOWN
 	or e.type == sdl.SDL_KEYUP
 	then
@@ -1883,6 +1884,7 @@ function App:event(e, ...)
 			if down then self:flipBoard() end
 		end
 	end
+	--]]
 end
 
 function App:updateGUI()
