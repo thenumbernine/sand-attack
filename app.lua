@@ -20,7 +20,6 @@ local vec2f = require 'vec-ffi.vec2f'
 local vec3f = require 'vec-ffi.vec3f'
 local getTime = require 'ext.timer'.getTime
 local ig = require 'imgui'
-local ImGuiApp = require 'imguiapp'
 local Audio = require 'audio'
 local AudioSource = require 'audio.source'
 local AudioBuffer = require 'audio.buffer'
@@ -82,7 +81,7 @@ end
 local mytolua = require 'sand-attack.serialize'.tolua
 local myfromlua = require 'sand-attack.serialize'.fromlua
 
-local App = class(ImGuiApp)
+local App = require 'imguiapp':subclass()
 
 App.title = 'Sand Attack'
 App.sdlInitFlags = bit.bor(
@@ -297,10 +296,20 @@ function App:initGL(...)
 		magFilter = gl.GL_NEAREST,
 	}
 
-	-- TODO use self.view with .useBuiltinMatrixMath=true
-	self.projMat = matrix({4,4},'float'):zeros()
-	self.mvMat = matrix({4,4},'float'):zeros()
-	self.mvProjMat = matrix({4,4},'float'):zeros()
+--[[ assign a view but not a view setup call every frame
+	local View = require 'glapp.view'
+	self.view = View{
+		useBuiltinMatrixMath = true,
+	}
+	self.projMat = self.view.projMat
+	self.mvMat = self.view.mvMat
+	self.mvProjMat = self.view.projMat
+--]]
+-- [[
+	self.projMat = matrix({4,4}, 'float'):zeros():setIdent()
+	self.mvMat = matrix({4,4}, 'float'):zeros():setIdent()
+	self.mvProjMat = matrix({4,4}, 'float'):zeros():setIdent()
+--]]
 
 	local vtxbufCPU = ffi.new('float[8]', {
 		0,0,
