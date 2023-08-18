@@ -12,7 +12,7 @@ require 'gl.setup'()	-- for desktop GL.  Windows needs this.
 local glfn = nil	-- default gl
 local ffi = require 'ffi'
 if ffi.os == 'Linux' then
-	glfn = 'OpenGLES3'	-- linux / raspi (also linux) can use GLES3
+	glfn = 'OpenGLES3'	-- linux / raspi (which is also classified under ffi.os == 'Linux') can use GLES3
 end
 if cmdline.gl ~= nil then	-- allow cmdline override
 	glfn = cmdline.gl
