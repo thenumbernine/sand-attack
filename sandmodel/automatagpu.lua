@@ -210,11 +210,7 @@ void main() {
 			tex = 0,
 			texsize = {w, h},
 		},
-
-		attrs = {
-			vertex = app.quadVertexBuf,
-		},
-	}
+	}:useNone()
 
 	self.testMergeShader = GLProgram{
 		vertexCode = app.shaderHeader..[[
@@ -257,11 +253,7 @@ void main() {
 			boardTex = 0,
 			pieceTex = 1,
 		},
-
-		attrs = {
-			vertex = app.quadVertexBuf,
-		},
-	}
+	}:useNone()
 
 	-- temp texture used for testing collisions
 	self.testMergeTex = app:makeTexWithBlankImage(vec2i(app.pieceSize.x, 1))
@@ -288,13 +280,14 @@ function AutomataSandGPU:testPieceMerge(player)
 	local fbo = self.fbo
 	local dsttex = self.testMergeTex
 	local shader = self.testMergeShader
+	local sceneObj = app.displayQuadSceneObj 
 	local sandTex = self:getSandTex()
 
 	gl.glBlendFunc(gl.GL_ONE, gl.GL_ONE)
 	gl.glEnable(gl.GL_BLEND)
 
 	shader:use()
-		:enableAttrs()
+	sceneObj:enableAndSetAttrs()
 
 	gl.glViewport(0, 0, app.pieceSize.x, 1)
 
@@ -334,8 +327,8 @@ function AutomataSandGPU:testPieceMerge(player)
 
 	gl.glDisable(gl.GL_BLEND)
 
-	shader:disableAttrs()
-		:useNone()
+	sceneObj:disableAttrs()
+	shader:useNone()
 
 	gl.glViewport(0, 0, app.width, app.height)
 
@@ -361,6 +354,7 @@ function AutomataSandGPU:mergePiece(player)
 	local fbo = self.fbo
 	local srctex = self.pp:prev()
 	local dsttex = self.pp:cur()
+	local sceneObj = app.displayQuadSceneObj 
 	local shader = app.displayShader
 
 	gl.glViewport(0, 0, w, h)
@@ -374,7 +368,8 @@ function AutomataSandGPU:mergePiece(player)
 	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 
 	shader:use()
-		:enableAttrs()
+	sceneObj:enableAndSetAttrs()
+	
 	gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 1)
 	
 	app.projMat:setOrtho(0, 1, 0, 1, -1, 1)
@@ -402,8 +397,8 @@ function AutomataSandGPU:mergePiece(player)
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 	srctex:unbind()
 
-	shader:disableAttrs()
-		:useNone()
+	sceneObj:disableAttrs()
+	shader:useNone()
 
 	self.pp:swap()
 
@@ -467,6 +462,9 @@ function AutomataSandGPU:test()
 	print'before'
 	local beforeStr = printBuf(self.sandTex.image.buffer, w, h, 0)
 
+	local shader = self.updateShader
+	local sceneObj = app.displayQuadSceneObj 
+	
 	-- copy sandtex to pingpong
 	self.pp:prev()
 		:bind()
@@ -475,11 +473,10 @@ function AutomataSandGPU:test()
 
 	app.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
 
-	self.updateShader
-		:use()
-		:enableAttrs()
+	shader:use()
+	sceneObj:enableAndSetAttrs()
 	gl.glUniformMatrix4fv(
-		self.updateShader.uniforms.mvProjMat.loc,
+		shader.uniforms.mvProjMat.loc,
 		1,
 		gl.GL_FALSE,
 		app.mvProjMat.ptr)
@@ -493,7 +490,7 @@ function AutomataSandGPU:test()
 					-- update
 					self.pp:draw{
 						callback = function()
-							gl.glUniform3i(self.updateShader.uniforms.ofs.loc, xofs, yofs, toppleRight)
+							gl.glUniform3i(shader.uniforms.ofs.loc, xofs, yofs, toppleRight)
 							local tex = self.pp:prev()
 							tex:bind()
 							gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
@@ -513,9 +510,8 @@ function AutomataSandGPU:test()
 	end
 	gl.glViewport(0, 0, app.width, app.height)
 
-	self.updateShader
-		:disableAttrs()
-		:useNone()
+	sceneObj:disableAttrs()
+	shader:useNone()
 
 	os.exit()
 end
@@ -527,9 +523,10 @@ function AutomataSandGPU:update()
 
 	local fbo = self.pp.fbo
 	local shader = self.updateShader
+	local sceneObj = app.displayQuadSceneObj 
 
 	shader:use()
-		:enableAttrs()
+	sceneObj:enableAndSetAttrs()
 
 	app.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
 	gl.glUniformMatrix4fv(
@@ -596,8 +593,9 @@ function AutomataSandGPU:update()
 	fbo:unbind()
 	gl.glViewport(0, 0, app.width, app.height)
 
-	shader:disableAttrs()
-		:useNone()
+	sceneObj:disableAttrs()
+	shader:useNone()
+	
 	return true
 end
 

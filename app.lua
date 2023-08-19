@@ -12,6 +12,8 @@ local Image = require 'image'
 local gl = require 'gl'
 local GLTex2D = require 'gl.tex2d'
 local GLProgram = require 'gl.program'
+local GLGeometry = require 'gl.geometry'
+local GLSceneObject = require 'gl.sceneobject'
 local GLArrayBuffer = require 'gl.arraybuffer'
 local GLFBO = require 'gl.fbo'
 local glreport = require 'gl.report'
@@ -311,16 +313,21 @@ function App:initGL(...)
 	self.mvProjMat = matrix({4,4}, 'float'):zeros():setIdent()
 --]]
 
-	local vtxbufCPU = ffi.new('float[8]', {
-		0,0,
-		1,0,
-		0,1,
-		1,1,
+	local vtxbufCPU = ffi.new('vec2f_t[8]', {
+		vec2f(0,0),
+		vec2f(1,0),
+		vec2f(0,1),
+		vec2f(1,1),
 	})
 	self.quadVertexBuf = GLArrayBuffer{
 		size = ffi.sizeof(vtxbufCPU),
 		data = vtxbufCPU,
 	}:unbind()
+
+	self.quadGeom = GLGeometry{
+		mode = gl.GL_TRIANGLE_STRIP,
+		count = 4,
+	}
 
 	--self.glslVersion = 460	-- too new
 	--self.glslVersion = 430
@@ -354,11 +361,28 @@ void main() {
 			tex = 0,
 			useAlphaTest = false,
 		},
+	}:useNone()
 
+	self.splashScreenSceneObj = GLSceneObject{
+		geometry = self.quadGeom,
+		program = self.displayShader,
 		attrs = {
 			vertex = self.quadVertexBuf,
 		},
-	}:useNone()
+		texs = {
+			self.splashTex,
+		},
+	}
+
+	-- same as splashScreenSceneObj but without texs
+	-- I could separate the attr+shader+geom from texs for the sake of minimizing VAO creation...
+	self.displayQuadSceneObj = GLSceneObject{
+		geometry = self.quadGeom,
+		program = self.displayShader,
+		attrs = {
+			vertex = self.quadVertexBuf,
+		},
+	}
 
 	self.populatePieceShader = GLProgram{
 		vertexCode = self.shaderHeader..[[
@@ -396,10 +420,6 @@ void main() {
 		uniforms = {
 			tex = 0,
 			randtex = 1,
-		},
-
-		attrs = {
-			vertex = self.quadVertexBuf,
 		},
 	}:useNone()
 
@@ -459,12 +479,7 @@ void main() {
 		uniforms = {
 			pieceTex = 0,
 		},
-
-		attrs = {
-			vertex = self.quadVertexBuf,
-		},
-
-	}
+	}:useNone()
 
 	self.sounds = {}
 
@@ -896,6 +911,7 @@ function App:populatePiece(args)
 	local fbo = self.pieceFBO
 	local dsttex = args.tex
 	local shader = self.populatePieceShader
+	local sceneObj = self.displayQuadSceneObj 
 
 	gl.glViewport(0, 0, self.pieceSize.x, self.pieceSize.y)
 
@@ -904,9 +920,8 @@ function App:populatePiece(args)
 	local res, err = fbo.check()
 	if not res then print(err) end
 
-	shader
-		:use()
-		:enableAttrs()
+	shader:use()
+	sceneObj:enableAndSetAttrs()
 
 	self.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
 	gl.glUniformMatrix4fv(
@@ -928,9 +943,8 @@ function App:populatePiece(args)
 	self.pieceRandomColorTex:unbind(1)
 	srctex:unbind(0)
 
-	shader
-		:disableAttrs()
-		:useNone()
+	sceneObj:disableAttrs()
+	shader:useNone()
 
 	gl.glReadPixels(
 		0,						--GLint x,
@@ -1034,6 +1048,7 @@ function App:updatePieceTex(player)
 	local fbo = self.pieceOutlineFBO
 	local dsttex = player.pieceOutlineTex
 	local shader = self.updatePieceOutlineShader
+	local sceneObj = self.displayQuadSceneObj 
 	local srctex = player.pieceTex
 
 	gl.glViewport(0, 0, fbo.width, fbo.height)
@@ -1044,7 +1059,7 @@ function App:updatePieceTex(player)
 	if not res then print(err) end
 
 	shader:use()
-		:enableAttrs()
+	sceneObj:enableAndSetAttrs()
 
 	self.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
 	gl.glUniformMatrix4fv(
@@ -1065,8 +1080,8 @@ function App:updatePieceTex(player)
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 	srctex:unbind()
 
-	shader:disableAttrs()
-		:useNone()
+	sceneObj:disableAttrs()
+	shader:useNone()
 
 	fbo:unbind()
 
@@ -1081,6 +1096,7 @@ function App:rotatePiece(player)
 	local srctex = player.pieceTex
 	local dsttex = self.rotPieceTex
 	local shader = self.displayShader
+	local sceneObj = self.displayQuadSceneObj 
 	gl.glViewport(0, 0, self.pieceSize.x, self.pieceSize.y)
 
 	fbo:bind()
@@ -1088,9 +1104,8 @@ function App:rotatePiece(player)
 	local res, err = fbo.check()
 	if not res then print(err) end
 
-	shader
-		:use()
-		:enableAttrs()
+	shader:use()
+	sceneObj:enableAndSetAttrs()
 
 	self.projMat:setOrtho(0, 1, 0, 1, -1, 1)
 	self.mvMat
@@ -1109,9 +1124,8 @@ function App:rotatePiece(player)
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 	srctex:unbind()
 
-	shader
-		:disableAttrs()
-		:useNone()
+	sceneObj:disableAttrs()
+	shader:useNone()
 
 	-- still needed by
 	-- 	- App:updatePieceTex for calculating pieceColMin and pieceColMax
@@ -1413,6 +1427,7 @@ function App:update(...)
 		-- draw
 
 		local shader = self.displayShader
+		local sceneObj = self.displayQuadSceneObj 
 
 		local aspectRatio = self.width / self.height
 		local s = w / h
@@ -1438,8 +1453,9 @@ function App:update(...)
 				1)
 			-- TODO also translate so it lines up with the bottom of the screen ....
 		end
+		
 		shader:use()
-			:enableAttrs()
+		sceneObj:enableAndSetAttrs()
 
 		self.mvMat:setTranslate(-.5, -.5)
 		self.mvProjMat:mul4x4(self.projMat, self.mvMat)
@@ -1587,9 +1603,8 @@ function App:update(...)
 		end
 
 		GLTex2D:unbind()
-		shader
-			:disableAttrs()
-			:useNone()
+		sceneObj:disableAttrs()
+		shader:useNone()
 	end
 
 	if self.loseTime
@@ -1675,12 +1690,12 @@ function App:drawTouchRegions()
 	local buttonRadius = self.width * self.cfg.screenButtonRadius
 
 	local shader = self.displayShader
+	local sceneObj = self.displayQuadSceneObj 
 
 	gl.glEnable(gl.GL_BLEND)
 	gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
-	shader
-		:use()
-		:enableAttrs()
+	shader:use()
+	sceneObj:enableAndSetAttrs()
 	gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 0)
 	self.buttonTex:bind()
 	self.projMat:setOrtho(0, self.width, self.height, 0, -1, 1)
@@ -1704,9 +1719,8 @@ function App:drawTouchRegions()
 		end
 	end
 	self.buttonTex:unbind()
-	shader
-		:disableAttrs()
-		:useNone()
+	sceneObj:disableAttrs()
+	shader:useNone()
 	gl.glDisable(gl.GL_BLEND)
 end
 
