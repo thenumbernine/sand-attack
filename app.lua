@@ -313,7 +313,7 @@ function App:initGL(...)
 	self.mvProjMat = matrix({4,4}, 'float'):zeros():setIdent()
 --]]
 
-	local vtxbufCPU = ffi.new('vec2f_t[8]', {
+	local vtxbufCPU = ffi.new('vec2f_t[4]', {
 		vec2f(0,0),
 		vec2f(1,0),
 		vec2f(0,1),
