@@ -1110,7 +1110,7 @@ function App:rotatePiece(player)
 	self.projMat:setOrtho(0, 1, 0, 1, -1, 1)
 	self.mvMat
 		:setTranslate(.5, .5, 0)
-		:applyRotate(90, 0, 0, 1)
+		:applyRotate(math.pi*.5, 0, 0, 1)
 		:applyTranslate(-.5, -.5, 0)
 	self.mvProjMat:mul4x4(self.projMat, self.mvMat)
 	gl.glUniformMatrix4fv(
