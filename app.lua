@@ -1000,6 +1000,7 @@ end
 -- called by new piece tex, and after rotating the pice
 App.pieceOutlineRadius = 5
 function App:updatePieceTex(player)
+	-- TODO use player.pieceTex.image:getZealousCropRect()
 	-- while we're here, find the first and last cols with content
 	-- use this for testing screen bounds
 	local pieceBuf = ffi.cast('uint32_t*', player.pieceTex.image.buffer)
