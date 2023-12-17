@@ -215,7 +215,7 @@ function HighScoreMenu:updateGUI()
 			app.highscores = {}
 			path(app.highScorePath):mkdir()
 			for f in path(app.highScorePath):dir() do
-				if f:match'%.demo$' then
+				if f.path:match'%.demo$' then
 					path(app.highScorePath..'/'..f):remove()
 				end
 			end

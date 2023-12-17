@@ -193,7 +193,7 @@ function App:initGL(...)
 	-- especially starting right around here ...
 	path(self.highScorePath):mkdir()
 	for f in path(self.highScorePath):dir() do
-		if f:match'%.demo$' then
+		if f.path:match'%.demo$' then
 			table.insert(
 				self.highscores,
 				readDemo(self.highScorePath..'/'..f)
@@ -499,7 +499,7 @@ void main() {
 
 			self.bgMusicFiles = table()
 			for f in path'music':dir() do
-				if f:match'%.ogg$' then
+				if f.path:match'%.ogg$' then
 					self.bgMusicFiles:insert('music/'..f)
 				end
 			end
