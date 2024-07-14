@@ -24,4 +24,6 @@ if not pcall(require, 'socket') then
 	print("WARNING: can't find luasocket -- you won't be able to submit highscores")
 end
 
-return require 'sand-attack.app'():run()
+local App = require 'sand-attack.app'
+App.skipCustomFont = cmdline.skipCustomFont
+return App():run()

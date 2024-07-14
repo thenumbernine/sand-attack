@@ -137,43 +137,45 @@ function App:initGL(...)
 	igio[0].FontGlobalScale = 2
 
 -- [[ imgui custom font
-	--local fontfile = 'font/moenstrum.ttf'				-- no numbers
-	--local fontfile = 'font/PixelGamer-Regular.otf'	-- no numbers
-	--local fontfile = 'font/goldingots.ttf'
-	local fontfile = 'font/Billow twirl Demo.ttf'
-	self.fontAtlas = ig.ImFontAtlas_ImFontAtlas()
-	self.font = ig.ImFontAtlas_AddFontFromFileTTF(self.fontAtlas, fontfile, 16, nil, nil)
-	-- just change the font, and imgui complains that you need to call FontAtlas::Build() ...
-	assert(ig.ImFontAtlas_Build(self.fontAtlas))
-	-- just call FontAtlas::Build() and you just get white blobs ...
-	-- is this proper behavior?  or a bug in imgui?
-	-- you have to download the font texture pixel data, make a GL texture out of it, and re-upload it
-	local width = ffi.new('int[1]')
-	local height = ffi.new('int[1]')
-	local bpp = ffi.new('int[1]')
-	local outPixels = ffi.new('unsigned char*[1]')
-	-- GL_LUMINANCE textures are deprecated ... khronos says use GL_RED instead ... meaning you have to write extra shaders for greyscale textures to be used as greyscale in opengl ... ugh
-	--ig.ImFontAtlas_GetTexDataAsAlpha8(self.fontAtlas, outPixels, width, height, bpp)
-	ig.ImFontAtlas_GetTexDataAsRGBA32(self.fontAtlas, outPixels, width, height, bpp)
-	self.fontTex = GLTex2D{
-		internalFormat = gl.GL_RGBA,
-		--internalFormat = gl.GL_RED,
-		format = gl.GL_RGBA,
-		--format = gl.GL_RED,
-		width = width[0],
-		height = height[0],
-		type = gl.GL_UNSIGNED_BYTE,
-		data = outPixels[0],
-		minFilter = gl.GL_NEAREST,
-		magFilter = gl.GL_NEAREST,
-		wrap = {
-			s = gl.GL_CLAMP_TO_EDGE,
-			t = gl.GL_CLAMP_TO_EDGE,
-		},
-	}
-	require 'ffi.req' 'c.stdlib'	-- free()
-	ffi.C.free(outPixels[0])	-- just betting here I have to free this myself ...
-	ig.ImFontAtlas_SetTexID(self.fontAtlas, ffi.cast('ImTextureID', self.fontTex.id))
+	if not self.skipCustomFont then
+		--local fontfile = 'font/moenstrum.ttf'				-- no numbers
+		--local fontfile = 'font/PixelGamer-Regular.otf'	-- no numbers
+		--local fontfile = 'font/goldingots.ttf'
+		local fontfile = 'font/Billow twirl Demo.ttf'
+		self.fontAtlas = ig.ImFontAtlas_ImFontAtlas()
+		self.font = ig.ImFontAtlas_AddFontFromFileTTF(self.fontAtlas, fontfile, 16, nil, nil)
+		-- just change the font, and imgui complains that you need to call FontAtlas::Build() ...
+		assert(ig.ImFontAtlas_Build(self.fontAtlas))
+		-- just call FontAtlas::Build() and you just get white blobs ...
+		-- is this proper behavior?  or a bug in imgui?
+		-- you have to download the font texture pixel data, make a GL texture out of it, and re-upload it
+		local width = ffi.new('int[1]')
+		local height = ffi.new('int[1]')
+		local bpp = ffi.new('int[1]')
+		local outPixels = ffi.new('unsigned char*[1]')
+		-- GL_LUMINANCE textures are deprecated ... khronos says use GL_RED instead ... meaning you have to write extra shaders for greyscale textures to be used as greyscale in opengl ... ugh
+		--ig.ImFontAtlas_GetTexDataAsAlpha8(self.fontAtlas, outPixels, width, height, bpp)
+		ig.ImFontAtlas_GetTexDataAsRGBA32(self.fontAtlas, outPixels, width, height, bpp)
+		self.fontTex = GLTex2D{
+			internalFormat = gl.GL_RGBA,
+			--internalFormat = gl.GL_RED,
+			format = gl.GL_RGBA,
+			--format = gl.GL_RED,
+			width = width[0],
+			height = height[0],
+			type = gl.GL_UNSIGNED_BYTE,
+			data = outPixels[0],
+			minFilter = gl.GL_NEAREST,
+			magFilter = gl.GL_NEAREST,
+			wrap = {
+				s = gl.GL_CLAMP_TO_EDGE,
+				t = gl.GL_CLAMP_TO_EDGE,
+			},
+		}
+		require 'ffi.req' 'c.stdlib'	-- free()
+		ffi.C.free(outPixels[0])	-- just betting here I have to free this myself ...
+		ig.ImFontAtlas_SetTexID(self.fontAtlas, ffi.cast('ImTextureID', self.fontTex.id))
+	end
 --]]
 
 	-- load config if it exists
