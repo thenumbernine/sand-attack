@@ -25,5 +25,6 @@ if not pcall(require, 'socket') then
 end
 
 local App = require 'sand-attack.app'
+App.cfgfilename = cmdline.config
 App.skipCustomFont = cmdline.skipCustomFont
 return App():run()
