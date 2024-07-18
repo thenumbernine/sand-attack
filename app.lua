@@ -913,7 +913,7 @@ function App:populatePiece(args)
 	local fbo = self.pieceFBO
 	local dsttex = args.tex
 	local shader = self.populatePieceShader
-	local sceneObj = self.displayQuadSceneObj 
+	local sceneObj = self.displayQuadSceneObj
 
 	gl.glViewport(0, 0, self.pieceSize.x, self.pieceSize.y)
 
@@ -1051,7 +1051,7 @@ function App:updatePieceTex(player)
 	local fbo = self.pieceOutlineFBO
 	local dsttex = player.pieceOutlineTex
 	local shader = self.updatePieceOutlineShader
-	local sceneObj = self.displayQuadSceneObj 
+	local sceneObj = self.displayQuadSceneObj
 	local srctex = player.pieceTex
 
 	gl.glViewport(0, 0, fbo.width, fbo.height)
@@ -1099,7 +1099,7 @@ function App:rotatePiece(player)
 	local srctex = player.pieceTex
 	local dsttex = self.rotPieceTex
 	local shader = self.displayShader
-	local sceneObj = self.displayQuadSceneObj 
+	local sceneObj = self.displayQuadSceneObj
 	gl.glViewport(0, 0, self.pieceSize.x, self.pieceSize.y)
 
 	fbo:bind()
@@ -1430,7 +1430,7 @@ function App:update(...)
 		-- draw
 
 		local shader = self.displayShader
-		local sceneObj = self.displayQuadSceneObj 
+		local sceneObj = self.displayQuadSceneObj
 
 		local aspectRatio = self.width / self.height
 		local s = w / h
@@ -1456,7 +1456,7 @@ function App:update(...)
 				1)
 			-- TODO also translate so it lines up with the bottom of the screen ....
 		end
-		
+
 		shader:use()
 		sceneObj:enableAndSetAttrs()
 
@@ -1693,7 +1693,7 @@ function App:drawTouchRegions()
 	local buttonRadius = self.width * self.cfg.screenButtonRadius
 
 	local shader = self.displayShader
-	local sceneObj = self.displayQuadSceneObj 
+	local sceneObj = self.displayQuadSceneObj
 
 	gl.glEnable(gl.GL_BLEND)
 	gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
