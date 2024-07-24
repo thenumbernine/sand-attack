@@ -93,7 +93,9 @@ for xofs=1 (fall left), same but mirrored
 
 	--]]
 	self.updateShader = GLProgram{
-		vertexCode = app.shaderHeader..[[
+		version = 'latest',
+		precision = 'best',
+		vertexCode = [[
 in vec2 vertex;
 
 out vec2 texcoordv;
@@ -105,7 +107,7 @@ void main() {
 	gl_Position = mvProjMat * vec4(vertex, 0., 1.);
 }
 ]],
-		fragmentCode = app.shaderHeader..[[
+		fragmentCode = [[
 in vec2 texcoordv;
 
 out vec4 fragColor;
@@ -213,7 +215,9 @@ void main() {
 	}:useNone()
 
 	self.testMergeShader = GLProgram{
-		vertexCode = app.shaderHeader..[[
+		version = 'latest',
+		precision = 'best',
+		vertexCode = [[
 in vec2 vertex;
 out vec2 texcoordv;
 uniform mat4 mvProjMat;
@@ -223,7 +227,7 @@ void main() {
 	gl_Position = mvProjMat * vec4(vertex.xy, 0., 1.);
 }
 ]],
-		fragmentCode = app.shaderHeader..[[
+		fragmentCode = [[
 in vec2 texcoordv;
 out vec4 fragColor;
 
