@@ -1844,75 +1844,75 @@ function App:event(e, ...)
 	end
 
 	-- handle any kind of sdl button event
-	if e.type == sdl.SDL_JOYHATMOTION then
-		--if e.jhat.value ~= 0 then
+	if e[0].type == sdl.SDL_JOYHATMOTION then
+		--if e[0].jhat.value ~= 0 then
 			-- TODO make sure all hat value bits are cleared
 			-- or keep track of press/release
 			for i=0,3 do
 				local dirbit = bit.lshift(1,i)
-				local press = bit.band(dirbit, e.jhat.value) ~= 0
-				self:processButtonEvent(press, sdl.SDL_JOYHATMOTION, e.jhat.which, e.jhat.hat, dirbit)
+				local press = bit.band(dirbit, e[0].jhat.value) ~= 0
+				self:processButtonEvent(press, sdl.SDL_JOYHATMOTION, e[0].jhat.which, e[0].jhat.hat, dirbit)
 			end
 			--[[
-			if e.jhat.value == sdl.SDL_HAT_CENTERED then
+			if e[0].jhat.value == sdl.SDL_HAT_CENTERED then
 				for i=0,3 do
 					local dirbit = bit.lshift(1,i)
-					self:processButtonEvent(false, sdl.SDL_JOYHATMOTION, e.jhat.which, e.jhat.hat, dirbit)
+					self:processButtonEvent(false, sdl.SDL_JOYHATMOTION, e[0].jhat.which, e[0].jhat.hat, dirbit)
 				end
 			end
 			--]]
 		--end
-	elseif e.type == sdl.SDL_JOYAXISMOTION then
+	elseif e[0].type == sdl.SDL_JOYAXISMOTION then
 		-- -1,0,1 depend on the axis press
-		local lr = math.floor(3 * (tonumber(e.jaxis.value) + 32768) / 65536) - 1
+		local lr = math.floor(3 * (tonumber(e[0].jaxis.value) + 32768) / 65536) - 1
 		local press = lr ~= 0
 		if not press then
 			-- clear both left and right movement
-			self:processButtonEvent(press, sdl.SDL_JOYAXISMOTION, e.jaxis.which, e.jaxis.axis, -1)
-			self:processButtonEvent(press, sdl.SDL_JOYAXISMOTION, e.jaxis.which, e.jaxis.axis, 1)
+			self:processButtonEvent(press, sdl.SDL_JOYAXISMOTION, e[0].jaxis.which, e[0].jaxis.axis, -1)
+			self:processButtonEvent(press, sdl.SDL_JOYAXISMOTION, e[0].jaxis.which, e[0].jaxis.axis, 1)
 		else
 			-- set movement for the lr direction
-			self:processButtonEvent(press, sdl.SDL_JOYAXISMOTION, e.jaxis.which, e.jaxis.axis, lr)
+			self:processButtonEvent(press, sdl.SDL_JOYAXISMOTION, e[0].jaxis.which, e[0].jaxis.axis, lr)
 		end
-	elseif e.type == sdl.SDL_JOYBUTTONDOWN or e.type == sdl.SDL_JOYBUTTONUP then
-		-- e.jbutton.menustate is 0/1 for up/down, right?
-		local press = e.type == sdl.SDL_JOYBUTTONDOWN
-		self:processButtonEvent(press, sdl.SDL_JOYBUTTONDOWN, e.jbutton.which, e.jbutton.button)
-	elseif e.type == sdl.SDL_CONTROLLERAXISMOTION then
+	elseif e[0].type == sdl.SDL_JOYBUTTONDOWN or e[0].type == sdl.SDL_JOYBUTTONUP then
+		-- e[0].jbutton.menustate is 0/1 for up/down, right?
+		local press = e[0].type == sdl.SDL_JOYBUTTONDOWN
+		self:processButtonEvent(press, sdl.SDL_JOYBUTTONDOWN, e[0].jbutton.which, e[0].jbutton.button)
+	elseif e[0].type == sdl.SDL_CONTROLLERAXISMOTION then
 		-- -1,0,1 depend on the axis press
-		local lr = math.floor(3 * (tonumber(e.caxis.value) + 32768) / 65536) - 1
+		local lr = math.floor(3 * (tonumber(e[0].caxis.value) + 32768) / 65536) - 1
 		local press = lr ~= 0
 		if not press then
 			-- clear both left and right movement
-			self:processButtonEvent(press, sdl.SDL_CONTROLLERAXISMOTION, e.caxis.which, e.jaxis.axis, -1)
-			self:processButtonEvent(press, sdl.SDL_CONTROLLERAXISMOTION, e.caxis.which, e.jaxis.axis, 1)
+			self:processButtonEvent(press, sdl.SDL_CONTROLLERAXISMOTION, e[0].caxis.which, e[0].jaxis.axis, -1)
+			self:processButtonEvent(press, sdl.SDL_CONTROLLERAXISMOTION, e[0].caxis.which, e[0].jaxis.axis, 1)
 		else
 			-- set movement for the lr direction
-			self:processButtonEvent(press, sdl.SDL_CONTROLLERAXISMOTION, e.caxis.which, e.jaxis.axis, lr)
+			self:processButtonEvent(press, sdl.SDL_CONTROLLERAXISMOTION, e[0].caxis.which, e[0].jaxis.axis, lr)
 		end
-	elseif e.type == sdl.SDL_CONTROLLERBUTTONDOWN or e.type == sdl.SDL_CONTROLLERBUTTONUP then
-		local press = e.type == sdl.SDL_CONTROLLERBUTTONDOWN
-		self:processButtonEvent(press, sdl.SDL_CONTROLLERBUTTONDOWN, e.cbutton.which, e.cbutton.button)
-	elseif e.type == sdl.SDL_KEYDOWN or e.type == sdl.SDL_KEYUP then
-		local press = e.type == sdl.SDL_KEYDOWN
-		self:processButtonEvent(press, sdl.SDL_KEYDOWN, e.key.keysym.sym)
-	elseif e.type == sdl.SDL_MOUSEBUTTONDOWN or e.type == sdl.SDL_MOUSEBUTTONUP then
-		local press = e.type == sdl.SDL_MOUSEBUTTONDOWN
-		self:processButtonEvent(press, sdl.SDL_MOUSEBUTTONDOWN, tonumber(e.button.x)/self.width, tonumber(e.button.y)/self.height, e.button.button)
-	--elseif e.type == sdl.SDL_MOUSEWHEEL then
+	elseif e[0].type == sdl.SDL_CONTROLLERBUTTONDOWN or e[0].type == sdl.SDL_CONTROLLERBUTTONUP then
+		local press = e[0].type == sdl.SDL_CONTROLLERBUTTONDOWN
+		self:processButtonEvent(press, sdl.SDL_CONTROLLERBUTTONDOWN, e[0].cbutton.which, e[0].cbutton.button)
+	elseif e[0].type == sdl.SDL_KEYDOWN or e[0].type == sdl.SDL_KEYUP then
+		local press = e[0].type == sdl.SDL_KEYDOWN
+		self:processButtonEvent(press, sdl.SDL_KEYDOWN, e[0].key.keysym.sym)
+	elseif e[0].type == sdl.SDL_MOUSEBUTTONDOWN or e[0].type == sdl.SDL_MOUSEBUTTONUP then
+		local press = e[0].type == sdl.SDL_MOUSEBUTTONDOWN
+		self:processButtonEvent(press, sdl.SDL_MOUSEBUTTONDOWN, tonumber(e[0].button.x)/self.width, tonumber(e[0].button.y)/self.height, e[0].button.button)
+	--elseif e[0].type == sdl.SDL_MOUSEWHEEL then
 	-- how does sdl do mouse wheel events ...
-	elseif e.type == sdl.SDL_FINGERDOWN or e.type == sdl.SDL_FINGERUP then
-		local press = e.type == sdl.SDL_FINGERDOWN
-		self:processButtonEvent(press, sdl.SDL_FINGERDOWN, e.tfinger.x, e.tfinger.y)
+	elseif e[0].type == sdl.SDL_FINGERDOWN or e[0].type == sdl.SDL_FINGERUP then
+		local press = e[0].type == sdl.SDL_FINGERDOWN
+		self:processButtonEvent(press, sdl.SDL_FINGERDOWN, e[0].tfinger.x, e[0].tfinger.y)
 	end
 
 	-- TODO how to incorporate this into the gameplay ...
 	--[[ don't do it for now, it'll mess with the demo recording
-	if e.type == sdl.SDL_KEYDOWN
-	or e.type == sdl.SDL_KEYUP
+	if e[0].type == sdl.SDL_KEYDOWN
+	or e[0].type == sdl.SDL_KEYUP
 	then
-		local down = e.type == sdl.SDL_KEYDOWN
-		if down and e.key.keysym.sym == ('f'):byte() then
+		local down = e[0].type == sdl.SDL_KEYDOWN
+		if down and e[0].key.keysym.sym == ('f'):byte() then
 			if down then self:flipBoard() end
 		end
 	end
