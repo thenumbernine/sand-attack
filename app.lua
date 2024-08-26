@@ -188,7 +188,10 @@ function App:initGL(...)
 
 	-- load config if it exists
 	xpcall(function()
-		self.cfg = myfromlua(assert(path(self.cfgfilename):read()))
+		local cfgpath = path(self.cfgfilename)
+		if cfgpath:exists() then
+			self.cfg = myfromlua(assert(cfgpath:read()))
+		end
 	end, function(err)
 		print('failed to read lua from file '..tostring(self.cfgfilename)..'\n'
 			..tostring(err)..'\n'
