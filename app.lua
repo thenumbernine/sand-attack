@@ -313,9 +313,7 @@ function App:initGL(...)
 
 --[[ assign a view but not a view setup call every frame
 	local View = require 'glapp.view'
-	self.view = View{
-		useBuiltinMatrixMath = true,
-	}
+	self.view = View()
 	self.projMat = self.view.projMat
 	self.mvMat = self.view.mvMat
 	self.mvProjMat = self.view.projMat
