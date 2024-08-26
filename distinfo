@@ -98,8 +98,11 @@ luajitLibs = {
 		'openal',		-- openal-soft
 	},
 	osx = {
-		'sdl',
-		'libpng',
-		'libimgui',
+		'png',
+		'SDL2',
+		'cimgui_sdl',
+		'ogg',
+		'vorbis',
+		'vorbisfile',
 	},
 }
