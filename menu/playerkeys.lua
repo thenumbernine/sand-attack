@@ -5,7 +5,7 @@ but it's going to contain some controls used by both the NewGame and Config menu
 local table = require 'ext.table'
 local class = require 'ext.class'
 local ig = require 'imgui'
-local sdl = require 'ffi.req' 'sdl'
+local sdl = require 'sdl'
 
 local PlayerKeysEditor = class()
 

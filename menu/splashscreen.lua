@@ -1,5 +1,5 @@
 local getTime = require 'ext.timer'.getTime
-local sdl = require 'ffi.req' 'sdl'
+local sdl = require 'sdl'
 local ig = require 'imgui'
 local gl = require 'gl'
 local Menu = require 'sand-attack.menu.menu'
