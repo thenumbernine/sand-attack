@@ -40,7 +40,6 @@ git clone https://github.com/thenumbernine/lua-image image
 git clone https://github.com/thenumbernine/lua-gl gl
 git clone https://github.com/thenumbernine/lua-glapp glapp
 git clone https://github.com/thenumbernine/lua-imgui imgui
-git clone https://github.com/thenumbernine/lua-imguiapp imguiapp
 git clone https://github.com/thenumbernine/lua-audio audio
 
 # install apt packages

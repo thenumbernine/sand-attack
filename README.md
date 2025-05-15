@@ -21,7 +21,6 @@ other repos of mine:
 - https://github.com/thenumbernine/lua-gl
 - https://github.com/thenumbernine/lua-glapp
 - https://github.com/thenumbernine/lua-imgui
-- https://github.com/thenumbernine/lua-imguiapp
 - https://github.com/thenumbernine/lua-audio
 
 external libraries required:
