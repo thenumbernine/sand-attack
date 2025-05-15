@@ -44,38 +44,21 @@ files = {
 		'gl',
 		'glapp',
 		'imgui',
-		'imguiapp',
 		'audio',
 	},
 }
 
--- luarocks ...
--- hmm how to organize this all better ...
--- hmm what destination?  wll, better be root based on lua-dist's package.path/cpath setup ...
--- hmmmmm now i'm thinking maybe distinfo files should contain path info as well ...
-if ffi.os == 'Linux' then
-	files['/usr/local/share/luajit-2.1.0-beta3/'] = {
-		'socket.lua',
-		'ltn12.lua',
-		'mime.lua',
-		'socket',
-	}
-	files['/usr/local/lib/lua/luajit-2.1.0-beta3/'] = {
-		'socket',
-		'mime',
-	}
-elseif ffi.os == 'Windows' then
-	files['${USERPROFILE}\\luarocks\\share'] = {
-		'socket.lua',
-		'ltn12.lua',
-		'mime.lua',
-		'socket',
-	}
-	files['${USERPROFILE}\\luarocks\\lib'] = {
-		'socket',
-		'mime',
-	}
-end
+-- luarocks
+files['../dist/release'] = {
+	'socket.lua',
+	'ltn12.lua',
+	'mime.lua',
+	'socket',
+}
+files['../dist/release/bin/'..ffi.os..'/'..ffi.arch] = {
+	'socket',
+	'mime',
+}
 
 -- binary libs needed for luajit
 luajitLibs = {

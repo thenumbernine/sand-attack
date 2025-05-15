@@ -83,7 +83,7 @@ end
 local mytolua = require 'sand-attack.serialize'.tolua
 local myfromlua = require 'sand-attack.serialize'.fromlua
 
-local App = require 'imguiapp':subclass()
+local App = require 'imgui.app':subclass()
 
 App.title = 'Sand Attack'
 App.sdlInitFlags = bit.bor(
