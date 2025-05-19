@@ -1,51 +1,68 @@
-name = 'SandAttack'
-luaDistVer = 'luajit'	-- luajit-openresty-2.1.0
+name = "SandAttack"
 luaArgs = {'run.lua'}
-
 files = {
-	-- IO files go here
-	['.'] = {
-		'run.lua',
-		'README.md',
-		'tex',
-		'music',
-		'sfx',
-		'font',
-		'splash.demo',
-	},
-	-- require script files go here
-	['..'] = table{
-		-- hmm better way to do this?
-		-- scripts (other than run.lua) are relative to parent dir
-		-- resources and run.lua are relative to sand-attack/
-		-- option #1: put all individual script files here:
-		'sand-attack/app.lua',
-		'sand-attack/player.lua',
-		'sand-attack/serialize.lua',
-		'sand-attack/sandmodel',
-		'sand-attack/menu',
-		-- extra util scripts
-		'sand-attack/convertdemo_bintohex.lua',
-		'sand-attack/test-submit-demo.lua',
-		'sand-attack/verify-demo.lua',
-
-		-- option #2: copy this dir and reference all resources from 'sand-attack/'
-		-- (this'll require a 'cd ..' every time you playtest it from within its cwd ...)
-		--'sand-attack',
-
-		'template',
-		'ext',
-		'ffi',
-		'struct',
-		'vec-ffi',
-		'matrix',
-		'image',
-		'sdl',
-		'gl',
-		'glapp',
-		'imgui',
-		'audio',
-	},
+	["INSTALL.raspi"] = "sand-attack/INSTALL.raspi",
+	["README.md"] = "sand-attack/README.md",
+	["app.lua"] = "sand-attack/app.lua",
+	["convertdemo_bintohex.lua"] = "sand-attack/convertdemo_bintohex.lua",
+	["distinfo"] = "sand-attack/distinfo",
+	["font/Billow twirl Demo.ttf"] = "sand-attack/font/Billow twirl Demo.ttf",
+	["font/Billow twirl Demo.url"] = "sand-attack/font/Billow twirl Demo.url",
+	["menu/config.lua"] = "sand-attack/menu/config.lua",
+	["menu/highscore.lua"] = "sand-attack/menu/highscore.lua",
+	["menu/main.lua"] = "sand-attack/menu/main.lua",
+	["menu/menu.lua"] = "sand-attack/menu/menu.lua",
+	["menu/newgame.lua"] = "sand-attack/menu/newgame.lua",
+	["menu/playerkeys.lua"] = "sand-attack/menu/playerkeys.lua",
+	["menu/playing.lua"] = "sand-attack/menu/playing.lua",
+	["menu/splashscreen.lua"] = "sand-attack/menu/splashscreen.lua",
+	["music/Desert-City.ogg"] = "sand-attack/music/Desert-City.ogg",
+	["music/Desert-City.url"] = "sand-attack/music/Desert-City.url",
+	["music/Exotic-Plains.ogg"] = "sand-attack/music/Exotic-Plains.ogg",
+	["music/Exotic-Plains.url"] = "sand-attack/music/Exotic-Plains.url",
+	["music/Ibn-Al-Noor.ogg"] = "sand-attack/music/Ibn-Al-Noor.ogg",
+	["music/Ibn-Al-Noor.url"] = "sand-attack/music/Ibn-Al-Noor.url",
+	["music/Market_Day.ogg"] = "sand-attack/music/Market_Day.ogg",
+	["music/Market_Day.url"] = "sand-attack/music/Market_Day.url",
+	["music/Return-of-the-Mummy.ogg"] = "sand-attack/music/Return-of-the-Mummy.ogg",
+	["music/Return-of-the-Mummy.url"] = "sand-attack/music/Return-of-the-Mummy.url",
+	["music/temple-of-endless-sands.ogg"] = "sand-attack/music/temple-of-endless-sands.ogg",
+	["music/temple-of-endless-sands.url"] = "sand-attack/music/temple-of-endless-sands.url",
+	["music/wombat-noises-audio-the-legend-of-narmer.ogg"] = "sand-attack/music/wombat-noises-audio-the-legend-of-narmer.ogg",
+	["music/wombat-noises-audio-the-legend-of-narmer.url"] = "sand-attack/music/wombat-noises-audio-the-legend-of-narmer.url",
+	["player.lua"] = "sand-attack/player.lua",
+	["run.lua"] = "sand-attack/run.lua",
+	["sandmodel/all.lua"] = "sand-attack/sandmodel/all.lua",
+	["sandmodel/automatacpu.lua"] = "sand-attack/sandmodel/automatacpu.lua",
+	["sandmodel/automatagpu.lua"] = "sand-attack/sandmodel/automatagpu.lua",
+	["sandmodel/cfd.lua"] = "sand-attack/sandmodel/cfd.lua",
+	["sandmodel/sandmodel.lua"] = "sand-attack/sandmodel/sandmodel.lua",
+	["sandmodel/sph.lua"] = "sand-attack/sandmodel/sph.lua",
+	["serialize.lua"] = "sand-attack/serialize.lua",
+	["sfx/levelup.url"] = "sand-attack/sfx/levelup.url",
+	["sfx/levelup.wav"] = "sand-attack/sfx/levelup.wav",
+	["sfx/line.url"] = "sand-attack/sfx/line.url",
+	["sfx/line.wav"] = "sand-attack/sfx/line.wav",
+	["sfx/place.url"] = "sand-attack/sfx/place.url",
+	["sfx/place.wav"] = "sand-attack/sfx/place.wav",
+	["splash.demo"] = "sand-attack/splash.demo",
+	["test-submit-demo.lua"] = "sand-attack/test-submit-demo.lua",
+	["tex/splash.png"] = "sand-attack/tex/splash.png",
+	["tex/youlose.png"] = "sand-attack/tex/youlose.png",
+	["verify-demo.lua"] = "sand-attack/verify-demo.lua",
+}
+deps = {
+	"audio",
+	"ext",
+	"ffi",
+	"gl",
+	"image",
+	"imgui",
+	"matrix",
+	"parser",
+	"sdl",
+	"template",
+	"vec-ffi",
 }
 
 -- luarocks
