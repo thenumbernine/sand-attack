@@ -19,17 +19,17 @@ function PlayerKeysEditor:init(app)
 		local App = require 'sand-attack.app'
 		defaultKeys = {
 			{
-				up = {sdl.SDL_KEYDOWN, sdl.SDLK_UP},
-				down = {sdl.SDL_KEYDOWN, sdl.SDLK_DOWN},
-				left = {sdl.SDL_KEYDOWN, sdl.SDLK_LEFT},
-				right = {sdl.SDL_KEYDOWN, sdl.SDLK_RIGHT},
-				pause = {sdl.SDL_KEYDOWN, sdl.SDLK_ESCAPE},
+				up = {sdl.SDL_EVENT_KEY_DOWN, sdl.SDLK_UP},
+				down = {sdl.SDL_EVENT_KEY_DOWN, sdl.SDLK_DOWN},
+				left = {sdl.SDL_EVENT_KEY_DOWN, sdl.SDLK_LEFT},
+				right = {sdl.SDL_EVENT_KEY_DOWN, sdl.SDLK_RIGHT},
+				pause = {sdl.SDL_EVENT_KEY_DOWN, sdl.SDLK_ESCAPE},
 			},
 			{
-				up = {sdl.SDL_KEYDOWN, ('w'):byte()},
-				down = {sdl.SDL_KEYDOWN, ('s'):byte()},
-				left = {sdl.SDL_KEYDOWN, ('a'):byte()},
-				right = {sdl.SDL_KEYDOWN, ('d'):byte()},
+				up = {sdl.SDL_EVENT_KEY_DOWN, ('w'):byte()},
+				down = {sdl.SDL_EVENT_KEY_DOWN, ('s'):byte()},
+				left = {sdl.SDL_EVENT_KEY_DOWN, ('a'):byte()},
+				right = {sdl.SDL_EVENT_KEY_DOWN, ('d'):byte()},
 				pause = {},	-- sorry keypad player 2
 			},
 		}
@@ -89,7 +89,7 @@ function PlayerKeysEditor:updateGUI()
 						playerIndex = self.currentPlayerIndex,
 						callback = function(ev)
 							--[[ always reserve escape?  or allow player to configure it as the pause key?
-							if ev[1] == sdl.SDL_KEYDOWN and ev[2] == sdl.SDLK_ESCAPE then
+							if ev[1] == sdl.SDL_EVENT_KEY_DOWN and ev[2] == sdl.SDLK_ESCAPE then
 								app.cfg.playerKeys[self.currentPlayerIndex][keyname] = {}
 								return
 							end

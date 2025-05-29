@@ -1,4 +1,4 @@
-name = "SandAttack"
+name = "sand-attack"
 luaArgs = {'run.lua'}
 files = {
 	["INSTALL.raspi"] = "sand-attack/INSTALL.raspi",
