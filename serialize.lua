@@ -1,5 +1,6 @@
 local ffi = require 'ffi'
 local table = require 'ext.table'
+local string = require 'ext.string'
 local path = require 'ext.path'
 local tolua = require 'ext.tolua'
 local fromlua = require 'ext.fromlua'
@@ -21,23 +22,6 @@ local function myfromlua(x)
 	return fromlua(x, nil, 't', {math={huge=math.huge}})
 end
 
-local function hextostr(h)
-	if bit.band(#h, 1) == 1
-	or h:find'[^0-9a-fA-F]'
-	then
-		return nil, "string is not hex"
-	end
-	return h:gsub('..', function(d)
-		return string.char(assert(tonumber(d, 16)))
-	end)
-end
-
-local function strtohex(s)
-	return (s:gsub('.', function(c)
-		return ('%02x'):format(c:byte())
-	end))
-end
-
 local function readDemo(fn)
 	local cfg
 	xpcall(function()
@@ -46,7 +30,7 @@ local function readDemo(fn)
 		cfg.demoFileName = fn
 
 		if cfg.demoPlayback then
-			cfg.demoPlayback = assert(hextostr(cfg.demoPlayback))
+			cfg.demoPlayback = assert(string.unhex(cfg.demoPlayback))
 		end
 
 		-- fix old files
@@ -69,7 +53,7 @@ local function writeDemo(fn, cfg)
 		-- shallow copy so I can convert the demoPlayback to a hex string upon writing without modifying the input table
 		cfg = table(cfg):setmetatable(nil)
 		if cfg.demoPlayback then
-			cfg.demoPlayback = strtohex(cfg.demoPlayback)
+			cfg.demoPlayback = string.hex(cfg.demoPlayback)
 		end
 		assert(path(fn):write(
 			assert(mytolua(cfg))
@@ -86,6 +70,4 @@ return {
 	fromlua = myfromlua,
 	readDemo = readDemo,
 	writeDemo = writeDemo,
-	strtohex = strtohex,
-	hextostr = hextostr,
 }

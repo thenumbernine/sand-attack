@@ -19,9 +19,7 @@ ffi.cdef[[ typedef uint32_t gameTick_t; ]]
 local recordingEventSize = ffi.sizeof'gameTick_t' + math.ceil(cfg.numPlayers * #Player.gameKeyNames / 8)
 assert(#demoPlayback % recordingEventSize == 0)
 
-local strtohex = require 'sand-attack.serialize'.strtohex
-
-cfg.demoPlayback = strtohex(demoPlayback)
+cfg.demoPlayback = string.hex(demoPlayback)
 
 -- make sure we encode cdata correctly
 local mytolua = require 'sand-attack.serialize'.mytolua

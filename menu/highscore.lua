@@ -7,7 +7,6 @@ local ig = require 'imgui'
 local sandModelClassNames = require 'sand-attack.sandmodel.all'.classNames
 local mytolua = require 'sand-attack.serialize'.tolua
 local writeDemo = require 'sand-attack.serialize'.writeDemo
-local strtohex = require 'sand-attack.serialize'.strtohex
 local Menu = require 'sand-attack.menu.menu'
 
 local HighScoreMenu = Menu:subclass()
@@ -229,7 +228,7 @@ function HighScoreMenu:submitScore(record)
 		local record = table(record)
 		-- encode as hex string (for serialization's sake) (just like in writeDemo)
 		if record.demoPlayback then
-			record.demoPlayback = strtohex(record.demoPlayback)
+			record.demoPlayback = string.hex(record.demoPlayback)
 		end
 		-- matches the test-submit-demo.lua
 		local URL = require 'socket.url'
