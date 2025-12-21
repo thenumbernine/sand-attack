@@ -1,7 +1,7 @@
 local ffi = require 'ffi'
 local class = require 'ext.class'
 local table = require 'ext.table'
-local GLFBO = require 'gl.fbo'
+local GLFramebuffer = require 'gl.framebuffer'
 local ig = require 'imgui'
 
 local SandModel = class()
@@ -18,7 +18,7 @@ function SandModel:init(app)
 		:unbind()
 
 	-- FBO the size of the sand texture
-	self.fbo = GLFBO{width=w, height=h}
+	self.fbo = GLFramebuffer{width=w, height=h}
 		:unbind()
 
 	--[[

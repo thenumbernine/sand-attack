@@ -15,7 +15,7 @@ local GLProgram = require 'gl.program'
 local GLGeometry = require 'gl.geometry'
 local GLSceneObject = require 'gl.sceneobject'
 local GLArrayBuffer = require 'gl.arraybuffer'
-local GLFBO = require 'gl.fbo'
+local GLFramebuffer = require 'gl.framebuffer'
 local glreport = require 'gl.report'
 local vec2i = require 'vec-ffi.vec2i'
 local vec2f = require 'vec-ffi.vec2f'
@@ -769,11 +769,11 @@ function App:reset(args)
 
 	self.pieceSize = self.pieceSizeInBlocks * playcfg.voxelsPerBlock
 
-	self.pieceFBO = GLFBO{width=self.pieceSize.x, height=self.pieceSize.y}
+	self.pieceFBO = GLFramebuffer{width=self.pieceSize.x, height=self.pieceSize.y}
 		:unbind()
 
 	self.pieceOutlineSize = self.pieceSize + 2 * self.pieceOutlineRadius
-	self.pieceOutlineFBO = GLFBO{width=self.pieceOutlineSize.x, height=self.pieceOutlineSize.y}
+	self.pieceOutlineFBO = GLFramebuffer{width=self.pieceOutlineSize.x, height=self.pieceOutlineSize.y}
 		:unbind()
 
 	do
