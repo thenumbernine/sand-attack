@@ -1,3 +1,7 @@
+--------------------------------------------
+-- generated with dist/build-distinfo.rua --
+--------------------------------------------
+
 name = "sand-attack"
 luaArgs = {'run.lua'}
 files = {
