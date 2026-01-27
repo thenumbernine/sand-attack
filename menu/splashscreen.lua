@@ -40,15 +40,7 @@ end
 
 function SplashScreenMenu:event(e)
 	local app = self.app
-	if e[0].type == sdl.SDL_EVENT_JOYSTICK_HAT_MOTION
-	or e[0].type == sdl.SDL_EVENT_JOYSTICK_AXIS_MOTION
-	or e[0].type == sdl.SDL_EVENT_JOYSTICK_BUTTON_DOWN
-	or e[0].type == sdl.SDL_EVENT_GAMEPAD_AXIS_MOTION
-	or e[0].type == sdl.SDL_EVENT_GAMEPAD_BUTTON_DOWN
-	or e[0].type == sdl.SDL_EVENT_KEY_DOWN
-	or e[0].type == sdl.SDL_EVENT_MOUSE_BUTTON_DOWN
-	or e[0].type == sdl.SDL_EVENT_FINGER_DOWN
-	then
+	if self.endSplashEventTypes[e[0].type] then
 		self:endSplashScreen()
 	end
 end

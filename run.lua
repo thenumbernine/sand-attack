@@ -19,6 +19,17 @@ if cmdline.gl ~= nil then	-- allow cmdline override
 end
 require 'gl.setup'(glfn)
 --]]
+-- [[ sdl too
+if cmdline.sdl == 2 then
+	-- TODO right now imgui/ffi/imgui.lua lib loads cimgui_sdl3 ...
+	-- but if we're asking for sdl2 then ...
+	-- ... then for desktop I'm going to want to override that ffi.load
+	-- ... or, for Browser, well, honestly, this is the default behavior for browser until I can get emscripten to run on my system again since the apt is broken and the git repo is bigger than the free space on my harddrive (smh why?)
+	-- so in that case, override ffi.load for cimgui_sdl3
+	require 'ffi.load'.cimgui_sdl3 = 'cimgui_sdl2'
+end
+require 'sdl.setup'(cmdline.sdl or '3')
+--]]
 
 if not pcall(require, 'socket') then
 	print("WARNING: can't find luasocket -- you won't be able to submit highscores")
