@@ -40,4 +40,5 @@ App.cfgfilename = cmdline.config or App.cfgfilename
 App.skipCustomFont = cmdline.skipCustomFont
 if cmdline.skipHighScores then App.highScorePath = nil end
 if cmdline.nosound then App.useAudio = nil end
+if cmdline.nodemo then App.disableSplashDemo = true end
 return App():run()

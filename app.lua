@@ -599,7 +599,10 @@ void main() {
 
 	-- play a demo in the background when the game starts
 	self:reset{
-		playingDemoRecord = readDemo'splash.demo',
+		playingDemoRecord =
+			not self.disableSplashDemo
+			and readDemo'splash.demo'
+			or nil,
 	}
 
 	glreport'here'
