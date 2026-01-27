@@ -27,4 +27,6 @@ end
 local App = require 'sand-attack.app'
 App.cfgfilename = cmdline.config or App.cfgfilename
 App.skipCustomFont = cmdline.skipCustomFont
+if cmdline.skipHighScores then App.highScorePath = nil end
+if cmdline.nosound then App.useAudio = nil end
 return App():run()

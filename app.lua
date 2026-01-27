@@ -204,13 +204,17 @@ function App:initGL(...)
 	-- TODO WARNING
 	-- for some reason in the Windows version, distributable ONLY (not in runtime setup), errors thrown in the app ctor are being hidden.
 	-- especially starting right around here ...
-	path(self.highScorePath):mkdir()
-	for f in path(self.highScorePath):dir() do
-		if f.path:match'%.demo$' then
-			table.insert(
-				self.highscores,
-				readDemo(self.highScorePath..'/'..f)
-			)
+	if not self.highScorePath then
+		print('WARNING: high scores are disabled !!!')
+	else
+		path(self.highScorePath):mkdir()
+		for f in path(self.highScorePath):dir() do
+			if f.path:match'%.demo$' then
+				table.insert(
+					self.highscores,
+					readDemo(self.highScorePath..'/'..f)
+				)
+			end
 		end
 	end
 

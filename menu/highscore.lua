@@ -52,26 +52,30 @@ function HighScoreMenu:updateGUI()
 		local gotSubmit = ig.igButton'Submit'
 
 		if gotOk or gotSubmit then
-			-- assigns demoFileName
-			local record = self.newRecord
-			self.newRecord = nil
+			if not app.highScorePath then
+				self.newRecord = nil
+			else
+				-- assigns demoFileName
+				local record = self.newRecord
+				self.newRecord = nil
 
-			-- give it a new unique filename for saving
-			local base = app.highScorePath..'/'..os.date'%Y-%m-%d-%H-%M-%S'
-			local fn
-			for i=0,math.huge do
-				fn = base..(i == 0 and '' or ('-'..i))..'.demo'
-				if not path(fn):exists() then break end
-			end
-			record.demoFileName = fn
+				-- give it a new unique filename for saving
+				local base = app.highScorePath..'/'..os.date'%Y-%m-%d-%H-%M-%S'
+				local fn
+				for i=0,math.huge do
+					fn = base..(i == 0 and '' or ('-'..i))..'.demo'
+					if not path(fn):exists() then break end
+				end
+				record.demoFileName = fn
 
-			table.insert(app.highscores, record)
-			table.sort(app.highscores, function(a,b) return a.score > b.score end)
+				table.insert(app.highscores, record)
+				table.sort(app.highscores, function(a,b) return a.score > b.score end)
 
-			self:saveHighScore(record)
+				self:saveHighScore(record)
 
-			if gotSubmit then
-				self:submitScore(record)
+				if gotSubmit then
+					self:submitScore(record)
+				end
 			end
 		end
 
@@ -208,7 +212,9 @@ function HighScoreMenu:updateGUI()
 		local MainMenu = require 'sand-attack.menu.main'
 		app.menustate = MainMenu(app)
 	end
-	if not self.newRecord then
+	if not self.newRecord
+	and app.highScorePath
+	then
 		ig.igSameLine()
 		if ig.igButton'Clear' then
 			app.highscores = {}
