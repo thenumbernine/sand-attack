@@ -69,17 +69,19 @@ deps = {
 	"vec-ffi",
 }
 
--- luarocks
-files['../dist/release'] = {
-	'socket.lua',
-	'ltn12.lua',
-	'mime.lua',
-	'socket',
-}
-files['../dist/release/bin/'..ffi.os..'/'..ffi.arch] = {
-	'socket',
-	'mime',
-}
+if ffi.os ~= 'Browser' then
+	-- luarocks
+	files['../dist/release'] = {
+		'socket.lua',
+		'ltn12.lua',
+		'mime.lua',
+		'socket',
+	}
+	files['../dist/release/bin/'..ffi.os..'/'..ffi.arch] = {
+		'socket',
+		'mime',
+	}
+end
 
 -- binary libs needed for luajit
 luajitLibs = {
