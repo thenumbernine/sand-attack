@@ -1,14 +1,18 @@
 local ffi = require 'ffi'
-local sdl = require 'sdl'
+local template = require 'template'
 local table = require 'ext.table'
 local path = require 'ext.path'
 local class = require 'ext.class'
 local math = require 'ext.math'
 local string = require 'ext.string'
 local range = require 'ext.range'
-local template = require 'template'
-local matrix = require 'matrix.ffi'
+local getTime = require 'ext.timer'.getTime
+local vec2i = require 'vec-ffi.vec2i'
+local vec2f = require 'vec-ffi.vec2f'
+local vec3f = require 'vec-ffi.vec3f'
+local vec4x4f = require 'vec-ffi.vec4x4f'
 local Image = require 'image'
+local sdl = require 'sdl'
 local gl = require 'gl'
 local GLTex2D = require 'gl.tex2d'
 local GLProgram = require 'gl.program'
@@ -17,10 +21,6 @@ local GLSceneObject = require 'gl.sceneobject'
 local GLArrayBuffer = require 'gl.arraybuffer'
 local GLFramebuffer = require 'gl.framebuffer'
 local glreport = require 'gl.report'
-local vec2i = require 'vec-ffi.vec2i'
-local vec2f = require 'vec-ffi.vec2f'
-local vec3f = require 'vec-ffi.vec3f'
-local getTime = require 'ext.timer'.getTime
 local ig = require 'imgui'
 local Audio = require 'audio'
 local AudioSource = require 'audio.source'
@@ -353,9 +353,9 @@ function App:initGL(...)
 	self.mvProjMat = self.view.projMat
 --]]
 -- [[
-	self.projMat = matrix({4,4}, 'float'):zeros():setIdent()
-	self.mvMat = matrix({4,4}, 'float'):zeros():setIdent()
-	self.mvProjMat = matrix({4,4}, 'float'):zeros():setIdent()
+	self.projMat = vec4x4f():setIdent()
+	self.mvMat = vec4x4f():setIdent()
+	self.mvProjMat = vec4x4f():setIdent()
 --]]
 
 	local vtxbufCPU = ffi.new('vec2f_t[4]', {

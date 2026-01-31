@@ -62,7 +62,6 @@ deps = {
 	"gl",
 	"image",
 	"imgui",
-	"matrix",
 	"parser",
 	"sdl",
 	"template",
