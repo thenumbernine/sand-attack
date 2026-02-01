@@ -1002,7 +1002,7 @@ function App:populatePiece(args)
 	gl.glUniformMatrix4fv(
 		shader.uniforms.mvProjMat.loc,
 		1,
-		gl.GL_FALSE,
+		gl.GL_TRUE,
 		self.mvProjMat.ptr)
 	gl.glUniform4f(shader.uniforms.color.loc, color.x, color.y, color.z, alpha)
 	gl.glUniform3f(shader.uniforms.pieceSize.loc,
@@ -1141,7 +1141,7 @@ function App:updatePieceTex(player)
 	gl.glUniformMatrix4fv(
 		shader.uniforms.mvProjMat.loc,
 		1,
-		gl.GL_FALSE,
+		gl.GL_TRUE,
 		self.mvProjMat.ptr)
 	gl.glUniform2i(shader.uniforms.pieceSize.loc,
 		self.pieceSize.x,
@@ -1192,7 +1192,7 @@ function App:rotatePiece(player)
 	gl.glUniformMatrix4fv(
 		shader.uniforms.mvProjMat.loc,
 		1,
-		gl.GL_FALSE,
+		gl.GL_TRUE,
 		self.mvProjMat.ptr)
 	gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 0)
 
@@ -1535,7 +1535,7 @@ function App:update(...)
 
 		self.mvMat:setTranslate(-.5, -.5)
 		self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-		gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+		gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_TRUE, self.mvProjMat.ptr)
 
 		gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 0)
 
@@ -1563,7 +1563,7 @@ function App:update(...)
 						(self.pieceSize.y + 2 * self.pieceOutlineRadius) / h
 					)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_TRUE, self.mvProjMat.ptr)
 
 				gl.glEnable(gl.GL_BLEND)
 				gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
@@ -1585,7 +1585,7 @@ function App:update(...)
 					self.pieceSize.y / h
 				)
 			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-			gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+			gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_TRUE, self.mvProjMat.ptr)
 
 			gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 1)
 			player.pieceTex:bind()
@@ -1604,7 +1604,7 @@ function App:update(...)
 				self.mvMat
 					:setTranslate(-.5, -.5)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_TRUE, self.mvProjMat.ptr)
 
 				self.flashTex:bind()
 				gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
@@ -1645,7 +1645,7 @@ function App:update(...)
 				self.mvMat
 					:setTranslate(-.5, -.5)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_TRUE, self.mvProjMat.ptr)
 
 				gl.glUniform1i(shader.uniforms.useAlphaTest.loc, 1)
 				self.youloseTex:bind()
@@ -1672,7 +1672,7 @@ function App:update(...)
 				:setTranslate(aspectRatio * .5 - nextPieceSize, .5 - (i-1) * dy)
 				:applyScale(nextPieceSize, -nextPieceSize)
 			self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-			gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+			gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_TRUE, self.mvProjMat.ptr)
 
 			it.tex:bind()
 			gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
@@ -1789,7 +1789,7 @@ function App:drawTouchRegions()
 					y-buttonRadius)
 					:applyScale(2*buttonRadius, 2*buttonRadius)
 				self.mvProjMat:mul4x4(self.projMat, self.mvMat)
-				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, self.mvProjMat.ptr)
+				gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_TRUE, self.mvProjMat.ptr)
 				gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 			end
 		end

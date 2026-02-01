@@ -304,7 +304,7 @@ function AutomataSandGPU:testPieceMerge(player)
 	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 
 	app.mvProjMat:setOrtho(0, 1, 0, 1, -1, 1)
-	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
+	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_TRUE, app.mvProjMat.ptr)
 	gl.glUniform2i(shader.uniforms.piecePos.loc, math.floor(player.piecePos.x), math.floor(player.piecePos.y))
 	gl.glUniform2i(shader.uniforms.pieceSize.loc, app.pieceSize:unpack())
 	sandTex:bind(0)
@@ -388,14 +388,14 @@ function AutomataSandGPU:mergePiece(player)
 			app.pieceSize.y / h
 		)
 	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
-	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
+	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_TRUE, app.mvProjMat.ptr)
 
 	player.pieceTex:bind()
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
 
 	app.mvMat:setIdent()
 	app.mvProjMat:mul4x4(app.projMat, app.mvMat)
-	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_FALSE, app.mvProjMat.ptr)
+	gl.glUniformMatrix4fv(shader.uniforms.mvProjMat.loc, 1, gl.GL_TRUE, app.mvProjMat.ptr)
 
 	srctex:bind()
 	gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
@@ -482,7 +482,7 @@ function AutomataSandGPU:test()
 	gl.glUniformMatrix4fv(
 		shader.uniforms.mvProjMat.loc,
 		1,
-		gl.GL_FALSE,
+		gl.GL_TRUE,
 		app.mvProjMat.ptr)
 
 	gl.glViewport(0, 0, w, h)
@@ -536,7 +536,7 @@ function AutomataSandGPU:update()
 	gl.glUniformMatrix4fv(
 		shader.uniforms.mvProjMat.loc,
 		1,
-		gl.GL_FALSE,
+		gl.GL_TRUE,
 		app.mvProjMat.ptr)
 
 	local rightxor = app.rng(0,1)
