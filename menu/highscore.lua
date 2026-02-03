@@ -237,7 +237,7 @@ function HighScoreMenu:submitScore(record)
 			record.demoPlayback = string.hex(record.demoPlayback)
 		end
 		-- matches the test-submit-demo.lua
-		local URL = require 'socket.url'
+		local URL = require 'url'
 		local reqbody = 'data='..URL.escape(mytolua(record))
 		local respbody = table()
 		print('response:')
@@ -245,7 +245,11 @@ function HighScoreMenu:submitScore(record)
 		local ltn12 = require 'ltn12'
 		print(mytolua{http.request{
 			method = 'POST',
-			url = 'http://ihavenoparachute.com/sand-attack/submit.js.lua',
+			url = URL{
+				scheme = 'http',
+				host = 'ihavenoparachute.com',
+				path = 'sand-attack/submit.js.lua',
+			}:tostring(),
 			source = ltn12.source.string(reqbody),
 			sink = ltn12.sink.table(respbody),
 			headers = {

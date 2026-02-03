@@ -1,7 +1,7 @@
 #!/usr/bin/env luajit
 -- https://stackoverflow.com/questions/17372330/lua-socket-post 
 require 'ext'
-local URL = require 'socket.url'
+local URL = require 'url'
 local http = require 'socket.http'
 local ltn12 = require 'ltn12'
 local fn = assert(..., "usage: <filename>")
@@ -10,7 +10,11 @@ local respbody = table()
 print('response:')
 print(tolua{http.request{
 	method = 'POST',
-	url = 'http://ihavenoparachute.com/sand-attack/submit.js.lua',
+	url = URL{
+		scheme = 'http',
+		host = 'ihavenoparachute.com',
+		path = 'sand-attack/submit.js.lua',
+	}:tostring(),
 	source = ltn12.source.string(reqbody),
 	sink = ltn12.sink.table(respbody),
 	headers = {
