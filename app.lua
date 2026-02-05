@@ -358,7 +358,7 @@ function App:initGL(...)
 	self.mvProjMat = vec4x4f():setIdent()
 --]]
 
-	local vtxbufCPU = ffi.new('vec2f_t[4]', {
+	local vtxbufCPU = ffi.new('vec2f[4]', {
 		vec2f(0,0),
 		vec2f(1,0),
 		vec2f(0,1),

@@ -13,8 +13,8 @@ local FLT_EPSILON = 1.1920928955078125e-7
 
 ffi.cdef[[
 typedef struct {
-	vec2f_t pos;
-	vec2f_t vel;
+	vec2f pos;
+	vec2f vel;
 	uint32_t color;
 } grain_t;
 ]]
@@ -36,7 +36,7 @@ function SPHSand:init(app)
 	-- use for diffusing velocity
 	local w, h = app.sandSize:unpack()
 	-- x,y, weight
-	self.vel = ffi.new('vec3f_t[?]', w * h)
+	self.vel = ffi.new('vec3f[?]', w * h)
 end
 
 function SPHSand:checkClearBlobs()
@@ -137,7 +137,7 @@ function SPHSand:update()
 	--[[
 	-- TODO here blit velocity to a separate buffer,
 	-- then read back that buffer for advection of velocity
-	ffi.fill(self.vel, 0, ffi.sizeof'vec3f_t' * w * h)
+	ffi.fill(self.vel, 0, ffi.sizeof'vec3f' * w * h)
 	local weights = {
 		[-1] = {[-1] = 1/36, [0]=4/36, [1]=1/36},
 		[0] = {[-1] = 4/36, [0]=16/36, [1]=4/36},
