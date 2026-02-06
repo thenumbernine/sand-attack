@@ -520,7 +520,6 @@ function AutomataSandGPU:test()
 	os.exit()
 end
 
-local glreport = require 'gl.report'
 function AutomataSandGPU:update()
 	local app = self.app
 	local w, h = app.sandSize:unpack()

@@ -20,7 +20,6 @@ local GLGeometry = require 'gl.geometry'
 local GLSceneObject = require 'gl.sceneobject'
 local GLArrayBuffer = require 'gl.arraybuffer'
 local GLFramebuffer = require 'gl.framebuffer'
-local glreport = require 'gl.report'
 local ig = require 'imgui'
 local Audio = require 'audio'
 local AudioSource = require 'audio.source'
@@ -604,8 +603,6 @@ void main() {
 			and readDemo'splash.demo'
 			or nil,
 	}
-
-	glreport'here'
 end
 
 function App:getDefaultColor(i)
@@ -1698,7 +1695,6 @@ function App:update(...)
 
 	-- update GUI
 	App.super.update(self, ...)
-	glreport'here'
 
 
 	-- draw menustate over gui?
