@@ -504,7 +504,9 @@ function AutomataSandGPU:test()
 					self.pp:swap()
 
 					-- get pingpong
-					self.pp:prev():toCPU(self.sandTex.image.buffer)
+					self.pp:prev()
+						:bind()
+						:getImage(self.sandTex.image.buffer)
 
 					print('after ofs', xofs, yofs, toppleRight)
 					local afterStr = printBuf(self.sandTex.image.buffer, w, h, yofs)
