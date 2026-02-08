@@ -1,6 +1,6 @@
 local ffi = require 'ffi'
 local math = require 'ext.math'
-local vector = require 'ffi.cpp.vector'
+local vector = require 'stl.vector'
 local vec2f = require 'vec-ffi.vec2f'
 local Image = require 'image'
 local ig = require 'imgui'

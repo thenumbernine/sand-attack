@@ -175,7 +175,7 @@ local ImageBlobColInterval_t = ffi.metatype('ImageBlobColInterval_t', {
 	end,
 })
 
-local vector = require 'ffi.cpp.vector'
+local vector = require 'stl.vector'
 
 -- unlike Image's Blob, this is a collection of column intervals
 -- maybe I should move it to Image, but then again, its usage here is pretty specialized

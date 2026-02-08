@@ -64,6 +64,7 @@ deps = {
 	"imgui",
 	"parser",
 	"sdl",
+	"stl",
 	"template",
 	"url",
 	"vec-ffi",
