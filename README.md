@@ -7,7 +7,7 @@
 
 Connect Lines From Falling Blocks of Sand
 
-[![sand attack](http://img.youtube.com/vi/L2Irjl3f8EY/0.jpg)](https://youtu.be/L2Irjl3f8EY)
+[![sand attack](https://img.youtube.com/vi/L2Irjl3f8EY/0.jpg)](https://youtu.be/L2Irjl3f8EY)
 
 # Dependencies:
 
